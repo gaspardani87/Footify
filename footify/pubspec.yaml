@@ -9,6 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_svg: ^1.1.6
 
 dev_dependencies:
   flutter_test:
@@ -29,5 +30,4 @@ flutter:
         - asset: assets/fonts/Lexend-Light.ttf
         - asset: assets/fonts/Lexend-Medium.ttf
         - asset: assets/fonts/Lexend-SemiBold.ttf
-     
 
