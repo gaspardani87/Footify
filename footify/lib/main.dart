@@ -2,8 +2,24 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:flutter/foundation.dart'; // Add this import
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
+Future<Map<String, dynamic>> fetchData() async {
+  final response = await http.get(
+    Uri.parse('https://api.football-data.org/v4/matches'),
+    headers: {
+      'X-Auth-Token': '4c553fac5d704101906782d1ecbe1b12' // Replace with your actual API key
+    },
+  );
+
+  if (response.statusCode == 200) {
+    return json.decode(response.body);
+  } else {
+    throw Exception('Failed to load data');
+  }
+}
 
 void main() {
   // Add this block to ensure proper initialization for desktop platforms
@@ -41,6 +57,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
+  late Future<Map<String, dynamic>> _futureData = fetchData();
 
   void _onItemTapped(int index) {
     setState(() {
@@ -54,7 +71,7 @@ class _MainScreenState extends State<MainScreen> {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF1D1D1D), Color(0xFF292929)], // Replace with your desired colors
+            colors: [Color(0xFF1D1D1D), Color(0xFF292929)],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -110,7 +127,40 @@ class _MainScreenState extends State<MainScreen> {
               color: Color(0xFFFFE6AC),
               thickness: 3,
             ),
-            const Expanded(child: Header()),
+            Expanded(
+              child: FutureBuilder<Map<String, dynamic>>(
+                future: _futureData,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  } else if (snapshot.hasError) {
+                    return Center(child: Text('Error: ${snapshot.error}'));
+                  } else if (snapshot.hasData) {
+                    final data = snapshot.data!;
+                    if (data['matches'] == null || data['matches'].isEmpty) {
+                      return const Center(child: Text('No data available'));
+                    }
+                    return ListView.builder(
+                      itemCount: data['matches'].length,
+                      itemBuilder: (context, index) {
+                        final item = data['matches'][index];
+                        final homeTeam = item['homeTeam']['name'] ?? 'No home team available';
+                        final awayTeam = item['awayTeam']['name'] ?? 'No away team available';
+                        final resultInfo = item['score']['fullTime']['home'] != null && item['score']['fullTime']['away'] != null
+                            ? '${item['score']['fullTime']['home']} - ${item['score']['fullTime']['away']}'
+                            : 'No result info available';
+                        return ListTile(
+                          title: Text('$homeTeam vs $awayTeam'),
+                          subtitle: Text(resultInfo),
+                        );
+                      },
+                    );
+                  } else {
+                    return const Center(child: Text('No data available'));
+                  }
+                },
+              ),
+            ),
           ],
         ),
       ),
