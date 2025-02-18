@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1061851623185",
+    "project_id": "footify-13da4",
+    "storage_bucket": "footify-13da4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1061851623185:android:376ed506468d7ba47fa6b0",
+        "android_client_info": {
+          "package_name": "com.example.footify"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBsfTqXzL1q7XYFn_Ke6gwng4FpV5eI-gQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
