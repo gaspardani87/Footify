@@ -5,14 +5,14 @@ class ThemeNotifier extends ChangeNotifier {
 
   bool get isDarkMode => _isDarkMode;
 
-  ThemeData get currentTheme => _isDarkMode ? _darkTheme : _lightTheme;
+  ThemeData get currentTheme => _isDarkMode ? darkTheme : lightTheme;
 
   void toggleTheme(bool isDark) {
     _isDarkMode = isDark;
     notifyListeners();
   }
 
-  static final ThemeData _lightTheme = ThemeData(
+  static final ThemeData lightTheme = ThemeData(
     brightness: Brightness.light,
     primaryColor: const Color(0xFFFFE6AC),
     scaffoldBackgroundColor: Colors.white,
@@ -31,7 +31,7 @@ class ThemeNotifier extends ChangeNotifier {
     ),
   );
 
-  static final ThemeData _darkTheme = ThemeData(
+  static final ThemeData darkTheme = ThemeData(
     brightness: Brightness.dark,
     primaryColor: const Color(0xFFFFE6AC),
     scaffoldBackgroundColor: const Color(0xFF1D1D1D),

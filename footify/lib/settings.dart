@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'localization.dart';
 import 'common_layout.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class SettingsPage extends StatefulWidget {
-  const SettingsPage({super.key});
+  final Function(Locale) setLocale;
+
+  const SettingsPage({super.key, required this.setLocale});
 
   @override
   _SettingsPageState createState() => _SettingsPageState();
@@ -24,6 +27,27 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  void _changeLanguage(String language) {
+    Locale locale;
+    switch (language) {
+      case 'Español':
+        locale = Locale('es');
+        break;
+      case 'Français':
+        locale = Locale('fr');
+        break;
+      case 'Deutsch':
+        locale = Locale('de');
+        break;
+      case 'Magyar':
+        locale = Locale('hu');
+        break;
+      default:
+        locale = Locale('en');
+    }
+    widget.setLocale(locale);
+  }
+
   @override
   Widget build(BuildContext context) {
     return CommonLayout(
@@ -33,8 +57,8 @@ class _SettingsPageState extends State<SettingsPage> {
         children: [
           // Theme Switcher
           ListTile(
-            title: const Text('Theme', style: TextStyle(color: Colors.white)),
-            subtitle: const Text('Switch between light and dark mode', style: TextStyle(color: Colors.grey)),
+            title: Text(AppLocalizations.of(context).translate('theme'), style: TextStyle(color: Colors.white)),
+            subtitle: Text(AppLocalizations.of(context).translate('switch between light and dark mode'), style: TextStyle(color: Colors.grey)),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -61,8 +85,8 @@ class _SettingsPageState extends State<SettingsPage> {
 
           // Language Selector
           ListTile(
-            title: const Text('Language', style: TextStyle(color: Colors.white)),
-            subtitle: const Text('Select your preferred language', style: TextStyle(color: Colors.grey)),
+            title: Text(AppLocalizations.of(context).translate('language'), style: TextStyle(color: Colors.white)),
+            subtitle: Text(AppLocalizations.of(context).translate('select your preferred language'), style: TextStyle(color: Colors.grey)),
             trailing: DropdownButton<String>(
               value: selectedLanguage,
               dropdownColor: Colors.black,
@@ -76,6 +100,7 @@ class _SettingsPageState extends State<SettingsPage> {
               onChanged: (String? newValue) {
                 setState(() {
                   selectedLanguage = newValue!;
+                  _changeLanguage(newValue);
                 });
               },
             ),
@@ -84,8 +109,8 @@ class _SettingsPageState extends State<SettingsPage> {
 
           // Notifications Toggle
           ListTile(
-            title: const Text('Notifications', style: TextStyle(color: Colors.white)),
-            subtitle: const Text('Enable or disable notifications', style: TextStyle(color: Colors.grey)),
+            title: Text(AppLocalizations.of(context).translate('notifications'), style: TextStyle(color: Colors.white)),
+            subtitle: Text(AppLocalizations.of(context).translate('enable or disable notifications'), style: TextStyle(color: Colors.grey)),
             trailing: Switch(
               value: notificationsEnabled,
               onChanged: (bool value) {
@@ -93,10 +118,6 @@ class _SettingsPageState extends State<SettingsPage> {
                   notificationsEnabled = value;
                 });
               },
-              activeColor: Color(0xFFFFE6AC),
-              activeTrackColor: Color.fromARGB(255, 87, 87, 87),
-              inactiveThumbColor: Color(0xFF1D1D1B),
-              inactiveTrackColor: Color.fromARGB(255, 255, 255, 255),
             ),
           ),
           const Divider(color: Color(0xFFFFE6AC)),
@@ -143,8 +164,8 @@ class _SettingsPageState extends State<SettingsPage> {
 
           // About Us
           ListTile(
-            title: const Text('About Us', style: TextStyle(color: Colors.white)),
-            subtitle: const Text('Learn more about us', style: TextStyle(color: Colors.grey)),
+            title: Text(AppLocalizations.of(context).translate('about_us'), style: TextStyle(color: Colors.white)),
+            subtitle: Text(AppLocalizations.of(context).translate('learn_more'), style: TextStyle(color: Colors.grey)),
           ),
           ListTile(
             title: Row(
