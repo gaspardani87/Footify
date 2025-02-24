@@ -9,6 +9,8 @@ import 'package:footify/settings.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'common_layout.dart';
+import 'package:footify/localization.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 Future<Map<String, dynamic>> fetchData() async {
   final response = await http.get(
@@ -30,7 +32,42 @@ void main() {
   if (kIsWeb || ![TargetPlatform.android, TargetPlatform.iOS].contains(defaultTargetPlatform)) {
     WidgetsFlutterBinding.ensureInitialized();
   }
-  runApp(const HomePage());
+  runApp(MyApp());
+}
+
+class MyApp extends StatefulWidget {
+  @override
+  _MyAppState createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  Locale _locale = Locale('en');
+
+  void setLocale(Locale locale) {
+    setState(() {
+      _locale = locale;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      locale: _locale,
+      localizationsDelegates: [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ],
+      supportedLocales: [
+        Locale('en', ''),
+        Locale('es', ''),
+        Locale('fr', ''),
+        Locale('de', ''),
+        Locale('hu', ''),
+      ],
+      home: SettingsPage(setLocale: setLocale),
+    );
+  }
 }
 
 class HomePage extends StatelessWidget {
@@ -83,7 +120,9 @@ class _MainScreenState extends State<MainScreen> {
         page = const ProfilePage();
         break;
       case 4:
-        page = const SettingsPage();
+        page = SettingsPage(setLocale: (Locale _locale) {
+         
+        });
         break;
       default:
         page = const HomePage();
