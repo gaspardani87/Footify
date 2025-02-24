@@ -46,7 +46,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '1061851623185',
     projectId: 'footify-13da4',
     authDomain: 'footify-13da4.firebaseapp.com',
-    storageBucket: 'footify-13da4.firebasestorage.app',
+    storageBucket: 'footify-13da4.appspot.com',
     measurementId: 'G-HD8BT3062N',
   );
 
@@ -55,7 +55,7 @@ class DefaultFirebaseOptions {
     appId: '1:1061851623185:android:376ed506468d7ba47fa6b0',
     messagingSenderId: '1061851623185',
     projectId: 'footify-13da4',
-    storageBucket: 'footify-13da4.firebasestorage.app',
+    storageBucket: 'footify-13da4.appspot.com',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
@@ -63,7 +63,7 @@ class DefaultFirebaseOptions {
     appId: '1:1061851623185:ios:15af8c5260c344127fa6b0',
     messagingSenderId: '1061851623185',
     projectId: 'footify-13da4',
-    storageBucket: 'footify-13da4.firebasestorage.app',
+    storageBucket: 'footify-13da4.appspot.com',
     iosBundleId: 'com.example.footify',
   );
 
@@ -72,7 +72,7 @@ class DefaultFirebaseOptions {
     appId: '1:1061851623185:ios:15af8c5260c344127fa6b0',
     messagingSenderId: '1061851623185',
     projectId: 'footify-13da4',
-    storageBucket: 'footify-13da4.firebasestorage.app',
+    storageBucket: 'footify-13da4.appspot.com',
     iosBundleId: 'com.example.footify',
   );
 
@@ -82,7 +82,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '1061851623185',
     projectId: 'footify-13da4',
     authDomain: 'footify-13da4.firebaseapp.com',
-    storageBucket: 'footify-13da4.firebasestorage.app',
+    storageBucket: 'footify-13da4.appspot.com',
     measurementId: 'G-M02TZ9TLL4',
   );
 }
