@@ -1,0 +1,2 @@
+C:/Users/gaspardaniel2314/Desktop/Footify/footify/android/app/.cxx/Debug/2942577i/armeabi-v7a/CMakeFiles/edit_cache.dir
+C:/Users/gaspardaniel2314/Desktop/Footify/footify/android/app/.cxx/Debug/2942577i/armeabi-v7a/CMakeFiles/rebuild_cache.dir

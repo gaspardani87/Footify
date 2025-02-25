@@ -9,23 +9,34 @@ import 'package:footify/settings.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'common_layout.dart';
+// import 'web_plugin.dart' if (dart.library.html) 'web_plugin.dart';
+// import 'package:flutter_web_plugins/flutter_web_plugins.dart'; // Import this package
 
-Future<Map<String, dynamic>> fetchData() async {
+// Define fetchData as a global variable
+late Future<Map<String, dynamic>> Function() fetchData;
+
+Future<Map<String, dynamic>> fetchDataDefault() async {
+  final proxyUrl = 'https://thingproxy.freeboard.io/fetch/';
+  final apiUrl = 'https://api.football-data.org/v4/matches';
+  
   final response = await http.get(
-    Uri.parse('https://api.football-data.org/v4/matches'),
+    Uri.parse('$proxyUrl$apiUrl'),
     headers: {
-      'X-Auth-Token': '4c553fac5d704101906782d1ecbe1b12' // Replace with your actual API key
+      'X-Auth-Token': '4c553fac5d704101906782d1ecbe1b12',
     },
   );
 
   if (response.statusCode == 200) {
     return json.decode(response.body);
   } else {
-    throw Exception('Failed to load data');
+    throw Exception('Failed to load data: ${response.statusCode} ${response.body}');
   }
 }
 
 void main() {
+  // Assign the default fetchData function
+  fetchData = fetchDataDefault;
+
   // Add this block to ensure proper initialization for desktop platforms
   if (kIsWeb || ![TargetPlatform.android, TargetPlatform.iOS].contains(defaultTargetPlatform)) {
     WidgetsFlutterBinding.ensureInitialized();
@@ -111,9 +122,9 @@ class _MainScreenState extends State<MainScreen> {
         future: _futureData,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator(color: Colors.white,));
           } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.white)));
           } else if (snapshot.hasData) {
             final data = snapshot.data!;
             if (data['matches'] == null || data['matches'].isEmpty) {
@@ -127,11 +138,11 @@ class _MainScreenState extends State<MainScreen> {
                 final awayTeam = item['awayTeam']['name'] ?? 'No away team available';
                 final resultInfo = item['score']['fullTime']['home'] != null && item['score']['fullTime']['away'] != null
                     ? '${item['score']['fullTime']['home']} - ${item['score']['fullTime']['away']}'
-                    : 'No result info available';
+                    : 'No result yet';
                 return ListTile(
-                  title: Text('$homeTeam vs $awayTeam'),
-                  subtitle: Text(resultInfo),
-                );
+                  title: Text('$homeTeam vs $awayTeam', style: const TextStyle(color: Colors.white),),
+                  subtitle: Text(resultInfo, style: const TextStyle(color: Colors.white),
+                ));
               },
             );
           } else {
