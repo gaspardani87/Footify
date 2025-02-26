@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:provider/provider.dart';
 import 'package:footify/calendar.dart';
 import 'package:footify/leagues.dart';
 import 'package:footify/profile.dart';
@@ -9,8 +10,7 @@ import 'package:footify/settings.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'common_layout.dart';
-// import 'web_plugin.dart' if (dart.library.html) 'web_plugin.dart';
-// import 'package:flutter_web_plugins/flutter_web_plugins.dart'; // Import this package
+import 'theme_provider.dart';
 
 // Define fetchData as a global variable
 late Future<Map<String, dynamic>> Function() fetchData;
@@ -18,7 +18,7 @@ late Future<Map<String, dynamic>> Function() fetchData;
 Future<Map<String, dynamic>> fetchDataDefault() async {
   final proxyUrl = 'https://thingproxy.freeboard.io/fetch/';
   final apiUrl = 'https://api.football-data.org/v4/matches';
-  
+
   final response = await http.get(
     Uri.parse('$proxyUrl$apiUrl'),
     headers: {
@@ -41,7 +41,12 @@ void main() {
   if (kIsWeb || ![TargetPlatform.android, TargetPlatform.iOS].contains(defaultTargetPlatform)) {
     WidgetsFlutterBinding.ensureInitialized();
   }
-  runApp(const HomePage());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => ThemeProvider(),
+      child: const HomePage(),
+    ),
+  );
 }
 
 class HomePage extends StatelessWidget {
@@ -49,15 +54,51 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        fontFamily: 'Lexend',
+      theme: ThemeData.light().copyWith(
+        // Set font family and default text color for light theme
+        textTheme: ThemeData.light().textTheme.apply(
+              fontFamily: 'Lexend',
+              bodyColor: Colors.black, // Set default text color to black
+              displayColor: Colors.black, // Set default text color to black
+            ),
+        appBarTheme: ThemeData.light().appBarTheme.copyWith(
+              titleTextStyle: TextStyle(
+                fontFamily: 'Lexend',
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.black, // Set AppBar text color to black
+              ),
+            ),
+        bottomNavigationBarTheme: BottomNavigationBarThemeData(
+          selectedItemColor: const Color(0xFFFFE6AC),
+          unselectedItemColor: Colors.black,
+        ),
+      ),
+      darkTheme: ThemeData.dark().copyWith(
+        // Set font family and default text color for dark theme
+        textTheme: ThemeData.dark().textTheme.apply(
+              fontFamily: 'Lexend',
+              bodyColor: Colors.white, // Set default text color to white
+              displayColor: Colors.white, // Set default text color to white
+            ),
+        appBarTheme: ThemeData.dark().appBarTheme.copyWith(
+              titleTextStyle: TextStyle(
+                fontFamily: 'Lexend',
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.white, // Set AppBar text color to white
+              ),
+            ),
         bottomNavigationBarTheme: BottomNavigationBarThemeData(
           selectedItemColor: const Color(0xFFFFE6AC),
           unselectedItemColor: Colors.white,
         ),
       ),
+      themeMode: themeProvider.themeMode, // Use the selected theme mode
       home: const MainScreen(),
     );
   }
@@ -116,19 +157,35 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return CommonLayout(
       selectedIndex: _selectedIndex,
       child: FutureBuilder<Map<String, dynamic>>(
         future: _futureData,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: Colors.white,));
+            return Center(
+              child: CircularProgressIndicator(
+                color: isDarkMode ? Colors.white : Colors.black, // Set progress indicator color
+              ),
+            );
           } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.white)));
+            return Center(
+              child: Text(
+                'Error: ${snapshot.error}',
+                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black), // Set text color
+              ),
+            );
           } else if (snapshot.hasData) {
             final data = snapshot.data!;
             if (data['matches'] == null || data['matches'].isEmpty) {
-              return const Center(child: Text('No data available'));
+              return Center(
+                child: Text(
+                  'No data available',
+                  style: TextStyle(color: isDarkMode ? Colors.white : Colors.black), // Set text color
+                ),
+              );
             }
             return ListView.builder(
               itemCount: data['matches'].length,
@@ -140,13 +197,24 @@ class _MainScreenState extends State<MainScreen> {
                     ? '${item['score']['fullTime']['home']} - ${item['score']['fullTime']['away']}'
                     : 'No result yet';
                 return ListTile(
-                  title: Text('$homeTeam vs $awayTeam', style: const TextStyle(color: Colors.white),),
-                  subtitle: Text(resultInfo, style: const TextStyle(color: Colors.white),
-                ));
+                  title: Text(
+                    '$homeTeam vs $awayTeam',
+                    style: TextStyle(color: isDarkMode ? Colors.white : Colors.black), // Set text color
+                  ),
+                  subtitle: Text(
+                    resultInfo,
+                    style: TextStyle(color: isDarkMode ? Colors.white : Colors.black), // Set text color
+                  ),
+                );
               },
             );
           } else {
-            return const Center(child: Text('No data available'));
+            return Center(
+              child: Text(
+                'No data available',
+                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black), // Set text color
+              ),
+            );
           }
         },
       ),
@@ -166,31 +234,31 @@ class Header extends StatelessWidget {
 class CustomSearchDelegate extends SearchDelegate {
   @override
   ThemeData appBarTheme(BuildContext context) {
-    return ThemeData(
-        fontFamily: 'Lexend',
-        appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFF1D1D1D), // Set the background color of the AppBar
-        
-      ),
-      inputDecorationTheme: const InputDecorationTheme(
-        
-        hintStyle: TextStyle(color: Color.fromARGB(170, 240, 240, 240)), // Set the hint text color
-        focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFffe6ac), width: 3.0)), // Set the focused border color
-        enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFffe6ac), width: 1.7)), // Set the enabled border color 
-      ),
-      textTheme: const TextTheme(
-        titleLarge: TextStyle(color: Colors.white), // Set the search text color
-         // Set the cursor color
-      ),
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
+    return ThemeData(
+      fontFamily: 'Lexend',
+      appBarTheme: AppBarTheme(
+        backgroundColor: isDarkMode ? const Color(0xFF1D1D1D) : Colors.white, // Set AppBar background color
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        hintStyle: TextStyle(color: isDarkMode ? const Color.fromARGB(170, 240, 240, 240) : Colors.black54), // Set hint text color
+        focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFffe6ac), width: 3.0)), // Set focused border color
+        enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFffe6ac), width: 1.7)), // Set enabled border color
+      ),
+      textTheme: TextTheme(
+        titleLarge: TextStyle(color: isDarkMode ? Colors.white : Colors.black), // Set search text color
+      ),
     );
   }
 
   @override
   List<Widget>? buildActions(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return [
       IconButton(
-        icon: const Icon(Icons.clear, color: Colors.white),
+        icon: Icon(Icons.clear, color: isDarkMode ? Colors.white : Colors.black), // Set clear icon color
         onPressed: () {
           query = '';
         },
@@ -200,8 +268,10 @@ class CustomSearchDelegate extends SearchDelegate {
 
   @override
   Widget? buildLeading(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return IconButton(
-      icon: const Icon(Icons.arrow_back, color: Colors.white),
+      icon: Icon(Icons.arrow_back, color: isDarkMode ? Colors.white : Colors.black), // Set back arrow icon color
       onPressed: () {
         close(context, null);
       },
@@ -210,30 +280,40 @@ class CustomSearchDelegate extends SearchDelegate {
 
   @override
   Widget buildResults(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF1D1D1D), Color(0xFF292929)], // Replace with your desired colors
+          colors: isDarkMode
+              ? [const Color(0xFF1D1D1D), const Color(0xFF292929)] // Dark mode gradient
+              : [Colors.white, Colors.white], // Light mode gradient
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
       ),
       child: Center(
-        child: Text(query, style: const TextStyle(color: Colors.white)),
+        child: Text(
+          query,
+          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black), // Set text color
+        ),
       ),
     );
   }
 
   @override
   Widget buildSuggestions(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final suggestions = query.isEmpty
         ? []
         : ['Suggestion 1', 'Suggestion 2', 'Suggestion 3']; // Replace with your own suggestions
 
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF1D1D1D), Color(0xFF292929)], // Replace with your desired colors
+          colors: isDarkMode
+              ? [const Color(0xFF1D1D1D), const Color(0xFF292929)] // Dark mode gradient
+              : [Colors.white, Colors.white], // Light mode gradient
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
@@ -242,7 +322,10 @@ class CustomSearchDelegate extends SearchDelegate {
         itemCount: suggestions.length,
         itemBuilder: (context, index) {
           return ListTile(
-            title: Text(suggestions[index], style: const TextStyle(color: Colors.white)),
+            title: Text(
+              suggestions[index],
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black), // Set text color
+            ),
             onTap: () {
               query = suggestions[index];
               showResults(context);

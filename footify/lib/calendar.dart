@@ -6,10 +6,15 @@ class CalendarPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return CommonLayout(
       selectedIndex: 1,
-      child: const Center(
-        child: Text('Calendar', style: TextStyle(color: Colors.white)),
+      child: Center(
+        child: Text(
+          'Calendar',
+          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+        ),
       ),
     );
   }

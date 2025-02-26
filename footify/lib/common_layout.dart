@@ -49,19 +49,27 @@ class CommonLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF1D1D1D), Color(0xFF292929)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
+        decoration: BoxDecoration(
+          gradient: isDarkMode
+              ? const LinearGradient(
+                  colors: [Color(0xFF1D1D1D), Color(0xFF292929)],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                )
+              : const LinearGradient(
+                  colors: [Colors.white, Colors.white], // Light mode background
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
         ),
         child: Column(
           children: [
             AppBar(
-              backgroundColor: Colors.transparent,
+              backgroundColor: isDarkMode ? Colors.transparent : Colors.white,
               elevation: 0,
               title: Padding(
                 padding: const EdgeInsets.only(top: 20),
@@ -69,15 +77,15 @@ class CommonLayout extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Image.asset(
-                      'assets/images/kicsiFootify-Logo-NoBG-LightMode.png',
+                      isDarkMode ? 'assets/images/kicsiFootify-Logo-NoBG-LightMode.png' : 'assets/images/Footify-Logo-NoBG_szerk_hosszu_logo-01.png',
                       width: 120,
                       height: 120,
                     ),
                     Row(
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.search, color: Colors.white),
-                          iconSize: 30, // Adjust the size of the search icon
+                          icon: Icon(Icons.search, color: isDarkMode ? Colors.white : Colors.black),
+                          iconSize: 30,
                           onPressed: () {
                             showSearch(
                               context: context,
@@ -86,8 +94,8 @@ class CommonLayout extends StatelessWidget {
                           },
                         ),
                         IconButton(
-                          icon: const Icon(Icons.notifications, color: Colors.white),
-                          iconSize: 30, // Adjust the size of the notifications icon
+                          icon: Icon(Icons.notifications, color: isDarkMode ? Colors.white : Colors.black),
+                          iconSize: 30,
                           onPressed: () {
                             // Add your notification functionality here
                           },
@@ -109,13 +117,13 @@ class CommonLayout extends StatelessWidget {
       ),
       bottomNavigationBar: Theme(
         data: Theme.of(context).copyWith(
-          canvasColor: const Color(0xFF1D1D1B),
+          canvasColor: isDarkMode ? const Color(0xFF1D1D1B) : Colors.white, // Light mode background
         ),
         child: BottomNavigationBar(
           currentIndex: selectedIndex,
           onTap: (index) => _onItemTapped(context, index),
-          selectedItemColor: const Color(0xFFFFE6AC),
-          unselectedItemColor: Colors.white,
+          selectedItemColor: isDarkMode ? const Color(0xFFFFE6AC) : Colors.black, // Light mode accent color
+          unselectedItemColor: isDarkMode ? Colors.white : Colors.black, // Light mode text color
           items: const [
             BottomNavigationBarItem(
               icon: Icon(Icons.home),

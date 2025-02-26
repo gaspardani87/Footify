@@ -7,6 +7,8 @@ class ProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return CommonLayout(
       selectedIndex: 3,
       child: ListView(
@@ -20,17 +22,17 @@ class ProfilePage extends StatelessWidget {
                 backgroundImage: AssetImage('assets/images/profile_picture.png'), // Replace with actual image path
               ),
               const SizedBox(height: 10),
-              const Text(
+              Text(
                 'John Doe', // Replace with actual name
-                style: TextStyle(color: Colors.white, fontSize: 24),
+                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontSize: 24),
               ),
-              const Text(
+              Text(
                 '@johndoe', // Replace with actual username
-                style: TextStyle(color: Colors.white, fontSize: 16),
+                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontSize: 16),
               ),
-              const Text(
+              Text(
                 'Member since: January 2022', // Replace with actual join date
-                style: TextStyle(color: Colors.grey, fontSize: 14),
+                style: TextStyle(color: isDarkMode ? Colors.grey : Colors.black54, fontSize: 14),
               ),
             ],
           ),
@@ -38,11 +40,12 @@ class ProfilePage extends StatelessWidget {
 
           // Name Card
           Card(
+            color: isDarkMode ? Colors.grey[850] : Colors.white,
             child: ListTile(
-              leading: const Icon(Icons.person, color: Colors.black),
-              title: const Text('Name', style: TextStyle(color: Colors.black)),
+              leading: Icon(Icons.person, color: isDarkMode ? Colors.white : Colors.black),
+              title: Text('Name', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
               trailing: IconButton(
-                icon: const Icon(Icons.edit, color: Colors.black),
+                icon: Icon(Icons.edit, color: isDarkMode ? Colors.white : Colors.black),
                 onPressed: () {
                   // Add edit functionality here
                 },
@@ -53,11 +56,12 @@ class ProfilePage extends StatelessWidget {
 
           // Username Card
           Card(
+            color: isDarkMode ? Colors.grey[850] : Colors.white,
             child: ListTile(
-              leading: const Icon(Icons.alternate_email, color: Colors.black),
-              title: const Text('Username', style: TextStyle(color: Colors.black)),
+              leading: Icon(Icons.alternate_email, color: isDarkMode ? Colors.white : Colors.black),
+              title: Text('Username', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
               trailing: IconButton(
-                icon: const Icon(Icons.edit, color: Colors.black),
+                icon: Icon(Icons.edit, color: isDarkMode ? Colors.white : Colors.black),
                 onPressed: () {
                   // Add edit functionality here
                 },
@@ -68,11 +72,12 @@ class ProfilePage extends StatelessWidget {
 
           // Password Card
           Card(
+            color: isDarkMode ? Colors.grey[850] : Colors.white,
             child: ListTile(
-              leading: const Icon(Icons.lock, color: Colors.black),
-              title: const Text('Password', style: TextStyle(color: Colors.black)),
+              leading: Icon(Icons.lock, color: isDarkMode ? Colors.white : Colors.black),
+              title: Text('Password', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
               trailing: IconButton(
-                icon: const Icon(Icons.edit, color: Colors.black),
+                icon: Icon(Icons.edit, color: isDarkMode ? Colors.white : Colors.black),
                 onPressed: () {
                   // Add edit functionality here
                 },
@@ -83,11 +88,12 @@ class ProfilePage extends StatelessWidget {
 
           // E-Mail Card
           Card(
+            color: isDarkMode ? Colors.grey[850] : Colors.white,
             child: ListTile(
-              leading: const Icon(Icons.email, color: Colors.black),
-              title: const Text('E-Mail', style: TextStyle(color: Colors.black)),
+              leading: Icon(Icons.email, color: isDarkMode ? Colors.white : Colors.black),
+              title: Text('E-Mail', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
               trailing: IconButton(
-                icon: const Icon(Icons.edit, color: Colors.black),
+                icon: Icon(Icons.edit, color: isDarkMode ? Colors.white : Colors.black),
                 onPressed: () {
                   // Add edit functionality here
                 },
@@ -98,11 +104,12 @@ class ProfilePage extends StatelessWidget {
 
           // Phone Card
           Card(
+            color: isDarkMode ? Colors.grey[850] : Colors.white,
             child: ListTile(
-              leading: const Icon(Icons.phone, color: Colors.black),
-              title: const Text('Phone', style: TextStyle(color: Colors.black)),
+              leading: Icon(Icons.phone, color: isDarkMode ? Colors.white : Colors.black),
+              title: Text('Phone', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
               trailing: IconButton(
-                icon: const Icon(Icons.edit, color: Colors.black),
+                icon: Icon(Icons.edit, color: isDarkMode ? Colors.white : Colors.black),
                 onPressed: () {
                   // Add edit functionality here
                 },
@@ -113,11 +120,12 @@ class ProfilePage extends StatelessWidget {
 
           // Favorite Team Card
           Card(
+            color: isDarkMode ? Colors.grey[850] : Colors.white,
             child: ListTile(
-              leading: const Icon(Icons.sports_soccer, color: Colors.black),
-              title: const Text('Favorite Team', style: TextStyle(color: Colors.black)),
+              leading: Icon(Icons.sports_soccer, color: isDarkMode ? Colors.white : Colors.black),
+              title: Text('Favorite Team', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
               trailing: IconButton(
-                icon: const Icon(Icons.edit, color: Colors.black),
+                icon: Icon(Icons.edit, color: isDarkMode ? Colors.white : Colors.black),
                 onPressed: () {
                   // Add edit functionality here
                 },
@@ -128,11 +136,12 @@ class ProfilePage extends StatelessWidget {
 
           // Favorite League Card
           Card(
+            color: isDarkMode ? Colors.grey[850] : Colors.white,
             child: ListTile(
-              leading: const Icon(Icons.emoji_events, color: Colors.black),
-              title: const Text('Favorite League', style: TextStyle(color: Colors.black)),
+              leading: Icon(Icons.emoji_events, color: isDarkMode ? Colors.white : Colors.black),
+              title: Text('Favorite League', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
               trailing: IconButton(
-                icon: const Icon(Icons.edit, color: Colors.black),
+                icon: Icon(Icons.edit, color: isDarkMode ? Colors.white : Colors.black),
                 onPressed: () {
                   // Add edit functionality here
                 },
