@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'theme_provider.dart';
+import 'font_size_provider.dart';
+import 'color_blind_mode_provider.dart';
 import 'common_layout.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -14,8 +17,6 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   bool notificationsEnabled = false;
-  bool isColorBlindMode = false;
-  double fontSize = 16.0;
   String selectedLanguage = 'English';
 
   Future<void> _launchURL(String url) async {
@@ -28,7 +29,10 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
+    final fontSizeProvider = Provider.of<FontSizeProvider>(context);
+    final colorBlindModeProvider = Provider.of<ColorBlindModeProvider>(context);
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
 
     return CommonLayout(
       selectedIndex: 4,
@@ -109,11 +113,9 @@ class _SettingsPageState extends State<SettingsPage> {
           ListTile(
             title: Text('Color Blind Mode', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
             trailing: Switch(
-              value: isColorBlindMode,
+              value: colorBlindModeProvider.isColorBlindMode,
               onChanged: (bool value) {
-                setState(() {
-                  isColorBlindMode = value;
-                });
+                colorBlindModeProvider.toggleColorBlindMode(value);
               },
               activeColor: const Color(0xFFFFE6AC),
               activeTrackColor: isDarkMode ? Colors.grey : Colors.grey[400],
@@ -124,17 +126,15 @@ class _SettingsPageState extends State<SettingsPage> {
           ListTile(
             title: Text('Font Size', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
             subtitle: Slider(
-              value: fontSize,
+              value: fontSizeProvider.fontSize,
               min: 10.0,
               max: 30.0,
               divisions: 20,
               activeColor: const Color(0xFFFFE6AC),
               inactiveColor: isDarkMode ? Colors.grey : Colors.grey[400],
-              label: fontSize.round().toString(),
+              label: fontSizeProvider.fontSize.round().toString(),
               onChanged: (double value) {
-                setState(() {
-                  fontSize = value;
-                });
+                fontSizeProvider.setFontSize(value);
               },
             ),
           ),

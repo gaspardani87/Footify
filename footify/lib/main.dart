@@ -1,5 +1,3 @@
-// ignore_for_file: library_private_types_in_public_api
-
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
@@ -11,6 +9,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'common_layout.dart';
 import 'theme_provider.dart';
+import 'font_size_provider.dart';
+import 'color_blind_mode_provider.dart';
 
 // Define fetchData as a global variable
 late Future<Map<String, dynamic>> Function() fetchData;
@@ -42,8 +42,12 @@ void main() {
     WidgetsFlutterBinding.ensureInitialized();
   }
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => ThemeProvider(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => FontSizeProvider()),
+        ChangeNotifierProvider(create: (_) => ColorBlindModeProvider()),
+      ],
       child: const HomePage(),
     ),
   );
@@ -55,51 +59,96 @@ class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
+    final fontSizeProvider = Provider.of<FontSizeProvider>(context);
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.light().copyWith(
-        // Set font family and default text color for light theme
-        textTheme: ThemeData.light().textTheme.apply(
-              fontFamily: 'Lexend',
-              bodyColor: Colors.black, // Set default text color to black
-              displayColor: Colors.black, // Set default text color to black
-            ),
-        appBarTheme: ThemeData.light().appBarTheme.copyWith(
-              titleTextStyle: TextStyle(
-                fontFamily: 'Lexend',
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.black, // Set AppBar text color to black
-              ),
-            ),
-        bottomNavigationBarTheme: BottomNavigationBarThemeData(
-          selectedItemColor: const Color(0xFFFFE6AC),
-          unselectedItemColor: Colors.black,
-        ),
-      ),
-      darkTheme: ThemeData.dark().copyWith(
-        // Set font family and default text color for dark theme
-        textTheme: ThemeData.dark().textTheme.apply(
-              fontFamily: 'Lexend',
-              bodyColor: Colors.white, // Set default text color to white
-              displayColor: Colors.white, // Set default text color to white
-            ),
-        appBarTheme: ThemeData.dark().appBarTheme.copyWith(
-              titleTextStyle: TextStyle(
-                fontFamily: 'Lexend',
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.white, // Set AppBar text color to white
-              ),
-            ),
-        bottomNavigationBarTheme: BottomNavigationBarThemeData(
-          selectedItemColor: const Color(0xFFFFE6AC),
-          unselectedItemColor: Colors.white,
-        ),
-      ),
+      theme: _buildTheme(ThemeData.light(), fontSizeProvider.fontSize, Provider.of<ColorBlindModeProvider>(context).isColorBlindMode),
+      darkTheme: _buildTheme(ThemeData.dark(), fontSizeProvider.fontSize, Provider.of<ColorBlindModeProvider>(context).isColorBlindMode),
       themeMode: themeProvider.themeMode, // Use the selected theme mode
       home: const MainScreen(),
+    );
+  }
+
+  // Helper function to build a theme with dynamic font size and color blind mode
+  ThemeData _buildTheme(ThemeData baseTheme, double fontSize, bool isColorBlindMode) {
+    return baseTheme.copyWith(
+      textTheme: _buildTextTheme(baseTheme.textTheme, fontSize),
+      appBarTheme: baseTheme.appBarTheme.copyWith(
+        titleTextStyle: TextStyle(
+          fontFamily: 'Lexend',
+          fontSize: fontSize * 1.25,
+          fontWeight: FontWeight.bold,
+          color: isColorBlindMode
+              ? (baseTheme.brightness == Brightness.light ? Colors.black : Colors.white) // High-contrast text
+              : baseTheme.appBarTheme.titleTextStyle?.color,
+        ),
+        backgroundColor: isColorBlindMode
+            ? (baseTheme.brightness == Brightness.light ? Colors.white : Colors.black) // High-contrast background
+            : baseTheme.appBarTheme.backgroundColor,
+      ),
+      bottomNavigationBarTheme: baseTheme.bottomNavigationBarTheme.copyWith(
+        selectedItemColor: isColorBlindMode
+            ? (baseTheme.brightness == Brightness.light ? Colors.black : Colors.white) // High-contrast selected item
+            : const Color(0xFFFFE6AC),
+        unselectedItemColor: isColorBlindMode
+            ? (baseTheme.brightness == Brightness.light ? Colors.grey : Colors.grey[400]) // High-contrast unselected item
+            : baseTheme.bottomNavigationBarTheme.unselectedItemColor,
+      ),
+      colorScheme: isColorBlindMode
+          ? baseTheme.colorScheme.copyWith(
+              primary: baseTheme.brightness == Brightness.light ? Colors.black : Colors.white, // High-contrast primary
+              secondary: baseTheme.brightness == Brightness.light ? Colors.white : Colors.black, // High-contrast secondary
+              background: baseTheme.brightness == Brightness.light ? Colors.white : Colors.black, // High-contrast background
+              surface: baseTheme.brightness == Brightness.light ? Colors.white : Colors.black, // High-contrast surface
+              onPrimary: baseTheme.brightness == Brightness.light ? Colors.white : Colors.black, // High-contrast text on primary
+              onSecondary: baseTheme.brightness == Brightness.light ? Colors.black : Colors.white, // High-contrast text on secondary
+              onBackground: baseTheme.brightness == Brightness.light ? Colors.black : Colors.white, // High-contrast text on background
+              onSurface: baseTheme.brightness == Brightness.light ? Colors.black : Colors.white, // High-contrast text on surface
+            )
+          : baseTheme.colorScheme,
+    );
+  }
+
+  // Helper function to build a TextTheme with the desired font size and Lexend font
+  TextTheme _buildTextTheme(TextTheme baseTextTheme, double fontSize) {
+    return baseTextTheme.copyWith(
+      bodyLarge: baseTextTheme.bodyLarge?.copyWith(
+        fontFamily: 'Lexend',
+        fontSize: fontSize,
+      ),
+      bodyMedium: baseTextTheme.bodyMedium?.copyWith(
+        fontFamily: 'Lexend',
+        fontSize: fontSize,
+      ),
+      bodySmall: baseTextTheme.bodySmall?.copyWith(
+        fontFamily: 'Lexend',
+        fontSize: fontSize,
+      ),
+      titleLarge: baseTextTheme.titleLarge?.copyWith(
+        fontFamily: 'Lexend',
+        fontSize: fontSize * 1.25,
+      ),
+      titleMedium: baseTextTheme.titleMedium?.copyWith(
+        fontFamily: 'Lexend',
+        fontSize: fontSize * 1.15,
+      ),
+      titleSmall: baseTextTheme.titleSmall?.copyWith(
+        fontFamily: 'Lexend',
+        fontSize: fontSize * 1.05,
+      ),
+      labelLarge: baseTextTheme.labelLarge?.copyWith(
+        fontFamily: 'Lexend',
+        fontSize: fontSize,
+      ),
+      labelMedium: baseTextTheme.labelMedium?.copyWith(
+        fontFamily: 'Lexend',
+        fontSize: fontSize,
+      ),
+      labelSmall: baseTextTheme.labelSmall?.copyWith(
+        fontFamily: 'Lexend',
+        fontSize: fontSize,
+      ),
     );
   }
 }
