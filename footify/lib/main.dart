@@ -11,6 +11,10 @@ import 'common_layout.dart';
 import 'theme_provider.dart';
 import 'font_size_provider.dart';
 import 'color_blind_mode_provider.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'providers/firebase_provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 // Define fetchData as a global variable
 late Future<Map<String, dynamic>> Function() fetchData;
@@ -33,20 +37,36 @@ Future<Map<String, dynamic>> fetchDataDefault() async {
   }
 }
 
-void main() {
-  // Assign the default fetchData function
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  await Firebase.initializeApp(
+    options: const FirebaseOptions(
+      apiKey: "AIzaSyBAlreR-jF2vcQDGH0hW6KakLoHcznnCWU",
+      authDomain: "footify-13da4.firebaseapp.com",
+      projectId: "footify-13da4",
+      storageBucket: "footify-13da4.appspot.com",
+      messagingSenderId: "1061851623185",
+      appId: "1:1061851623185:web:a7bb2765e604d7397fa6b0",
+      measurementId: "G-M02TZ9TLL4"
+    ),
+  );
+
+  // Your existing code
   fetchData = fetchDataDefault;
 
-  // Add this block to ensure proper initialization for desktop platforms
   if (kIsWeb || ![TargetPlatform.android, TargetPlatform.iOS].contains(defaultTargetPlatform)) {
-    WidgetsFlutterBinding.ensureInitialized();
+    // Remove this line as we already initialized the bindings
+    // WidgetsFlutterBinding.ensureInitialized();
   }
+  
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => FontSizeProvider()),
         ChangeNotifierProvider(create: (_) => ColorBlindModeProvider()),
+        ChangeNotifierProvider(create: (_) => FirebaseProvider()),
       ],
       child: const HomePage(),
     ),
@@ -62,6 +82,7 @@ class HomePage extends StatelessWidget {
     final fontSizeProvider = Provider.of<FontSizeProvider>(context);
 
     return MaterialApp(
+      title: 'Footify',
       debugShowCheckedModeBanner: false,
       theme: _buildTheme(ThemeData.light(), fontSizeProvider.fontSize, Provider.of<ColorBlindModeProvider>(context).isColorBlindMode),
       darkTheme: _buildTheme(ThemeData.dark(), fontSizeProvider.fontSize, Provider.of<ColorBlindModeProvider>(context).isColorBlindMode),

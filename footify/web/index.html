@@ -1,39 +1,46 @@
 <!DOCTYPE html>
-  <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <html lang="en">
-  <head>
-    <!--
-      If you are serving your web app in a path other than the root, change the
-      href value below to reflect the base path you are serving from.
+<html>
+<head>
+  <base href="$FLUTTER_BASE_HREF">
 
-      The path provided below has to start and end with a slash "/" in order for
-      it to work correctly.
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="A new Flutter project.">
 
-      For more details:
-      * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+  <!-- iOS meta tags & icons -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="footify">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
-      This is a placeholder for base href that will be replaced by the value of
-      the `--base-href` argument provided to `flutter build`.
-    -->
-    <base href="$FLUTTER_BASE_HREF">
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
 
-    <meta charset="UTF-8">
-    <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-    <meta name="description" content="A new Flutter project.">
+  <title>Footify</title>
+  <link rel="manifest" href="manifest.json">
 
-    <!-- iOS meta tags & icons -->
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <meta name="apple-mobile-web-app-title" content="footify">
-    <link rel="apple-touch-icon" href="../assets/images/footify_logo_simple-01.svg">
+  <!-- Firebase Core -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <!-- Firebase Auth -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <!-- Firebase Firestore -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
-    <!-- Favicon -->
-    <link rel="icon" type="image/png" href="../assets/images/footify_logo_simple-01.svg"/>
-
-    <title>Footify</title>
-    <link rel="manifest" href="manifest.json">
-  </head>
-  <body>
-    <script src="flutter_bootstrap.js" async></script>
-  </body>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBAlreR-jF2vcQDGH0hW6KakLoHcznnCWU",
+      authDomain: "footify-13da4.firebaseapp.com",
+      projectId: "footify-13da4",
+      storageBucket: "footify-13da4.appspot.com",
+      messagingSenderId: "1061851623185",
+      appId: "1:1061851623185:web:a7bb2765e604d7397fa6b0",
+      measurementId: "G-M02TZ9TLL4"
+    };
+    firebase.initializeApp(firebaseConfig);
+  </script>
+</head>
+<body>
+  <div id="loading">Loading...</div>
+  <script src="main.dart.js" type="application/javascript"></script>
+</body>
 </html>
