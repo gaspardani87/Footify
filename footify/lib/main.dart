@@ -72,41 +72,100 @@ class HomePage extends StatelessWidget {
 
   // Helper function to build a theme with dynamic font size and color blind mode
   ThemeData _buildTheme(ThemeData baseTheme, double fontSize, bool isColorBlindMode) {
+    final isDark = baseTheme.brightness == Brightness.dark;
+    
+    // Keep your existing color palettes
+    final colorBlindPalette = isDark ? {
+  // Dark Mode Adjustments
+  'background': const Color(0xFF1A1A2F),  // Keep dark navy (good contrast)
+  'surface': const Color(0xFF2A2A4A),     // Increased contrast from background
+  'primary': const Color(0xFFF4D03F),     // Golden yellow (distinct from reds/greens)
+  'secondary': const Color(0xFFE67E22),   // Pumpkin orange (differentiates from primary)
+  'text': const Color(0xFFF9E79F),        // Pale yellow (high contrast)
+  'textSecondary': const Color(0xFFF7DC6F), // Brighter yellow
+  'accent': const Color(0xFF58D68D),      // Teal (visible to all CVD types)
+  'divider': const Color(0xFFF1C40F),     // Bold yellow
+  'button': const Color(0xFFF4D03F),      // Matches primary
+} : {
+  // Light Mode Adjustments
+  'background': const Color(0xFFF8F9FA),  // Off-white
+  'surface': const Color(0xFFE9ECEF),      // Light gray
+  'primary': const Color(0xFF2E86C1),      // Perceptual blue (CVD-safe)
+  'secondary': const Color(0xFF48C9B0),    // Teal (distinct from primary)
+  'text': const Color(0xFF2C3E50),         // Dark navy (high contrast)
+  'textSecondary': const Color(0xFF566573), // Medium slate
+  'accent': const Color(0xFFE74C3C),       // Vermillion red (CVD-visible)
+  'divider': const Color(0xFFAED6F1),      // Light blue
+  'button': const Color(0xFF2E86C1),       // Matches primary
+};
+
+    final regularPalette = isDark ? {
+      'background': const Color(0xFF1D1D1D),
+      'surface': const Color(0xFF292929),
+      'primary': const Color(0xFFFFE6AC),
+      'secondary': const Color(0xFFFFE6AC).withOpacity(0.8),
+      'text': Colors.white,
+      'textSecondary': Colors.grey,
+      'accent': const Color(0xFFFFE6AC),
+      'divider': const Color(0xFFFFE6AC),
+      'button': const Color(0xFFFFE6AC),
+    } : {
+      'background': Colors.white,
+      'surface': Colors.grey[50]!,
+      'primary': const Color(0xFFFFE6AC),
+      'secondary': const Color(0xFFFFE6AC).withOpacity(0.8),
+      'text': Colors.black,
+      'textSecondary': Colors.black54,
+      'accent': const Color(0xFFFFE6AC),
+      'divider': Colors.black,
+      'button': const Color(0xFFFFE6AC),
+    };
+
+    // Select the appropriate palette based on colorblind mode
+    final colors = isColorBlindMode ? colorBlindPalette : regularPalette;
+
+    // Apply the colors consistently throughout the theme
     return baseTheme.copyWith(
-      textTheme: _buildTextTheme(baseTheme.textTheme, fontSize),
-      appBarTheme: baseTheme.appBarTheme.copyWith(
+      scaffoldBackgroundColor: colors['background'],
+      cardColor: colors['surface'],
+      primaryColor: colors['primary'],
+      colorScheme: ColorScheme(
+        brightness: isDark ? Brightness.dark : Brightness.light,
+        primary: colors['primary']!,
+        onPrimary: colors['text']!,
+        secondary: colors['secondary']!,
+        onSecondary: colors['text']!,
+        error: Colors.red,
+        onError: Colors.white,
+        background: colors['background']!,
+        onBackground: colors['text']!,
+        surface: colors['surface']!,
+        onSurface: colors['text']!,
+      ),
+      textTheme: _buildTextTheme(baseTheme.textTheme, fontSize).apply(
+        bodyColor: colors['text'],
+        displayColor: colors['text'],
+      ),
+      iconTheme: IconThemeData(color: colors['text']),
+      primaryIconTheme: IconThemeData(color: colors['text']),
+      appBarTheme: AppBarTheme(
+        backgroundColor: colors['background'],
+        iconTheme: IconThemeData(color: colors['text']),
         titleTextStyle: TextStyle(
-          fontFamily: 'Lexend',
+          color: colors['text'],
           fontSize: fontSize * 1.25,
+          fontFamily: 'Lexend',
           fontWeight: FontWeight.bold,
-          color: isColorBlindMode
-              ? (baseTheme.brightness == Brightness.light ? Colors.black : Colors.white) // High-contrast text
-              : baseTheme.appBarTheme.titleTextStyle?.color,
         ),
-        backgroundColor: isColorBlindMode
-            ? (baseTheme.brightness == Brightness.light ? Colors.white : Colors.black) // High-contrast background
-            : baseTheme.appBarTheme.backgroundColor,
       ),
-      bottomNavigationBarTheme: baseTheme.bottomNavigationBarTheme.copyWith(
-        selectedItemColor: isColorBlindMode
-            ? (baseTheme.brightness == Brightness.light ? Colors.black : Colors.white) // High-contrast selected item
-            : const Color(0xFFFFE6AC),
-        unselectedItemColor: isColorBlindMode
-            ? (baseTheme.brightness == Brightness.light ? Colors.grey : Colors.grey[400]) // High-contrast unselected item
-            : baseTheme.bottomNavigationBarTheme.unselectedItemColor,
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
+        backgroundColor: colors['background'],
+        selectedItemColor: colors['primary'],
+        unselectedItemColor: colors['textSecondary'],
       ),
-      colorScheme: isColorBlindMode
-          ? baseTheme.colorScheme.copyWith(
-              primary: baseTheme.brightness == Brightness.light ? Colors.black : Colors.white, // High-contrast primary
-              secondary: baseTheme.brightness == Brightness.light ? Colors.white : Colors.black, // High-contrast secondary
-              background: baseTheme.brightness == Brightness.light ? Colors.white : Colors.black, // High-contrast background
-              surface: baseTheme.brightness == Brightness.light ? Colors.white : Colors.black, // High-contrast surface
-              onPrimary: baseTheme.brightness == Brightness.light ? Colors.white : Colors.black, // High-contrast text on primary
-              onSecondary: baseTheme.brightness == Brightness.light ? Colors.black : Colors.white, // High-contrast text on secondary
-              onBackground: baseTheme.brightness == Brightness.light ? Colors.black : Colors.white, // High-contrast text on background
-              onSurface: baseTheme.brightness == Brightness.light ? Colors.black : Colors.white, // High-contrast text on surface
-            )
-          : baseTheme.colorScheme,
+      dividerTheme: DividerThemeData(
+        color: colors['divider'],
+      ),
     );
   }
 
