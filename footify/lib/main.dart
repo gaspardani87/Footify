@@ -41,25 +41,11 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   await Firebase.initializeApp(
-    options: const FirebaseOptions(
-      apiKey: "AIzaSyBAlreR-jF2vcQDGH0hW6KakLoHcznnCWU",
-      authDomain: "footify-13da4.firebaseapp.com",
-      projectId: "footify-13da4",
-      storageBucket: "footify-13da4.appspot.com",
-      messagingSenderId: "1061851623185",
-      appId: "1:1061851623185:web:a7bb2765e604d7397fa6b0",
-      measurementId: "G-M02TZ9TLL4"
-    ),
+    options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Your existing code
   fetchData = fetchDataDefault;
 
-  if (kIsWeb || ![TargetPlatform.android, TargetPlatform.iOS].contains(defaultTargetPlatform)) {
-    // Remove this line as we already initialized the bindings
-    // WidgetsFlutterBinding.ensureInitialized();
-  }
-  
   runApp(
     MultiProvider(
       providers: [

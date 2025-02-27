@@ -5,12 +5,22 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'providers/firebase_provider.dart';
 import 'package:flutter/services.dart';
 import 'services/football_api_service.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
-  static const Color goldColor = Color(0xFFFFD700);
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  static const Color goldColor = Color(0xFFFFE6AC);
   static const Color darkColor = Color(0xFF2C2C2C);
+  
+  File? _profileImage;
+  final ImagePicker _picker = ImagePicker();
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +62,7 @@ class ProfilePage extends StatelessWidget {
               ),
             );
           }
-
+          
           // User is logged in, show profile layout with logout button
           return Padding(
             padding: const EdgeInsets.all(20),
@@ -80,48 +90,52 @@ class ProfilePage extends StatelessWidget {
                     ),
                   ),
                 ),
-                // Logout button always visible when logged in
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: () async {
-                    await provider.signOut();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: goldColor,
-                    foregroundColor: darkColor,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 50,
-                      vertical: 16,
-                    ),
-                    shape: const StadiumBorder(),
-                  ),
-                  child: const Text(
-                    'Logout',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
+                // Logout button always visible when logged in              
                 const SizedBox(height: 12),
-                OutlinedButton(
-                  onPressed: () => _showDeleteAccountDialog(context),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.red,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 50,
-                      vertical: 16,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    ElevatedButton(
+                      onPressed: () async {
+                        await provider.signOut();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: goldColor,
+                        foregroundColor: darkColor,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 50,
+                          vertical: 16,
+                        ),
+                        shape: const StadiumBorder(),
+                      ),
+                      child: const Text(
+                        'Logout',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                    side: const BorderSide(color: Colors.red),
-                    shape: const StadiumBorder(),
-                  ),
-                  child: const Text(
-                    'Delete Account',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                    OutlinedButton(
+                      onPressed: () => _showDeleteAccountDialog(context),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 26,
+                          vertical: 16,
+                        ),
+                        side: const BorderSide(color: Colors.red),
+                        shape: const StadiumBorder(),
+                      ),
+                      child: const Text(
+                        'Delete Account',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),
@@ -134,10 +148,37 @@ class ProfilePage extends StatelessWidget {
   Widget _buildProfileData(BuildContext context, Map<String, dynamic> userData) {
     return Column(
       children: [
-        const CircleAvatar(
-          radius: 50,
-          backgroundColor: goldColor,
-          child: Icon(Icons.person, size: 50, color: darkColor),
+        GestureDetector(
+          onTap: () => _pickImage(context),
+          child: Stack(
+            alignment: Alignment.bottomRight,
+            children: [
+              CircleAvatar(
+                radius: 50,
+                backgroundColor: Colors.grey[800],
+                backgroundImage: _profileImage != null
+                    ? FileImage(_profileImage!)
+                    : (userData['profilePictureUrl'] != null 
+                        ? NetworkImage(userData['profilePictureUrl']) as ImageProvider
+                        : null),
+                child: (_profileImage == null && (userData['profilePictureUrl'] == null || userData['profilePictureUrl'].isEmpty))
+                    ? const Icon(Icons.person, size: 50, color: Colors.white70)
+                    : null,
+              ),
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: goldColor,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.camera_alt,
+                  size: 20,
+                  color: darkColor,
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 12),
         Text(
@@ -160,7 +201,7 @@ class ProfilePage extends StatelessWidget {
         ),
         const SizedBox(height: 20),
         Card(
-          color: Colors.grey[900],
+          color: const Color.fromARGB(255, 32, 32, 32),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
           ),
@@ -175,30 +216,21 @@ class ProfilePage extends StatelessWidget {
                   userData['email'] ?? 'No email provided',
                   Icons.email,
                 ),
-                const Divider(color: Colors.grey),
+                const Divider(color: Color(0xFFFFE6AC)),
                 _buildProfileItem(
                   context,
                   'Name',
                   userData['name'] ?? 'No name provided',
                   Icons.person,
                 ),
-                const Divider(color: Colors.grey),
-                _buildProfileItem(
-                  context,
-                  'Phone',
-                  userData['phoneNumber']?.isEmpty ?? true
-                      ? 'No phone provided'
-                      : userData['phoneNumber'],
-                  Icons.phone,
-                ),
-                const Divider(color: Colors.grey),
+                const Divider(color: Color(0xFFFFE6AC)),
                 _buildProfileItem(
                   context,
                   'Favorite Team',
                   userData['favoriteTeam'] ?? 'No team selected',
                   Icons.sports_soccer,
                 ),
-                const Divider(color: Colors.grey),
+                const Divider(color: Color(0xFFFFE6AC)),
                 _buildProfileItem(
                   context,
                   'Favorite League',
@@ -211,6 +243,48 @@ class ProfilePage extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  Future<void> _pickImage(BuildContext context) async {
+    try {
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+      
+      if (image != null) {
+        setState(() {
+          _profileImage = File(image.path);
+        });
+        
+        // Here you would typically upload the image to Firebase storage
+        // and update the user profile with the new image URL
+        final provider = Provider.of<FirebaseProvider>(context, listen: false);
+        
+        // This is a placeholder - you would need to implement the uploadProfileImage method
+        // in your FirebaseProvider class
+        try {
+          // Show a loading indicator
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Uploading profile picture...')),
+          );
+          
+          // Assuming you have this method in your FirebaseProvider
+          final String? imageUrl = await provider.uploadProfileImage(_profileImage!);
+          
+          if (imageUrl != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Profile picture updated successfully')),
+            );
+          }
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to upload profile picture: ${e.toString()}')),
+          );
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error selecting image: ${e.toString()}')),
+      );
+    }
   }
 
   Widget _buildLoginButton(BuildContext context) {
@@ -304,9 +378,6 @@ class ProfilePage extends StatelessWidget {
     // Step 3: Username
     final username = await _showUsernameDialog(context);
     if (username == null) return;
-
-    // Step 4: Phone Number (Optional)
-    final phoneNumber = await _showPhoneDialog(context);
     // Note: phoneNumber can be null as it's optional
 
     // Step 5: Favorite Team
@@ -324,7 +395,6 @@ class ProfilePage extends StatelessWidget {
         final success = await firebaseProvider.completeSignUp(
           name: name,
           username: username,
-          phoneNumber: phoneNumber ?? '',
           favoriteTeam: team['name'] ?? '',
           favoriteLeague: league['name'] ?? '',
         );
@@ -498,39 +568,6 @@ class ProfilePage extends StatelessWidget {
                 );
               }
             },
-            child: const Text('Next'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<String?> _showPhoneDialog(BuildContext context) async {
-    final phoneController = TextEditingController();
-
-    return showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Phone Number (Optional)'),
-        content: TextField(
-          controller: phoneController,
-          decoration: const InputDecoration(
-            labelText: 'Phone Number',
-          ),
-          keyboardType: TextInputType.phone,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Back'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, ''),
-            child: const Text('Skip'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, phoneController.text),
             child: const Text('Next'),
           ),
         ],
@@ -731,8 +768,7 @@ class ProfilePage extends StatelessWidget {
               TextField(
                 controller: emailController,
                 decoration: const InputDecoration(
-                  labelText: 'Email',
-                  hintText: 'Enter your email',
+                  labelText: 'Email'
                 ),
                 keyboardType: TextInputType.emailAddress,
                 enabled: !isLoading,
@@ -741,8 +777,7 @@ class ProfilePage extends StatelessWidget {
               TextField(
                 controller: passwordController,
                 decoration: const InputDecoration(
-                  labelText: 'Password',
-                  hintText: 'Enter your password',
+                  labelText: 'Password'
                 ),
                 obscureText: true,
                 enabled: !isLoading,

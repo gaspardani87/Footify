@@ -3,6 +3,8 @@ import '../services/firebase_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:io';
+import 'package:firebase_storage/firebase_storage.dart';
 
 class FirebaseProvider with ChangeNotifier {
   final FirebaseService _firebaseService = FirebaseService();
@@ -315,4 +317,17 @@ class FirebaseProvider with ChangeNotifier {
       throw e;
     }
   }
-} 
+
+  Future<String?> uploadProfileImage(File image) async {
+    try {
+      final storageRef = FirebaseStorage.instance.ref().child('profile_images/${currentUser!.uid}.jpg');
+      final uploadTask = storageRef.putFile(image);
+      final snapshot = await uploadTask.whenComplete(() => null);
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      print('Error uploading profile image: $e');
+      return null;
+    }
+  }
+}
