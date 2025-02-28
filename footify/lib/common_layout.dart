@@ -1,9 +1,13 @@
+// ignore_for_file: unused_import
+
 import 'package:flutter/material.dart';
 import 'main.dart';
 import 'calendar.dart';
 import 'leagues.dart';
 import 'profile.dart';
 import 'settings.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'language_provider.dart';
 
 class CommonLayout extends StatelessWidget {
   final Widget child;
@@ -76,10 +80,18 @@ class CommonLayout extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Image.asset(
-                      isDarkMode ? 'assets/images/kicsiFootify-Logo-NoBG-LightMode.png' : 'assets/images/Footify-Logo-NoBG_szerk_hosszu_logo-01.png',
-                      width: 120,
-                      height: 120,
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (context) => const HomePage()),
+                        );
+                      },
+                      child: Image.asset(
+                        isDarkMode ? 'assets/images/kicsiFootify-Logo-NoBG-LightMode.png' : 'assets/images/Footify-Logo-NoBG_szerk_hosszu_logo-01.png',
+                        width: 120,
+                        height: 120,
+                      ),
                     ),
                     Row(
                       children: [
@@ -124,26 +136,26 @@ class CommonLayout extends StatelessWidget {
           onTap: (index) => _onItemTapped(context, index),
           selectedItemColor: isDarkMode ? const Color(0xFFFFE6AC) : Colors.black, // Light mode accent color
           unselectedItemColor: isDarkMode ? Colors.white : Colors.black, // Light mode text color
-          items: const [
+          items: [
             BottomNavigationBarItem(
-              icon: Icon(Icons.home),
-              label: 'Home',
+              icon: const Icon(Icons.home),
+              label: AppLocalizations.of(context)!.home,
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.calendar_month),
-              label: 'Calendar',
+              icon: const Icon(Icons.calendar_month),
+              label: AppLocalizations.of(context)!.calendar,
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.emoji_events),
-              label: 'League',
+              icon: const Icon(Icons.emoji_events),
+              label: AppLocalizations.of(context)!.league,
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.person),
-              label: 'Profile',
+              icon: const Icon(Icons.person),
+              label: AppLocalizations.of(context)!.profile,
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.settings),
-              label: 'Settings',
+              icon: const Icon(Icons.settings),
+              label: AppLocalizations.of(context)!.settings,
             ),
           ],
         ),

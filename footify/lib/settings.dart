@@ -4,8 +4,10 @@ import 'theme_provider.dart';
 import 'font_size_provider.dart';
 import 'color_blind_mode_provider.dart';
 import 'common_layout.dart';
+import 'language_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 
 class SettingsPage extends StatefulWidget {
@@ -17,13 +19,51 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   bool notificationsEnabled = false;
-  String selectedLanguage = 'English';
+  late String selectedLanguage;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize selectedLanguage based on current locale
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+      final currentLocale = languageProvider.currentLocale.languageCode;
+      setState(() {
+        selectedLanguage = _getLanguageName(currentLocale);
+      });
+    });
+  }
+
+  String _getLanguageName(String code) {
+    switch (code) {
+      case 'en':
+        return 'English';
+      case 'es':
+        return 'Español';
+      case 'it':  
+        return 'Italiano';  
+      case 'de':
+        return 'Deutsch';
+      case 'hu':
+        return 'Magyar';
+      default:
+        return 'English';
+    }
+  }
 
   Future<void> _launchURL(String url) async {
     final Uri uri = Uri.parse(url);
     if (!await launchUrl(uri)) {
       throw 'Could not launch $url';
     }
+  }
+
+  void _updateLanguage(String newLanguage) {
+    setState(() {
+      selectedLanguage = newLanguage;
+    });
+    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    languageProvider.setLocale(newLanguage);
   }
 
   @override
@@ -41,8 +81,14 @@ class _SettingsPageState extends State<SettingsPage> {
         children: [
           // Theme Switcher
           ListTile(
-            title: Text('Theme', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
-            subtitle: Text('Switch between light and dark mode', style: TextStyle(color: isDarkMode ? Colors.grey : Colors.black54)),
+            title: Text(
+              AppLocalizations.of(context)!.theme,
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)
+            ),
+            subtitle: Text(
+              AppLocalizations.of(context)!.themeText,
+              style: TextStyle(color: isDarkMode ? Colors.grey : Colors.black54)
+            ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -65,12 +111,18 @@ class _SettingsPageState extends State<SettingsPage> {
 
           // Language Selector
           ListTile(
-            title: Text('Language', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
-            subtitle: Text('Select your preferred language', style: TextStyle(color: isDarkMode ? Colors.grey : Colors.black54)),
+            title: Text(
+              AppLocalizations.of(context)!.language,
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)
+            ),
+            subtitle: Text(
+              AppLocalizations.of(context)!.languageText,
+              style: TextStyle(color: isDarkMode ? Colors.grey : Colors.black54)
+            ),
             trailing: DropdownButton<String>(
               value: selectedLanguage,
               dropdownColor: isDarkMode ? Colors.grey[850] : Colors.white,
-              items: <String>['English', 'Español', 'Français', 'Deutsch', 'Magyar']
+              items: <String>['English', 'Español', 'Italiano', 'Deutsch', 'Magyar']
                   .map((String value) {
                 return DropdownMenuItem<String>(
                   value: value,
@@ -78,9 +130,9 @@ class _SettingsPageState extends State<SettingsPage> {
                 );
               }).toList(),
               onChanged: (String? newValue) {
-                setState(() {
-                  selectedLanguage = newValue!;
-                });
+                if (newValue != null) {
+                  _updateLanguage(newValue);
+                }
               },
             ),
           ),
@@ -88,8 +140,12 @@ class _SettingsPageState extends State<SettingsPage> {
 
           // Notifications Toggle
           ListTile(
-            title: Text('Notifications', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
-            subtitle: Text('Enable or disable notifications', style: TextStyle(color: isDarkMode ? Colors.grey : Colors.black54)),
+            title: Text(
+              AppLocalizations.of(context)!.notifications, 
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
+            subtitle: Text(
+              AppLocalizations.of(context)!.notificationsText,
+              style: TextStyle(color: isDarkMode ? Colors.grey : Colors.black54)),
             trailing: Switch(
               value: notificationsEnabled,
               onChanged: (bool value) {
@@ -107,11 +163,18 @@ class _SettingsPageState extends State<SettingsPage> {
 
           // Accessibility Settings
           ListTile(
-            title: Text('Accessibility', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
-            subtitle: Text('Adjust accessibility settings', style: TextStyle(color: isDarkMode ? Colors.grey : Colors.black54)),
+            title: Text(
+              AppLocalizations.of(context)!.accessibility, 
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
+            subtitle: Text(
+              AppLocalizations.of(context)!.accessibilityText, 
+              style: TextStyle(color: isDarkMode ? Colors.grey : Colors.black54)),
           ),
           ListTile(
-            title: Text('Color Blind Mode', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
+            title: Text(
+              AppLocalizations.of(context)!.colorBlindMode,
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)
+            ),
             trailing: Switch(
               value: colorBlindModeProvider.isColorBlindMode,
               onChanged: (bool value) {
@@ -124,7 +187,10 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           ListTile(
-            title: Text('Font Size', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
+            title: Text(
+              AppLocalizations.of(context)!.fontSize,
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)
+            ),
             subtitle: Slider(
               value: fontSizeProvider.fontSize,
               min: 10.0,
@@ -142,8 +208,11 @@ class _SettingsPageState extends State<SettingsPage> {
 
           // About Us
           ListTile(
-            title: Text('About Us', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
-            subtitle: Text('Learn more about us', style: TextStyle(color: isDarkMode ? Colors.grey : Colors.black54)),
+            title: Text(
+              AppLocalizations.of(context)!.aboutUs, style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
+            subtitle: Text(
+              AppLocalizations.of(context)!.aboutUsText, 
+              style: TextStyle(color: isDarkMode ? Colors.grey : Colors.black54)),
           ),
           ListTile(
             title: Row(

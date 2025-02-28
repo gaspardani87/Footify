@@ -1,0 +1,20 @@
+{
+    "@@locale": "it",
+    "home": "Casa",
+    "calendar": "Calendario",
+    "league": "Lega",
+    "profile": "Profilo",
+    "settings": "Impostazioni", 
+    "theme": "Tema",
+    "themeText": "Passa dalla modalità chiara a quella scura",
+    "language": "Lingua",
+    "languageText": "Seleziona la tua lingua preferita",
+    "notifications": "Notifiche",
+    "notificationsText": "Abilita o disabilita le notifiche",
+    "accessibility": "Accessibilità",
+    "accessibilityText": "Regola le impostazioni di accessibilità",
+    "colorBlindMode": "Modalità daltonico",
+    "fontSize": "Dimensione carattere",
+    "aboutUs": "Chi siamo",
+    "aboutUsText": "Scopri di più su di noi"
+}

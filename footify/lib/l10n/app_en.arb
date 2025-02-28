@@ -1,0 +1,20 @@
+{
+    "@@locale": "en",
+    "home": "Home",
+    "calendar": "Calendar",
+    "league": "League",
+    "profile": "Profile",
+    "settings": "Settings", 
+    "theme": "Theme",
+    "themeText": "Switch between light and dark mode",
+    "language": "Language",
+    "languageText": "Select your preferred language",
+    "notifications": "Notifications",
+    "notificationsText": "Enable or disable notifications",
+    "accessibility": "Accessibility",
+    "accessibilityText": "Adjust accessibility settings",
+    "colorBlindMode": "Color Blind Mode",
+    "fontSize": "Font Size",
+    "aboutUs": "About Us",
+    "aboutUsText": "Learn more about us"
+}

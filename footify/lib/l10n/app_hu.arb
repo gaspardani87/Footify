@@ -1,0 +1,20 @@
+{
+    "@@locale": "hu",
+    "home": "Otthon",
+    "calendar": "Naptár",
+    "league": "Ligák",
+    "profile": "Profil",
+    "settings": "Beállítások", 
+    "theme": "Téma",
+    "themeText": "Váltás a világos és sötét mód között",
+    "language": "Nyelv",
+    "languageText": "Válassza ki a kívánt nyelvet",
+    "notifications": "Értesítések",
+    "notificationsText": "Értesítések engedélyezése vagy letiltása",
+    "accessibility": "Kisegítő lehetőségek",
+    "accessibilityText": "Módosítsa a kisegítő lehetőségeket",
+    "colorBlindMode": "Színtévesztő mód",
+    "fontSize": "Betűméret",
+    "aboutUs": "Rólunk",
+    "aboutUsText": "Tudjon meg többet rólunk"
+}

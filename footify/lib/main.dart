@@ -1,3 +1,5 @@
+// ignore_for_file: unused_element, deprecated_member_use, prefer_final_fields, library_private_types_in_public_api
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
@@ -15,6 +17,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'providers/firebase_provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'language_provider.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 // Define fetchData as a global variable
 late Future<Map<String, dynamic>> Function() fetchData;
@@ -53,6 +58,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => FontSizeProvider()),
         ChangeNotifierProvider(create: (_) => ColorBlindModeProvider()),
         ChangeNotifierProvider(create: (_) => FirebaseProvider()),
+        ChangeNotifierProvider(create: (_) => LanguageProvider()),
       ],
       child: const HomePage(),
     ),
@@ -66,13 +72,17 @@ class HomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final fontSizeProvider = Provider.of<FontSizeProvider>(context);
+    final languageProvider = Provider.of<LanguageProvider>(context); // Add this
 
     return MaterialApp(
       title: 'Footify',
       debugShowCheckedModeBanner: false,
       theme: _buildTheme(ThemeData.light(), fontSizeProvider.fontSize, Provider.of<ColorBlindModeProvider>(context).isColorBlindMode),
       darkTheme: _buildTheme(ThemeData.dark(), fontSizeProvider.fontSize, Provider.of<ColorBlindModeProvider>(context).isColorBlindMode),
-      themeMode: themeProvider.themeMode, // Use the selected theme mode
+      themeMode: themeProvider.themeMode,
+      locale: languageProvider.currentLocale, // Add this line
+      localizationsDelegates: AppLocalizations.localizationsDelegates,  // Change this
+      supportedLocales: AppLocalizations.supportedLocales,  // Change this
       home: const MainScreen(),
     );
   }

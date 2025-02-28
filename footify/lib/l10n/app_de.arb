@@ -1,0 +1,20 @@
+{
+    "@@locale": "de",
+    "home": "Startseite",
+    "calendar": "Kalender",
+    "league": "Liga",
+    "profile": "Profil",
+    "settings": "Einstellungen",
+    "theme": "Design",
+    "themeText": "Zwischen Hell- und Dunkelmodus wechseln",
+    "language": "Sprache",
+    "languageText": "Wählen Sie Ihre bevorzugte Sprache",
+    "notifications": "Benachrichtigungen",
+    "notificationsText": "Benachrichtigungen aktivieren oder deaktivieren",
+    "accessibility": "Barrierefreiheit",
+    "accessibilityText": "Barrierefreiheit-Einstellungen anpassen",
+    "colorBlindMode": "Farbenblindenmodus",
+    "fontSize": "Schriftgröße",
+    "aboutUs": "Über uns",
+    "aboutUsText": "Erfahren Sie mehr über uns"
+}
