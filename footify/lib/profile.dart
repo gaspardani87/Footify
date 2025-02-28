@@ -41,7 +41,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     Text(
                       'Welcome to Footify!',
                       style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        color: Colors.white,
+                        color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -49,7 +49,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     Text(
                       'Please log in or register to access your profile',
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: Colors.white70,
+                        color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54,
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -76,12 +76,12 @@ class _ProfilePageState extends State<ProfilePage> {
                         if (provider.userData != null) ...[
                           _buildProfileData(context, provider.userData!),
                         ] else ...[
-                          const Center(
+                          Center(
                             child: Padding(
-                              padding: EdgeInsets.all(20),
+                              padding: const EdgeInsets.all(20),
                               child: Text(
                                 'Error loading profile data',
-                                style: TextStyle(color: Colors.white),
+                                style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
                               ),
                             ),
                           ),
@@ -146,45 +146,46 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _buildProfileData(BuildContext context, Map<String, dynamic> userData) {
+    final textColor = Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black;
+    final subTextColor = Theme.of(context).brightness == Brightness.dark ? Colors.grey[400] : Colors.black54;
+
     return Column(
       children: [
-        GestureDetector(
-          onTap: () => _pickImage(context),
-          child: Stack(
-            alignment: Alignment.bottomRight,
-            children: [
-              CircleAvatar(
-                radius: 50,
-                backgroundColor: Colors.grey[800],
-                backgroundImage: _profileImage != null
-                    ? FileImage(_profileImage!)
-                    : (userData['profilePictureUrl'] != null 
-                        ? NetworkImage(userData['profilePictureUrl']) as ImageProvider
-                        : null),
-                child: (_profileImage == null && (userData['profilePictureUrl'] == null || userData['profilePictureUrl'].isEmpty))
-                    ? const Icon(Icons.person, size: 50, color: Colors.white70)
-                    : null,
-              ),
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: goldColor,
-                  shape: BoxShape.circle,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            IconButton(
+              icon: Icon(Icons.camera_alt, size: 20, color: Colors.black),
+              onPressed: () => _pickImage(context),
+            ),
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                CircleAvatar(
+                  radius: 50,
+                  backgroundColor: Colors.grey[800],
+                  backgroundImage: _profileImage != null
+                      ? FileImage(_profileImage!)
+                      : (userData['profilePictureUrl'] != null 
+                          ? NetworkImage(userData['profilePictureUrl']) as ImageProvider
+                          : null),
+                  child: (_profileImage == null && (userData['profilePictureUrl'] == null || userData['profilePictureUrl'].isEmpty))
+                      ? const Icon(Icons.person, size: 50, color: Colors.white70)
+                      : null,
                 ),
-                child: Icon(
-                  Icons.camera_alt,
-                  size: 20,
-                  color: darkColor,
-                ),
-              ),
-            ],
-          ),
+              ],
+            ),
+            IconButton(
+              icon: Icon(Icons.close, size: 20, color: Colors.black),
+              onPressed: () => _deleteProfilePicture(context),
+            ),
+          ],
         ),
         const SizedBox(height: 12),
         Text(
           '@${userData['username'] ?? 'username'}',
-          style: const TextStyle(
-            color: goldColor,
+          style: TextStyle(
+            color: Theme.of(context).brightness == Brightness.dark ? Color(0xFFFFE6AC) : Colors.black,
             fontSize: 18,
             fontWeight: FontWeight.bold,
           ),
@@ -194,14 +195,14 @@ class _ProfilePageState extends State<ProfilePage> {
         Text(
           'Joined ${_formatDate(userData['joinDate'] ?? DateTime.now())}',
           style: TextStyle(
-            color: Colors.grey[400],
+            color: subTextColor,
             fontSize: 14,
           ),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 20),
         Card(
-          color: const Color.fromARGB(255, 32, 32, 32),
+          color: Theme.of(context).brightness == Brightness.dark ? const Color.fromARGB(255, 32, 32, 32) : Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
           ),
@@ -215,6 +216,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   'Email',
                   userData['email'] ?? 'No email provided',
                   Icons.email,
+                  textColor,
                 ),
                 const Divider(color: Color(0xFFFFE6AC)),
                 _buildProfileItem(
@@ -222,6 +224,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   'Name',
                   userData['name'] ?? 'No name provided',
                   Icons.person,
+                  textColor,
                 ),
                 const Divider(color: Color(0xFFFFE6AC)),
                 _buildProfileItem(
@@ -229,6 +232,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   'Favorite Team',
                   userData['favoriteTeam'] ?? 'No team selected',
                   Icons.sports_soccer,
+                  textColor,
                 ),
                 const Divider(color: Color(0xFFFFE6AC)),
                 _buildProfileItem(
@@ -236,6 +240,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   'Favorite League',
                   userData['favoriteLeague'] ?? 'No league selected',
                   Icons.emoji_events,
+                  textColor,
                 ),
               ],
             ),
@@ -243,6 +248,25 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
       ],
     );
+  }
+
+  Future<void> _deleteProfilePicture(BuildContext context) async {
+    setState(() {
+      _profileImage = null;
+    });
+
+    // Optionally, update the user's profile picture URL in your backend or Firebase
+    final provider = Provider.of<FirebaseProvider>(context, listen: false);
+    try {
+      await provider.updateProfilePictureUrl(null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile picture deleted successfully')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete profile picture: ${e.toString()}')),
+      );
+    }
   }
 
   Future<void> _pickImage(BuildContext context) async {
@@ -310,28 +334,33 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _buildRegisterButton(BuildContext context) {
-    return OutlinedButton(
-      onPressed: () => _showRegistrationFlow(context),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: goldColor,
-        padding: const EdgeInsets.symmetric(
-          horizontal: 50,
-          vertical: 16,
-        ),
-        side: const BorderSide(color: goldColor),
-        shape: const StadiumBorder(),
-      ),
-      child: const Text(
-        'Register',
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
+  final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+  final borderColor = isDarkMode ? goldColor : Colors.black;
+  final textColor = isDarkMode ? goldColor : Colors.black;
 
-  Widget _buildProfileItem(BuildContext context, String label, String value, IconData icon) {
+  return OutlinedButton(
+    onPressed: () => _showRegistrationFlow(context),
+    style: OutlinedButton.styleFrom(
+      foregroundColor: textColor,
+      padding: const EdgeInsets.symmetric(
+        horizontal: 50,
+        vertical: 16,
+      ),
+      side: BorderSide(color: borderColor),
+      shape: const StadiumBorder(),
+    ),
+    child: Text(
+      'Register',
+      style: TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.bold,
+        color: textColor,
+      ),
+    ),
+  );
+}
+
+  Widget _buildProfileItem(BuildContext context, String label, String value, IconData icon, Color textColor) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -346,15 +375,15 @@ class _ProfilePageState extends State<ProfilePage> {
                   label,
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.grey[400],
+                    color: textColor,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   value,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
-                    color: Colors.white,
+                    color: textColor,
                     fontWeight: FontWeight.w500,
                   ),
                 ),

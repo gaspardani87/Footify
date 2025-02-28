@@ -330,4 +330,14 @@ class FirebaseProvider with ChangeNotifier {
       return null;
     }
   }
+
+  Future<void> updateProfilePictureUrl(String? url) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+        'profilePictureUrl': url,
+      });
+      notifyListeners();
+    }
+  }
 }

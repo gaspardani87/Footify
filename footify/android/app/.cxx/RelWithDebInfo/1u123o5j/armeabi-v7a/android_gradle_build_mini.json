@@ -1,0 +1,20 @@
+{
+  "buildFiles": [
+    "E:\\Szakdolgozat\\flutter\\packages\\flutter_tools\\gradle\\src\\main\\groovy\\CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "C:\\Users\\gaspa\\AppData\\Local\\Android\\sdk\\cmake\\3.22.1\\bin\\ninja.exe",
+      "-C",
+      "C:\\Users\\gaspa\\Documents\\GitHub\\Footify\\footify\\android\\app\\.cxx\\RelWithDebInfo\\1u123o5j\\armeabi-v7a",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "C:\\Users\\gaspa\\AppData\\Local\\Android\\sdk\\cmake\\3.22.1\\bin\\ninja.exe",
+    "-C",
+    "C:\\Users\\gaspa\\Documents\\GitHub\\Footify\\footify\\android\\app\\.cxx\\RelWithDebInfo\\1u123o5j\\armeabi-v7a",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {}
+}
