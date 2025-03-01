@@ -239,6 +239,7 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   late Future<Map<String, dynamic>> _futureData = fetchData();
+  Map<String, bool> _expandedCompetitions = {};
 
   void _onItemTapped(int index) {
     setState(() {
@@ -283,6 +284,7 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return CommonLayout(
       selectedIndex: _selectedIndex,
@@ -292,14 +294,14 @@ class _MainScreenState extends State<MainScreen> {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(
               child: CircularProgressIndicator(
-                color: isDarkMode ? Colors.white : Colors.black, // Set progress indicator color
+                color: isDarkMode ? Colors.white : Colors.black,
               ),
             );
           } else if (snapshot.hasError) {
             return Center(
               child: Text(
                 'Error: ${snapshot.error}',
-                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black), // Set text color
+                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
               ),
             );
           } else if (snapshot.hasData) {
@@ -307,29 +309,275 @@ class _MainScreenState extends State<MainScreen> {
             if (data['matches'] == null || data['matches'].isEmpty) {
               return Center(
                 child: Text(
-                  'No data available',
-                  style: TextStyle(color: isDarkMode ? Colors.white : Colors.black), // Set text color
+                  'No matches available',
+                  style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
                 ),
               );
             }
+            
+            // Group matches by competition
+            final Map<String, List<dynamic>> matchesByCompetition = {};
+            
+            for (var match in data['matches']) {
+              final competitionName = match['competition']['name'] ?? 'Other Competitions';
+              if (!matchesByCompetition.containsKey(competitionName)) {
+                matchesByCompetition[competitionName] = [];
+              }
+              matchesByCompetition[competitionName]!.add(match);
+            }
+            
+            // Sort competitions alphabetically
+            final sortedCompetitions = matchesByCompetition.keys.toList()..sort();
+            
             return ListView.builder(
-              itemCount: data['matches'].length,
+              padding: const EdgeInsets.all(16),
+              itemCount: sortedCompetitions.length,
               itemBuilder: (context, index) {
-                final item = data['matches'][index];
-                final homeTeam = item['homeTeam']['name'] ?? 'No home team available';
-                final awayTeam = item['awayTeam']['name'] ?? 'No away team available';
-                final resultInfo = item['score']['fullTime']['home'] != null && item['score']['fullTime']['away'] != null
-                    ? '${item['score']['fullTime']['home']} - ${item['score']['fullTime']['away']}'
-                    : 'No result yet';
-                return ListTile(
-                  title: Text(
-                    '$homeTeam vs $awayTeam',
-                    style: TextStyle(color: isDarkMode ? Colors.white : Colors.black), // Set text color
-                  ),
-                  subtitle: Text(
-                    resultInfo,
-                    style: TextStyle(color: isDarkMode ? Colors.white : Colors.black), // Set text color
-                  ),
+                final competitionName = sortedCompetitions[index];
+                final matches = matchesByCompetition[competitionName]!;
+                
+                return StatefulBuilder(
+                  builder: (context, setState) {
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 20),
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      color: colorScheme.surface,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Competition header (clickable)
+                          InkWell(
+                            onTap: () {
+                              setState(() {
+                                // Toggle the expanded state for this competition
+                                _expandedCompetitions[competitionName] = !(_expandedCompetitions[competitionName] ?? true);
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: colorScheme.primary,
+                                borderRadius: BorderRadius.only(
+                                  topLeft: const Radius.circular(12),
+                                  topRight: const Radius.circular(12),
+                                  bottomLeft: (_expandedCompetitions[competitionName] ?? true) ? Radius.zero : const Radius.circular(12),
+                                  bottomRight: (_expandedCompetitions[competitionName] ?? true) ? Radius.zero : const Radius.circular(12),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  // Trophy icon
+                                  Icon(
+                                    Icons.emoji_events,
+                                    color: colorScheme.onPrimary,
+                                    size: 24,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      competitionName,
+                                      style: TextStyle(
+                                        color: colorScheme.onPrimary,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                      ),
+                                    ),
+                                  ),
+                                  AnimatedRotation(
+                                    turns: (_expandedCompetitions[competitionName] ?? true) ? 0.0 : 0.5,
+                                    duration: const Duration(milliseconds: 300),
+                                    child: Icon(
+                                      Icons.keyboard_arrow_up,
+                                      color: colorScheme.onPrimary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          
+                          // Animated matches list (collapsible)
+                          AnimatedCrossFade(
+                            firstChild: ListView.separated(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: matches.length,
+                              separatorBuilder: (context, index) => Divider(
+                                height: 1,
+                                color: colorScheme.onSurface.withOpacity(0.1),
+                              ),
+                              itemBuilder: (context, matchIndex) {
+                                final match = matches[matchIndex];
+                                final homeTeam = match['homeTeam']['name'] ?? 'Unknown Team';
+                                final awayTeam = match['awayTeam']['name'] ?? 'Unknown Team';
+                                final homeScore = match['score']['fullTime']['home'];
+                                final awayScore = match['score']['fullTime']['away'];
+                                final matchStatus = match['status'] ?? '';
+                                final matchDate = DateTime.parse(match['utcDate']);
+                                final formattedDate = '${matchDate.year}/${matchDate.month.toString().padLeft(2, '0')}/${matchDate.day.toString().padLeft(2, '0')}';
+                                final formattedTime = '${matchDate.hour.toString().padLeft(2, '0')}:${matchDate.minute.toString().padLeft(2, '0')}';
+                                
+                                final scoreText = (homeScore != null && awayScore != null) 
+                                    ? '$homeScore - $awayScore' 
+                                    : 'vs';
+                                
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                  child: Row(
+                                    children: [
+                                      // Match time/date
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            formattedDate,
+                                            style: TextStyle(
+                                              color: colorScheme.onSurface.withOpacity(0.7),
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                          Text(
+                                            formattedTime,
+                                            style: TextStyle(
+                                              color: colorScheme.onSurface,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                          Text(
+                                            matchStatus == 'FINISHED' 
+                                                ? 'FINISHED'
+                                                : matchStatus == 'IN_PLAY' 
+                                                    ? 'LIVE'
+                                                    : matchStatus,
+                                            style: TextStyle(
+                                              color: matchStatus == 'FINISHED' 
+                                                  ? Colors.green 
+                                                  : matchStatus == 'IN_PLAY' 
+                                                      ? Colors.red 
+                                                      : colorScheme.onSurface.withOpacity(0.7),
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      
+                                      const SizedBox(width: 16),
+                                      
+                                      // Match details
+                                      Expanded(
+                                        child: Row(
+                                          children: [
+                                            // Home team with badge on left
+                                            Expanded(
+                                              child: Row(
+                                                children: [
+                                                  // Home team badge
+                                                  ClipRRect(
+                                                    borderRadius: BorderRadius.circular(4),
+                                                    child: Image.network(
+                                                      match['homeTeam']['crest'] ?? '',
+                                                      width: 24,
+                                                      height: 24,
+                                                      errorBuilder: (context, error, stackTrace) => const SizedBox(
+                                                        width: 24,
+                                                        height: 24,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  // Home team name
+                                                  Expanded(
+                                                    child: Text(
+                                                      homeTeam,
+                                                      style: TextStyle(
+                                                        color: colorScheme.onSurface,
+                                                        fontWeight: FontWeight.w500,
+                                                      ),
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            
+                                            // Score
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: matchStatus == 'FINISHED' 
+                                                    ? colorScheme.primaryContainer
+                                                    : colorScheme.surfaceVariant,
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                scoreText,
+                                                style: TextStyle(
+                                                  color: matchStatus == 'FINISHED'
+                                                      ? colorScheme.onPrimaryContainer
+                                                      : colorScheme.onSurfaceVariant,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                            
+                                            // Away team with badge on right
+                                            Expanded(
+                                              child: Row(
+                                                mainAxisAlignment: MainAxisAlignment.end,
+                                                children: [
+                                                  // Away team name
+                                                  Expanded(
+                                                    child: Text(
+                                                      awayTeam,
+                                                      style: TextStyle(
+                                                        color: colorScheme.onSurface,
+                                                        fontWeight: FontWeight.w500,
+                                                      ),
+                                                      textAlign: TextAlign.end,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  // Away team badge
+                                                  ClipRRect(
+                                                    borderRadius: BorderRadius.circular(4),
+                                                    child: Image.network(
+                                                      match['awayTeam']['crest'] ?? '',
+                                                      width: 24,
+                                                      height: 24,
+                                                      errorBuilder: (context, error, stackTrace) => const SizedBox(
+                                                        width: 24,
+                                                        height: 24,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                            secondChild: const SizedBox.shrink(),
+                            crossFadeState: (_expandedCompetitions[competitionName] ?? true) 
+                                ? CrossFadeState.showFirst 
+                                : CrossFadeState.showSecond,
+                            duration: const Duration(milliseconds: 300),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 );
               },
             );
@@ -337,13 +585,24 @@ class _MainScreenState extends State<MainScreen> {
             return Center(
               child: Text(
                 'No data available',
-                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black), // Set text color
+                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
               ),
             );
           }
         },
       ),
     );
+  }
+
+  String getScoreText(dynamic match) {
+    final homeScore = match['score']['fullTime']['home'];
+    final awayScore = match['score']['fullTime']['away'];
+    
+    if (homeScore != null && awayScore != null) {
+      return '$homeScore - $awayScore';
+    } else {
+      return 'vs';
+    }
   }
 }
 

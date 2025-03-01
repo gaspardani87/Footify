@@ -8,6 +8,8 @@ import 'profile.dart';
 import 'settings.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'language_provider.dart';
+import 'package:provider/provider.dart';
+import 'providers/firebase_provider.dart';
 
 class CommonLayout extends StatelessWidget {
   final Widget child;
@@ -54,6 +56,7 @@ class CommonLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final isLoggedIn = Provider.of<FirebaseProvider>(context).currentUser != null;
 
     return Scaffold(
       body: Container(
@@ -105,13 +108,44 @@ class CommonLayout extends StatelessWidget {
                             );
                           },
                         ),
-                        IconButton(
-                          icon: Icon(Icons.notifications, color: isDarkMode ? Colors.white : Colors.black),
-                          iconSize: 30,
-                          onPressed: () {
-                            // Add your notification functionality here
-                          },
-                        ),
+                        if (isLoggedIn)
+                          IconButton(
+                            icon: Icon(
+                              Icons.notifications,
+                              color: isDarkMode ? Colors.white : Colors.black,
+                            ),
+                            onPressed: () {
+                              // Handle notifications
+                            },
+                          )
+                        else
+                          Padding(
+                            padding: const EdgeInsets.only(right: 16.0),
+                            child: TextButton(
+                              onPressed: () {
+                                // Navigate to profile/login page
+                                Navigator.pushReplacement(
+                                  context,
+                                  PageRouteBuilder(
+                                    pageBuilder: (context, animation, secondaryAnimation) => const ProfilePage(),
+                                    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                                      return FadeTransition(
+                                        opacity: animation,
+                                        child: child,
+                                      );
+                                    },
+                                  ),
+                                );
+                              },
+                              child: Text(
+                                'Login/Register',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white : Colors.black,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ],
