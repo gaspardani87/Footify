@@ -236,10 +236,28 @@ class MainScreen extends StatefulWidget {
   _MainScreenState createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
+class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateMixin {
   int _selectedIndex = 0;
   late Future<Map<String, dynamic>> _futureData = fetchData();
   Map<String, bool> _expandedCompetitions = {};
+  late AnimationController _blinkController;
+  late Animation<double> _blinkAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _blinkController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    )..repeat(reverse: true);
+    _blinkAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(_blinkController);
+  }
+
+  @override
+  void dispose() {
+    _blinkController.dispose();
+    super.dispose();
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -482,24 +500,43 @@ class _MainScreenState extends State<MainScreen> {
                                               // Status
                                               Expanded(
                                                 flex: 1,
-                                                child: Text(
-                                                  matchStatus == 'FINISHED' 
-                                                      ? 'FINISHED'
-                                                      : matchStatus == 'IN_PLAY' 
-                                                          ? 'LIVE'
-                                                          : matchStatus == 'TIMED'
-                                                              ? 'UPCOMING'  // Changed from 'TIMED' to 'UPCOMING'
-                                                              : matchStatus,
-                                                  style: TextStyle(
-                                                    color: matchStatus == 'FINISHED' 
-                                                        ? Colors.green 
-                                                        : matchStatus == 'IN_PLAY' 
-                                                            ? Colors.red 
-                                                            : colorScheme.onSurface.withOpacity(0.7),
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.w500,
-                                                  ),
-                                                  textAlign: TextAlign.end,
+                                                child: Row(
+                                                  mainAxisAlignment: MainAxisAlignment.end,
+                                                  children: [
+                                                    if (matchStatus == 'IN_PLAY')
+                                                      Padding(
+                                                        padding: const EdgeInsets.only(right: 4.0),
+                                                        child: FadeTransition(
+                                                          opacity: _blinkAnimation,
+                                                          child: Container(
+                                                            width: 8,
+                                                            height: 8,
+                                                            decoration: BoxDecoration(
+                                                              color: Colors.red,
+                                                              shape: BoxShape.circle,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    Text(
+                                                      matchStatus == 'FINISHED' 
+                                                          ? 'FINISHED'
+                                                          : matchStatus == 'IN_PLAY' 
+                                                              ? 'LIVE'
+                                                              : matchStatus == 'TIMED'
+                                                                  ? 'UPCOMING'  // Changed from 'TIMED' to 'UPCOMING'
+                                                                  : matchStatus,
+                                                      style: TextStyle(
+                                                        color: matchStatus == 'FINISHED' 
+                                                            ? Colors.green 
+                                                            : matchStatus == 'IN_PLAY' 
+                                                                ? Colors.red 
+                                                                : colorScheme.onSurface.withOpacity(0.7),
+                                                        fontSize: 12,
+                                                        fontWeight: FontWeight.w500,
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
                                               ),
                                             ],
@@ -574,7 +611,9 @@ class _MainScreenState extends State<MainScreen> {
                                                         ? isDarkMode 
                                                             ? Colors.white
                                                             : Colors.black
-                                                        : Colors.black,
+                                                        : matchStatus == 'IN_PLAY' && isDarkMode
+                                                            ? Colors.white
+                                                            : Colors.black,
                                                     fontWeight: FontWeight.bold,
                                                   ),
                                                 ),
