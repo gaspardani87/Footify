@@ -191,17 +191,29 @@ class _SettingsPageState extends State<SettingsPage> {
               AppLocalizations.of(context)!.fontSize,
               style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)
             ),
-            subtitle: Slider(
-              value: fontSizeProvider.fontSize,
-              min: 10.0,
-              max: 30.0,
-              divisions: 20,
-              activeColor: const Color(0xFFFFE6AC),
-              inactiveColor: isDarkMode ? Colors.grey : Colors.grey[400],
-              label: fontSizeProvider.fontSize.round().toString(),
-              onChanged: (double value) {
-                fontSizeProvider.setFontSize(value);
-              },
+            subtitle: Row(
+              children: [
+                Expanded(
+                  child: Slider(
+                    value: fontSizeProvider.fontSize,
+                    min: 10.0,
+                    max: 30.0,
+                    divisions: 20,
+                    activeColor: const Color(0xFFFFE6AC),
+                    inactiveColor: isDarkMode ? Colors.grey : Colors.grey[400],
+                    label: fontSizeProvider.fontSize.round().toString(),
+                    onChanged: (double value) {
+                      fontSizeProvider.setFontSize(value);
+                    },
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.refresh, color: isDarkMode ? Colors.white : Colors.black),
+                  onPressed: () {
+                    fontSizeProvider.setFontSize(16.0);
+                  },
+                ),
+              ],
             ),
           ),
           Divider(color: isDarkMode ? const Color(0xFFFFE6AC) : Colors.black),

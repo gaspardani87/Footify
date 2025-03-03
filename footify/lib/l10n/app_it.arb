@@ -16,5 +16,15 @@
     "colorBlindMode": "Modalità daltonico",
     "fontSize": "Dimensione carattere",
     "aboutUs": "Chi siamo",
-    "aboutUsText": "Scopri di più su di noi"
+    "aboutUsText": "Scopri di più su di noi",
+    "welcomeToFootify": "Benvenuti a Footify!",
+    "welcomeText": "Effettua il login o registrati per accedere al tuo profilo",
+    "loginButton": "Login",
+    "registerButton": "Registro",
+    "errorLoading": "Errore durante il caricamento dei dati del profilo",
+    "logOut": "Esci",
+    "deleteAccount": "Elimina Account",
+    "profileName": "Nome",
+    "favTeam": "Squadra preferita",
+    "favLeague": "Lega preferita"
 }

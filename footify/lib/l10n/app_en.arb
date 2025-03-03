@@ -16,5 +16,15 @@
     "colorBlindMode": "Color Blind Mode",
     "fontSize": "Font Size",
     "aboutUs": "About Us",
-    "aboutUsText": "Learn more about us"
+    "aboutUsText": "Learn more about us",
+    "welcomeToFootify": "Welcome to Footify!",
+    "welcomeText": "Please log in or register to access your profile",
+    "loginButton": "Login",
+    "registerButton": "Register",
+    "errorLoading": "Error loading profile data",
+    "logOut": "Logout",
+    "deleteAccount": "Delete Account",
+    "profileName": "Name",
+    "favTeam": "Favorite Team",
+    "favLeague": "Favorite League"
 }

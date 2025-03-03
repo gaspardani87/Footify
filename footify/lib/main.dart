@@ -32,6 +32,7 @@ Future<Map<String, dynamic>> fetchDataDefault() async {
     Uri.parse('$proxyUrl$apiUrl'),
     headers: {
       'X-Auth-Token': '4c553fac5d704101906782d1ecbe1b12',
+      'x-cors-api-key': 'temp_b7020b5f16680aae2a61be69685f4115'
     },
   );
 

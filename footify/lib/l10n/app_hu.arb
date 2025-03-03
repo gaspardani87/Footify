@@ -16,5 +16,15 @@
     "colorBlindMode": "Színtévesztő mód",
     "fontSize": "Betűméret",
     "aboutUs": "Rólunk",
-    "aboutUsText": "Tudjon meg többet rólunk"
+    "aboutUsText": "Tudjon meg többet rólunk",
+    "welcomeToFootify": "Üdvözöljük a Footify-ban!",
+    "welcomeText": "Kérjük, jelentkezzen be vagy regisztráljon a profil eléréséhez",
+    "loginButton": "Bejelentkezés",
+    "registerButton": "Regisztráció",
+    "errorLoading": "Hiba a profiladatok betöltésekor",
+    "logOut": "Kijelentkezés",
+    "deleteAccount": "Fiók törlés",
+    "profileName": "Név",
+    "favTeam": "Kedvenc Csapat",
+    "favLeague": "Kedvenc Bajnokság"
 }

@@ -7,6 +7,8 @@ import 'package:flutter/services.dart';
 import 'services/football_api_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'language_provider.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -39,7 +41,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      'Welcome to Footify!',
+                      AppLocalizations.of(context)!.welcomeToFootify,
                       style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                         color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                         fontWeight: FontWeight.bold,
@@ -47,7 +49,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Please log in or register to access your profile',
+                      AppLocalizations.of(context)!.welcomeText,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54,
                       ),
@@ -80,7 +82,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             child: Padding(
                               padding: const EdgeInsets.all(20),
                               child: Text(
-                                'Error loading profile data',
+                                AppLocalizations.of(context)!.errorLoading,
                                 style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
                               ),
                             ),
@@ -108,8 +110,8 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                         shape: const StadiumBorder(),
                       ),
-                      child: const Text(
-                        'Logout',
+                      child: Text(
+                        AppLocalizations.of(context)!.logOut,
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -127,8 +129,8 @@ class _ProfilePageState extends State<ProfilePage> {
                         side: const BorderSide(color: Colors.red),
                         shape: const StadiumBorder(),
                       ),
-                      child: const Text(
-                        'Delete Account',
+                      child: Text(
+                        AppLocalizations.of(context)!.deleteAccount,
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -155,7 +157,7 @@ class _ProfilePageState extends State<ProfilePage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             IconButton(
-              icon: Icon(Icons.camera_alt, size: 20, color: Colors.black),
+              icon: Icon(Icons.camera_alt, size: 20, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
               onPressed: () => _pickImage(context),
             ),
             Stack(
@@ -176,7 +178,7 @@ class _ProfilePageState extends State<ProfilePage> {
               ],
             ),
             IconButton(
-              icon: Icon(Icons.close, size: 20, color: Colors.black),
+              icon: Icon(Icons.close, size: 20, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
               onPressed: () => _deleteProfilePicture(context),
             ),
           ],
@@ -221,7 +223,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 const Divider(color: Color(0xFFFFE6AC)),
                 _buildProfileItem(
                   context,
-                  'Name',
+                  AppLocalizations.of(context)!.profileName,
                   userData['name'] ?? 'No name provided',
                   Icons.person,
                   textColor,
@@ -229,7 +231,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 const Divider(color: Color(0xFFFFE6AC)),
                 _buildProfileItem(
                   context,
-                  'Favorite Team',
+                  AppLocalizations.of(context)!.favTeam,
                   userData['favoriteTeam'] ?? 'No team selected',
                   Icons.sports_soccer,
                   textColor,
@@ -237,7 +239,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 const Divider(color: Color(0xFFFFE6AC)),
                 _buildProfileItem(
                   context,
-                  'Favorite League',
+                  AppLocalizations.of(context)!.favLeague,
                   userData['favoriteLeague'] ?? 'No league selected',
                   Icons.emoji_events,
                   textColor,
@@ -323,8 +325,8 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
         shape: const StadiumBorder(),
       ),
-      child: const Text(
-        'Login',
+      child: Text(
+        AppLocalizations.of(context)!.loginButton,
         style: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.bold,
@@ -350,7 +352,7 @@ class _ProfilePageState extends State<ProfilePage> {
       shape: const StadiumBorder(),
     ),
     child: Text(
-      'Register',
+      AppLocalizations.of(context)!.registerButton,
       style: TextStyle(
         fontSize: 16,
         fontWeight: FontWeight.bold,
