@@ -25,11 +25,15 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 late Future<Map<String, dynamic>> Function() fetchData;
 
 Future<Map<String, dynamic>> fetchDataDefault() async {
-  // Replace with your actual Firebase function URL
-  const firebaseFunctionUrl = 'https://us-central1-footify-13da4.cloudfunctions.net/fetchMatches';
+  final proxyUrl = 'https://thingproxy.freeboard.io/fetch/';
+  final apiUrl = 'https://api.football-data.org/v4/matches';
 
   final response = await http.get(
-    Uri.parse(firebaseFunctionUrl),
+    Uri.parse('$proxyUrl$apiUrl'),
+    headers: {
+      'X-Auth-Token': '4c553fac5d704101906782d1ecbe1b12',
+      'x-cors-api-key': 'temp_b7020b5f16680aae2a61be69685f4115'
+    },
   );
 
   if (response.statusCode == 200) {
@@ -298,10 +302,12 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
 
   String getProxiedImageUrl(String? originalUrl) {
     if (originalUrl == null || originalUrl.isEmpty) return '';
-    
-    // Use Firebase proxy for all platforms
-    const proxyUrl = 'https://us-central1-footify-13da4.cloudfunctions.net/proxyImage';
-    return '$proxyUrl?url=${Uri.encodeComponent(originalUrl)}';
+    if (kIsWeb) {
+      // Use cors-anywhere for web platform
+      return 'https://cors-anywhere.herokuapp.com/$originalUrl';
+    }
+    // Return direct URL for mobile platforms
+    return originalUrl;
   }
 
   @override
