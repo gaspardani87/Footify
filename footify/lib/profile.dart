@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'language_provider.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // Added for email availability check
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -20,7 +21,7 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   static const Color goldColor = Color(0xFFFFE6AC);
   static const Color darkColor = Color(0xFF2C2C2C);
-  
+
   File? _profileImage;
   final ImagePicker _picker = ImagePicker();
 
@@ -32,7 +33,6 @@ class _ProfilePageState extends State<ProfilePage> {
         builder: (context, provider, _) {
           final user = provider.currentUser;
 
-          // If not logged in, show login/register buttons
           if (user == null) {
             return Center(
               child: Padding(
@@ -64,8 +64,7 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             );
           }
-          
-          // User is logged in, show profile layout with logout button
+
           return Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -74,7 +73,6 @@ class _ProfilePageState extends State<ProfilePage> {
                   child: SingleChildScrollView(
                     child: Column(
                       children: [
-                        // Profile data section
                         if (provider.userData != null) ...[
                           _buildProfileData(context, provider.userData!),
                         ] else ...[
@@ -92,7 +90,6 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                   ),
                 ),
-                // Logout button always visible when logged in              
                 const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -112,7 +109,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                       child: Text(
                         AppLocalizations.of(context)!.logOut,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
@@ -131,7 +128,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                       child: Text(
                         AppLocalizations.of(context)!.deleteAccount,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
@@ -168,7 +165,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   backgroundColor: Colors.grey[800],
                   backgroundImage: _profileImage != null
                       ? FileImage(_profileImage!)
-                      : (userData['profilePictureUrl'] != null 
+                      : (userData['profilePictureUrl'] != null
                           ? NetworkImage(userData['profilePictureUrl']) as ImageProvider
                           : null),
                   child: (_profileImage == null && (userData['profilePictureUrl'] == null || userData['profilePictureUrl'].isEmpty))
@@ -187,7 +184,7 @@ class _ProfilePageState extends State<ProfilePage> {
         Text(
           '@${userData['username'] ?? 'username'}',
           style: TextStyle(
-            color: Theme.of(context).brightness == Brightness.dark ? Color(0xFFFFE6AC) : Colors.black,
+            color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFFFFE6AC) : Colors.black,
             fontSize: 18,
             fontWeight: FontWeight.bold,
           ),
@@ -257,7 +254,6 @@ class _ProfilePageState extends State<ProfilePage> {
       _profileImage = null;
     });
 
-    // Optionally, update the user's profile picture URL in your backend or Firebase
     final provider = Provider.of<FirebaseProvider>(context, listen: false);
     try {
       await provider.updateProfilePictureUrl(null);
@@ -274,27 +270,17 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _pickImage(BuildContext context) async {
     try {
       final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-      
       if (image != null) {
         setState(() {
           _profileImage = File(image.path);
         });
-        
-        // Here you would typically upload the image to Firebase storage
-        // and update the user profile with the new image URL
+
         final provider = Provider.of<FirebaseProvider>(context, listen: false);
-        
-        // This is a placeholder - you would need to implement the uploadProfileImage method
-        // in your FirebaseProvider class
         try {
-          // Show a loading indicator
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Uploading profile picture...')),
           );
-          
-          // Assuming you have this method in your FirebaseProvider
           final String? imageUrl = await provider.uploadProfileImage(_profileImage!);
-          
           if (imageUrl != null) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Profile picture updated successfully')),
@@ -327,7 +313,7 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
       child: Text(
         AppLocalizations.of(context)!.loginButton,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.bold,
         ),
@@ -336,31 +322,31 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _buildRegisterButton(BuildContext context) {
-  final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-  final borderColor = isDarkMode ? goldColor : Colors.black;
-  final textColor = isDarkMode ? goldColor : Colors.black;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final borderColor = isDarkMode ? goldColor : Colors.black;
+    final textColor = isDarkMode ? goldColor : Colors.black;
 
-  return OutlinedButton(
-    onPressed: () => _showRegistrationFlow(context),
-    style: OutlinedButton.styleFrom(
-      foregroundColor: textColor,
-      padding: const EdgeInsets.symmetric(
-        horizontal: 50,
-        vertical: 16,
+    return OutlinedButton(
+      onPressed: () => _showRegistrationFlow(context),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: textColor,
+        padding: const EdgeInsets.symmetric(
+          horizontal: 50,
+          vertical: 16,
+        ),
+        side: BorderSide(color: borderColor),
+        shape: const StadiumBorder(),
       ),
-      side: BorderSide(color: borderColor),
-      shape: const StadiumBorder(),
-    ),
-    child: Text(
-      AppLocalizations.of(context)!.registerButton,
-      style: TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.bold,
-        color: textColor,
+      child: Text(
+        AppLocalizations.of(context)!.registerButton,
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          color: textColor,
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildProfileItem(BuildContext context, String label, String value, IconData icon, Color textColor) {
     return Padding(
@@ -398,38 +384,40 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _showRegistrationFlow(BuildContext context) async {
-    // Step 1: Email and Password
+    // Step 1: Collect Email and Password
     final credentials = await _showEmailPasswordDialog(context);
     if (credentials == null) return;
+    final email = credentials['email']!;
+    final password = credentials['password']!;
 
-    // Step 2: Full Name
+    // Step 2: Collect Full Name
     final name = await _showNameDialog(context);
     if (name == null) return;
 
-    // Step 3: Username
+    // Step 3: Collect Username
     final username = await _showUsernameDialog(context);
     if (username == null) return;
-    // Note: phoneNumber can be null as it's optional
 
-    // Step 5: Favorite Team
+    // Step 4: Collect Favorite Team
     final team = await _showTeamSelectionDialog(context);
     if (team == null) return;
 
-    // Step 6: Favorite League
+    // Step 5: Collect Favorite League
     final league = await _showLeagueSelectionDialog(context);
     if (league == null) return;
 
-    // Complete Registration
+    // Complete Registration with all collected data
     if (context.mounted) {
       final firebaseProvider = Provider.of<FirebaseProvider>(context, listen: false);
       try {
         final success = await firebaseProvider.completeSignUp(
+          email: email,
+          password: password,
           name: name,
           username: username,
           favoriteTeam: team['name'] ?? '',
           favoriteLeague: league['name'] ?? '',
         );
-
         if (success && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Registration completed successfully')),
@@ -438,7 +426,7 @@ class _ProfilePageState extends State<ProfilePage> {
       } catch (e) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: ${e.toString()}')),
+            SnackBar(content: Text('Registration failed: ${e.toString()}')),
           );
         }
       }
@@ -462,25 +450,19 @@ class _ProfilePageState extends State<ProfilePage> {
             children: [
               TextField(
                 controller: emailController,
-                decoration: const InputDecoration(
-                  labelText: 'Email',
-                ),
+                decoration: const InputDecoration(labelText: 'Email'),
                 keyboardType: TextInputType.emailAddress,
                 enabled: !isLoading,
               ),
               TextField(
                 controller: passwordController,
-                decoration: const InputDecoration(
-                  labelText: 'Password',
-                ),
+                decoration: const InputDecoration(labelText: 'Password'),
                 obscureText: true,
                 enabled: !isLoading,
               ),
               TextField(
                 controller: confirmPasswordController,
-                decoration: const InputDecoration(
-                  labelText: 'Confirm Password',
-                ),
+                decoration: const InputDecoration(labelText: 'Confirm Password'),
                 obscureText: true,
                 enabled: !isLoading,
               ),
@@ -504,28 +486,23 @@ class _ProfilePageState extends State<ProfilePage> {
 
                       setState(() => isLoading = true);
                       try {
-                        final firebaseProvider =
-                            Provider.of<FirebaseProvider>(context, listen: false);
-                        final success = await firebaseProvider.initiateSignUp(
-                          emailController.text,
-                          passwordController.text,
-                        );
-
-                        if (success) {
-                          Navigator.pop(context, {
-                            'email': emailController.text,
-                            'password': passwordController.text,
-                          });
-                        } else {
-                          setState(() => isLoading = false);
-                        }
-                      } catch (e) {
-                        setState(() => isLoading = false);
-                        if (context.mounted) {
+                        final methods = await FirebaseAuth.instance.fetchSignInMethodsForEmail(emailController.text);
+                        if (methods.isNotEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error: ${e.toString()}')),
+                            const SnackBar(content: Text('Email already in use')),
                           );
+                          setState(() => isLoading = false);
+                          return;
                         }
+                        Navigator.pop(context, {
+                          'email': emailController.text,
+                          'password': passwordController.text,
+                        });
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error checking email: $e')),
+                        );
+                        setState(() => isLoading = false);
                       }
                     },
               child: const Text('Next'),
@@ -798,18 +775,14 @@ class _ProfilePageState extends State<ProfilePage> {
             children: [
               TextField(
                 controller: emailController,
-                decoration: const InputDecoration(
-                  labelText: 'Email'
-                ),
+                decoration: const InputDecoration(labelText: 'Email'),
                 keyboardType: TextInputType.emailAddress,
                 enabled: !isLoading,
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: passwordController,
-                decoration: const InputDecoration(
-                  labelText: 'Password'
-                ),
+                decoration: const InputDecoration(labelText: 'Password'),
                 obscureText: true,
                 enabled: !isLoading,
               ),
@@ -828,12 +801,9 @@ class _ProfilePageState extends State<ProfilePage> {
               onPressed: isLoading
                   ? null
                   : () async {
-                      if (emailController.text.isEmpty ||
-                          passwordController.text.isEmpty) {
+                      if (emailController.text.isEmpty || passwordController.text.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Please fill in all fields'),
-                          ),
+                          const SnackBar(content: Text('Please fill in all fields')),
                         );
                         return;
                       }
@@ -841,8 +811,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       setState(() => isLoading = true);
 
                       try {
-                        final firebaseProvider =
-                            Provider.of<FirebaseProvider>(context, listen: false);
+                        final firebaseProvider = Provider.of<FirebaseProvider>(context, listen: false);
                         final success = await firebaseProvider.signIn(
                           emailController.text,
                           passwordController.text,
@@ -851,25 +820,19 @@ class _ProfilePageState extends State<ProfilePage> {
                         if (success && context.mounted) {
                           Navigator.pop(context);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Login successful'),
-                            ),
+                            const SnackBar(content: Text('Login successful')),
                           );
                         } else if (context.mounted) {
                           setState(() => isLoading = false);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Login failed'),
-                            ),
+                            const SnackBar(content: Text('Login failed')),
                           );
                         }
                       } catch (e) {
                         setState(() => isLoading = false);
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Error: ${e.toString()}'),
-                            ),
+                            SnackBar(content: Text('Error: ${e.toString()}')),
                           );
                         }
                       }

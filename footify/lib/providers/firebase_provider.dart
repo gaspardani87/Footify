@@ -13,7 +13,6 @@ class FirebaseProvider with ChangeNotifier {
   User? _user;
   Map<String, dynamic>? _userData;
   bool _isLoading = true;
-  UserCredential? _tempUserCredential;
 
   // Getters
   User? get currentUser => _user;
@@ -66,7 +65,7 @@ class FirebaseProvider with ChangeNotifier {
       }
 
       final doc = await _firestore.collection('users').doc(_user!.uid).get();
-      
+
       if (doc.exists) {
         _userData = doc.data();
         if (_userData!['joinDate'] != null) {
@@ -90,7 +89,7 @@ class FirebaseProvider with ChangeNotifier {
     if (_userData != null) {
       return _userData;
     }
-    
+
     try {
       await _fetchUserData();
       return _userData;
@@ -101,29 +100,23 @@ class FirebaseProvider with ChangeNotifier {
   }
 
   // Sign Up
-  Future<bool> initiateSignUp(String email, String password) async {
+  Future<bool> completeSignUp({
+    required String email,
+    required String password,
+    required String name,
+    required String username,
+    required String favoriteTeam,
+    required String favoriteLeague,
+    String? phoneNumber,
+  }) async {
     try {
-      final userCredential = await _auth.createUserWithEmailAndPassword(
+      // Create the user account with email and password
+      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
       _user = userCredential.user;
-      notifyListeners();
-      return true;
-    } catch (e) {
-      print('Sign up initiation error: $e');
-      return false;
-    }
-  }
 
-  Future<bool> completeSignUp({
-    required String name,
-    required String username,
-    String? phoneNumber,
-    required String favoriteTeam,
-    required String favoriteLeague,
-  }) async {
-    try {
       if (_user != null) {
         final userData = {
           'name': name,
@@ -132,17 +125,18 @@ class FirebaseProvider with ChangeNotifier {
           'favoriteTeam': favoriteTeam,
           'favoriteLeague': favoriteLeague,
           'joinDate': FieldValue.serverTimestamp(),
-          'email': _user!.email,
+          'email': email,
           'uid': _user!.uid,
         };
 
         // Store data in Firestore
         await _firestore.collection('users').doc(_user!.uid).set(userData);
-        
+
         // Update display name in Firebase Auth
         await _user!.updateDisplayName(name);
-        
+
         print('User data saved successfully: $userData');
+        await _fetchUserData(); // Fetch the newly created user data
         return true;
       }
       return false;
@@ -257,7 +251,7 @@ class FirebaseProvider with ChangeNotifier {
     }
   }
 
-  // Add these new methods
+  // Check Username Availability
   Future<bool> isUsernameAvailable(String username) async {
     try {
       return await _firebaseService.isUsernameAvailable(username);
@@ -267,6 +261,7 @@ class FirebaseProvider with ChangeNotifier {
     }
   }
 
+  // Complete User Profile
   Future<void> completeUserProfile(
     String userId, {
     required String name,
@@ -294,7 +289,7 @@ class FirebaseProvider with ChangeNotifier {
     }
   }
 
-  // Method to check if profile is completed
+  // Check if Profile is Completed
   Future<bool> isProfileCompleted(String userId) async {
     try {
       final doc = await _firestore.collection('users').doc(userId).get();
@@ -305,6 +300,7 @@ class FirebaseProvider with ChangeNotifier {
     }
   }
 
+  // Delete Account
   Future<void> deleteAccount() async {
     try {
       if (_user != null) {
@@ -318,6 +314,7 @@ class FirebaseProvider with ChangeNotifier {
     }
   }
 
+  // Upload Profile Image
   Future<String?> uploadProfileImage(File image) async {
     try {
       final storageRef = FirebaseStorage.instance.ref().child('profile_images/${currentUser!.uid}.jpg');
@@ -331,6 +328,7 @@ class FirebaseProvider with ChangeNotifier {
     }
   }
 
+  // Update Profile Picture URL
   Future<void> updateProfilePictureUrl(String? url) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
