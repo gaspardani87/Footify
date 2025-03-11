@@ -20,27 +20,33 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'language_provider.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:io';
+import 'package:http/io_client.dart';
 
 
 // Define fetchData as a global variable
 late Future<Map<String, dynamic>> Function() fetchData;
 
-Future<Map<String, dynamic>> fetchDataDefault() async {
-  final proxyUrl = 'https://thingproxy.freeboard.io/fetch/';
-  final apiUrl = 'https://api.football-data.org/v4/matches';
-
-  final response = await http.get(
-    Uri.parse('$proxyUrl$apiUrl'),
-    headers: {
-      'X-Auth-Token': '4c553fac5d704101906782d1ecbe1b12',
-      'x-cors-api-key': 'temp_b7020b5f16680aae2a61be69685f4115'
-    },
-  );
-
-  if (response.statusCode == 200) {
-    return json.decode(response.body);
-  } else {
-    throw Exception('Failed to load data: ${response.statusCode} ${response.body}');
+Future<Map<String, dynamic>> fetchDataFirebase() async {
+  const String url = 'https://us-central1-footify-13da4.cloudfunctions.net/fetchFootballData';
+  try {
+    final response = await http.get(
+      Uri.parse(url),
+      headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+    ).timeout(const Duration(seconds: 10));
+    print('Status: ${response.statusCode}');
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Failed: ${response.statusCode} - ${response.body}');
+    }
+  } on http.ClientException catch (e) {
+    print('ClientException: ${e.message}, URI: ${e.uri}');
+    throw Exception('ClientException: Failed to fetch data - ${e.message}');
+  } catch (e) {
+    print('Error: $e');
+    throw Exception('Error: $e');
   }
 }
 
@@ -51,7 +57,7 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  fetchData = fetchDataDefault;
+  fetchData = fetchDataFirebase;
 
   runApp(
     MultiProvider(
@@ -74,7 +80,7 @@ class HomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final fontSizeProvider = Provider.of<FontSizeProvider>(context);
-    final languageProvider = Provider.of<LanguageProvider>(context); // Add this
+    final languageProvider = Provider.of<LanguageProvider>(context);
 
     return MaterialApp(
       title: 'Footify',
@@ -82,9 +88,9 @@ class HomePage extends StatelessWidget {
       theme: _buildTheme(ThemeData.light(), fontSizeProvider.fontSize, Provider.of<ColorBlindModeProvider>(context).isColorBlindMode),
       darkTheme: _buildTheme(ThemeData.dark(), fontSizeProvider.fontSize, Provider.of<ColorBlindModeProvider>(context).isColorBlindMode),
       themeMode: themeProvider.themeMode,
-      locale: languageProvider.currentLocale, // Add this line
-      localizationsDelegates: AppLocalizations.localizationsDelegates,  // Change this
-      supportedLocales: AppLocalizations.supportedLocales,  // Change this
+      locale: languageProvider.currentLocale,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       home: const MainScreen(),
     );
   }
@@ -93,30 +99,27 @@ class HomePage extends StatelessWidget {
   ThemeData _buildTheme(ThemeData baseTheme, double fontSize, bool isColorBlindMode) {
     final isDark = baseTheme.brightness == Brightness.dark;
     
-    // Keep your existing color palettes
     final colorBlindPalette = isDark ? {
-  // Dark Mode Adjustments
-  'background': const Color(0xFF1A1A2F),  // Keep dark navy (good contrast)
-  'surface': const Color(0xFF2A2A4A),     // Increased contrast from background
-  'primary': const Color(0xFFF4D03F),     // Golden yellow (distinct from reds/greens)
-  'secondary': const Color(0xFFE67E22),   // Pumpkin orange (differentiates from primary)
-  'text': const Color(0xFFF9E79F),        // Pale yellow (high contrast)
-  'textSecondary': const Color(0xFFF7DC6F), // Brighter yellow
-  'accent': const Color(0xFF58D68D),      // Teal (visible to all CVD types)
-  'divider': const Color(0xFFF1C40F),     // Bold yellow
-  'button': const Color(0xFFF4D03F),      // Matches primary
-} : {
-  // Light Mode Adjustments
-  'background': const Color(0xFFF8F9FA),  // Off-white
-  'surface': const Color(0xFFE9ECEF),      // Light gray
-  'primary': const Color(0xFF2E86C1),      // Perceptual blue (CVD-safe)
-  'secondary': const Color(0xFF48C9B0),    // Teal (distinct from primary)
-  'text': const Color(0xFF2C3E50),         // Dark navy (high contrast)
-  'textSecondary': const Color(0xFF566573), // Medium slate
-  'accent': const Color(0xFFE74C3C),       // Vermillion red (CVD-visible)
-  'divider': const Color(0xFFAED6F1),      // Light blue
-  'button': const Color(0xFF2E86C1),       // Matches primary
-};
+      'background': const Color(0xFF1A1A2F),
+      'surface': const Color(0xFF2A2A4A),
+      'primary': const Color(0xFFF4D03F),
+      'secondary': const Color(0xFFE67E22),
+      'text': const Color(0xFFF9E79F),
+      'textSecondary': const Color(0xFFF7DC6F),
+      'accent': const Color(0xFF58D68D),
+      'divider': const Color(0xFFF1C40F),
+      'button': const Color(0xFFF4D03F),
+    } : {
+      'background': const Color(0xFFF8F9FA),
+      'surface': const Color(0xFFE9ECEF),
+      'primary': const Color(0xFF2E86C1),
+      'secondary': const Color(0xFF48C9B0),
+      'text': const Color(0xFF2C3E50),
+      'textSecondary': const Color(0xFF566573),
+      'accent': const Color(0xFFE74C3C),
+      'divider': const Color(0xFFAED6F1),
+      'button': const Color(0xFF2E86C1),
+    };
 
     final regularPalette = isDark ? {
       'background': const Color(0xFF1D1D1D),
@@ -140,10 +143,8 @@ class HomePage extends StatelessWidget {
       'button': const Color(0xFFFFE6AC),
     };
 
-    // Select the appropriate palette based on colorblind mode
     final colors = isColorBlindMode ? colorBlindPalette : regularPalette;
 
-    // Apply the colors consistently throughout the theme
     return baseTheme.copyWith(
       scaffoldBackgroundColor: colors['background'],
       cardColor: colors['surface'],
@@ -188,45 +189,17 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  // Helper function to build a TextTheme with the desired font size and Lexend font
   TextTheme _buildTextTheme(TextTheme baseTextTheme, double fontSize) {
     return baseTextTheme.copyWith(
-      bodyLarge: baseTextTheme.bodyLarge?.copyWith(
-        fontFamily: 'Lexend',
-        fontSize: fontSize,
-      ),
-      bodyMedium: baseTextTheme.bodyMedium?.copyWith(
-        fontFamily: 'Lexend',
-        fontSize: fontSize,
-      ),
-      bodySmall: baseTextTheme.bodySmall?.copyWith(
-        fontFamily: 'Lexend',
-        fontSize: fontSize,
-      ),
-      titleLarge: baseTextTheme.titleLarge?.copyWith(
-        fontFamily: 'Lexend',
-        fontSize: fontSize * 1.25,
-      ),
-      titleMedium: baseTextTheme.titleMedium?.copyWith(
-        fontFamily: 'Lexend',
-        fontSize: fontSize * 1.15,
-      ),
-      titleSmall: baseTextTheme.titleSmall?.copyWith(
-        fontFamily: 'Lexend',
-        fontSize: fontSize * 1.05,
-      ),
-      labelLarge: baseTextTheme.labelLarge?.copyWith(
-        fontFamily: 'Lexend',
-        fontSize: fontSize,
-      ),
-      labelMedium: baseTextTheme.labelMedium?.copyWith(
-        fontFamily: 'Lexend',
-        fontSize: fontSize,
-      ),
-      labelSmall: baseTextTheme.labelSmall?.copyWith(
-        fontFamily: 'Lexend',
-        fontSize: fontSize,
-      ),
+      bodyLarge: baseTextTheme.bodyLarge?.copyWith(fontFamily: 'Lexend', fontSize: fontSize),
+      bodyMedium: baseTextTheme.bodyMedium?.copyWith(fontFamily: 'Lexend', fontSize: fontSize),
+      bodySmall: baseTextTheme.bodySmall?.copyWith(fontFamily: 'Lexend', fontSize: fontSize),
+      titleLarge: baseTextTheme.titleLarge?.copyWith(fontFamily: 'Lexend', fontSize: fontSize * 1.25),
+      titleMedium: baseTextTheme.titleMedium?.copyWith(fontFamily: 'Lexend', fontSize: fontSize * 1.15),
+      titleSmall: baseTextTheme.titleSmall?.copyWith(fontFamily: 'Lexend', fontSize: fontSize * 1.05),
+      labelLarge: baseTextTheme.labelLarge?.copyWith(fontFamily: 'Lexend', fontSize: fontSize),
+      labelMedium: baseTextTheme.labelMedium?.copyWith(fontFamily: 'Lexend', fontSize: fontSize),
+      labelSmall: baseTextTheme.labelSmall?.copyWith(fontFamily: 'Lexend', fontSize: fontSize),
     );
   }
 }
@@ -292,24 +265,21 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) => page,
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return FadeTransition(
-            opacity: animation,
-            child: child,
-          );
+          return FadeTransition(opacity: animation, child: child);
         },
       ),
     );
   }
 
   String getProxiedImageUrl(String? originalUrl) {
-    if (originalUrl == null || originalUrl.isEmpty) return '';
-    if (kIsWeb) {
-      // Use cors-anywhere for web platform
-      return 'https://cors-anywhere.herokuapp.com/$originalUrl';
-    }
-    // Return direct URL for mobile platforms
-    return originalUrl;
+  if (originalUrl == null || originalUrl.isEmpty) return '';
+  if (kIsWeb) {
+    // Proxy through Firebase function for web
+    return 'https://us-central1-footify-13da4.cloudfunctions.net/proxyImage?url=${Uri.encodeComponent(originalUrl)}';
   }
+  // Use direct URL for mobile
+  return originalUrl;
+}
 
   @override
   Widget build(BuildContext context) {
@@ -322,32 +292,16 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
         future: _futureData,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(
-              child: CircularProgressIndicator(
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
-            );
+            return Center(child: CircularProgressIndicator(color: isDarkMode ? Colors.white : Colors.black));
           } else if (snapshot.hasError) {
-            return Center(
-              child: Text(
-                'Error: ${snapshot.error}',
-                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-              ),
-            );
+            return Center(child: Text('Error: ${snapshot.error}', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)));
           } else if (snapshot.hasData) {
             final data = snapshot.data!;
             if (data['matches'] == null || data['matches'].isEmpty) {
-              return Center(
-                child: Text(
-                  'No matches available',
-                  style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-                ),
-              );
+              return Center(child: Text('No matches available', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)));
             }
             
-            // Group matches by competition
             final Map<String, List<dynamic>> matchesByCompetition = {};
-            
             for (var match in data['matches']) {
               final competitionName = match['competition']['name'] ?? 'Other Competitions';
               if (!matchesByCompetition.containsKey(competitionName)) {
@@ -356,7 +310,6 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
               matchesByCompetition[competitionName]!.add(match);
             }
             
-            // Sort competitions alphabetically
             final sortedCompetitions = matchesByCompetition.keys.toList()..sort();
             
             return ListView.builder(
@@ -371,18 +324,14 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                     return Card(
                       margin: const EdgeInsets.only(bottom: 20),
                       elevation: 4,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       color: colorScheme.surface,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Competition header (clickable)
                           InkWell(
                             onTap: () {
                               setState(() {
-                                // Toggle the expanded state for this competition
                                 _expandedCompetitions[competitionName] = !(_expandedCompetitions[competitionName] ?? true);
                               });
                             },
@@ -400,43 +349,27 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                               ),
                               child: Row(
                                 children: [
-                                  // Trophy icon
-                                  Icon(
-                                    Icons.emoji_events,
-                                    color: Colors.black,
-                                    size: 24,
-                                  ),
+                                  Icon(Icons.emoji_events, color: Colors.black, size: 24),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
                                       competitionName,
-                                      style: TextStyle(
-                                        color: Colors.black,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 18,
-                                      ),
+                                      style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18),
                                     ),
                                   ),
                                   AnimatedRotation(
                                     turns: (_expandedCompetitions[competitionName] ?? true) ? 0.0 : 0.5,
                                     duration: const Duration(milliseconds: 300),
-                                    child: Icon(
-                                      Icons.keyboard_arrow_up,
-                                      color: Colors.black,
-                                    ),
+                                    child: Icon(Icons.keyboard_arrow_up, color: Colors.black),
                                   ),
                                 ],
                               ),
                             ),
                           ),
-                          
-                          // Animated matches list (collapsible)
                           AnimatedContainer(
                             duration: const Duration(milliseconds: 300),
                             curve: Curves.easeInOut,
-                            height: (_expandedCompetitions[competitionName] ?? true) 
-                                ? null  // Let the content determine the height
-                                : 0,
+                            height: (_expandedCompetitions[competitionName] ?? true) ? null : 0,
                             child: ClipRect(
                               child: Align(
                                 alignment: Alignment.topCenter,
@@ -445,10 +378,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                                   shrinkWrap: true,
                                   physics: const NeverScrollableScrollPhysics(),
                                   itemCount: matches.length,
-                                  separatorBuilder: (context, index) => Divider(
-                                    height: 1,
-                                    color: colorScheme.onSurface.withOpacity(0.1),
-                                  ),
+                                  separatorBuilder: (context, index) => Divider(height: 1, color: colorScheme.onSurface.withOpacity(0.1)),
                                   itemBuilder: (context, matchIndex) {
                                     final match = matches[matchIndex];
                                     final homeTeam = match['homeTeam']['name'] ?? 'Unknown Team';
@@ -457,49 +387,18 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                                     final awayScore = match['score']['fullTime']['away'];
                                     final matchStatus = match['status'] ?? '';
                                     final matchDate = DateTime.parse(match['utcDate']).add(const Duration(hours: 1));
-                                    // During summer time (last Sunday in March to last Sunday in October)
-                                    // Use this line instead during DST:
-                                    // final matchDate = DateTime.parse(match['utcDate']).add(const Duration(hours: 2));
-
                                     final formattedDate = '${matchDate.year}/${matchDate.month.toString().padLeft(2, '0')}/${matchDate.day.toString().padLeft(2, '0')}';
                                     final formattedTime = '${matchDate.hour.toString().padLeft(2, '0')}:${matchDate.minute.toString().padLeft(2, '0')}';
-                                    
-                                    final scoreText = (homeScore != null && awayScore != null) 
-                                        ? '$homeScore - $awayScore' 
-                                        : 'vs';
+                                    final scoreText = (homeScore != null && awayScore != null) ? '$homeScore - $awayScore' : 'vs';
                                     
                                     return Padding(
                                       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                                       child: Column(
                                         children: [
-                                          // Match info row
                                           Row(
                                             children: [
-                                              // Date
-                                              Expanded(
-                                                flex: 1,
-                                                child: Text(
-                                                  formattedDate,
-                                                  style: TextStyle(
-                                                    color: colorScheme.onSurface.withOpacity(0.7),
-                                                    fontSize: 12,
-                                                  ),
-                                                ),
-                                              ),
-                                              // Time
-                                              Expanded(
-                                                flex: 1,
-                                                child: Text(
-                                                  formattedTime,
-                                                  style: TextStyle(
-                                                    color: colorScheme.onSurface,
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 14,
-                                                  ),
-                                                  textAlign: TextAlign.center,
-                                                ),
-                                              ),
-                                              // Status
+                                              Expanded(flex: 1, child: Text(formattedDate, style: TextStyle(color: colorScheme.onSurface.withOpacity(0.7), fontSize: 12))),
+                                              Expanded(flex: 1, child: Text(formattedTime, style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14), textAlign: TextAlign.center)),
                                               Expanded(
                                                 flex: 1,
                                                 child: Row(
@@ -513,27 +412,14 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                                                           child: Container(
                                                             width: 8,
                                                             height: 8,
-                                                            decoration: BoxDecoration(
-                                                              color: Colors.red,
-                                                              shape: BoxShape.circle,
-                                                            ),
+                                                            decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
                                                           ),
                                                         ),
                                                       ),
                                                     Text(
-                                                      matchStatus == 'FINISHED' 
-                                                          ? 'FINISHED'
-                                                          : matchStatus == 'IN_PLAY' 
-                                                              ? 'LIVE'
-                                                              : matchStatus == 'TIMED'
-                                                                  ? 'UPCOMING'  // Changed from 'TIMED' to 'UPCOMING'
-                                                                  : matchStatus,
+                                                      matchStatus == 'FINISHED' ? 'FINISHED' : matchStatus == 'IN_PLAY' ? 'LIVE' : matchStatus == 'TIMED' ? 'UPCOMING' : matchStatus,
                                                       style: TextStyle(
-                                                        color: matchStatus == 'FINISHED' 
-                                                            ? Colors.green 
-                                                            : matchStatus == 'IN_PLAY' 
-                                                                ? Colors.red 
-                                                                : colorScheme.onSurface.withOpacity(0.7),
+                                                        color: matchStatus == 'FINISHED' ? Colors.green : matchStatus == 'IN_PLAY' ? Colors.red : colorScheme.onSurface.withOpacity(0.7),
                                                         fontSize: 12,
                                                         fontWeight: FontWeight.w500,
                                                       ),
@@ -543,126 +429,65 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                                               ),
                                             ],
                                           ),
-                                          
-                                          const SizedBox(height: 8), // Spacing between info and teams
-                                          
-                                          // Teams and score row
+                                          const SizedBox(height: 8),
                                           Row(
                                             children: [
-                                              // Home team with badge on left
                                               Expanded(
                                                 child: Row(
                                                   children: [
-                                                    // Home team badge
                                                     ClipRRect(
                                                       borderRadius: BorderRadius.circular(4),
                                                       child: Image.network(
                                                         getProxiedImageUrl(match['homeTeam']['crest']),
                                                         width: 24,
                                                         height: 24,
-                                                        headers: kIsWeb ? {
-                                                          'Origin': 'null',
-                                                        } : {
-                                                          'User-Agent': 'Mozilla/5.0',
-                                                        },
+                                                        headers: kIsWeb ? {'Origin': 'null'} : {'User-Agent': 'Mozilla/5.0'},
                                                         errorBuilder: (context, error, stackTrace) => Container(
                                                           width: 24,
                                                           height: 24,
-                                                          decoration: BoxDecoration(
-                                                            color: colorScheme.surfaceVariant,
-                                                            borderRadius: BorderRadius.circular(4),
-                                                          ),
-                                                          child: Icon(
-                                                            Icons.sports_soccer,
-                                                            size: 16,
-                                                            color: colorScheme.onSurface,
-                                                          ),
+                                                          decoration: BoxDecoration(color: colorScheme.surfaceVariant, borderRadius: BorderRadius.circular(4)),
+                                                          child: Icon(Icons.sports_soccer, size: 16, color: colorScheme.onSurface),
                                                         ),
                                                       ),
                                                     ),
                                                     const SizedBox(width: 8),
-                                                    // Home team name
-                                                    Expanded(
-                                                      child: Text(
-                                                        homeTeam,
-                                                        style: TextStyle(
-                                                          color: colorScheme.onSurface,
-                                                          fontWeight: FontWeight.w500,
-                                                        ),
-                                                        overflow: TextOverflow.ellipsis,
-                                                      ),
-                                                    ),
+                                                    Expanded(child: Text(homeTeam, style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)),
                                                   ],
                                                 ),
                                               ),
-                                              
-                                              // Score
                                               Container(
                                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                                 margin: const EdgeInsets.symmetric(horizontal: 8),
                                                 decoration: BoxDecoration(
-                                                  color: matchStatus == 'FINISHED' 
-                                                      ? colorScheme.primaryContainer
-                                                      : colorScheme.surfaceVariant,
+                                                  color: matchStatus == 'FINISHED' ? colorScheme.primaryContainer : colorScheme.surfaceVariant,
                                                   borderRadius: BorderRadius.circular(4),
                                                 ),
                                                 child: Text(
                                                   scoreText,
                                                   style: TextStyle(
-                                                    color: scoreText == 'vs'
-                                                        ? isDarkMode 
-                                                            ? Colors.white
-                                                            : Colors.black
-                                                        : matchStatus == 'IN_PLAY' && isDarkMode
-                                                            ? Colors.white
-                                                            : Colors.black,
+                                                    color: scoreText == 'vs' ? (isDarkMode ? Colors.white : Colors.black) : (matchStatus == 'IN_PLAY' && isDarkMode ? Colors.white : Colors.black),
                                                     fontWeight: FontWeight.bold,
                                                   ),
                                                 ),
                                               ),
-                                              
-                                              // Away team with badge on right
                                               Expanded(
                                                 child: Row(
                                                   mainAxisAlignment: MainAxisAlignment.end,
                                                   children: [
-                                                    // Away team name
-                                                    Expanded(
-                                                      child: Text(
-                                                        awayTeam,
-                                                        style: TextStyle(
-                                                          color: colorScheme.onSurface,
-                                                          fontWeight: FontWeight.w500,
-                                                        ),
-                                                        textAlign: TextAlign.end,
-                                                        overflow: TextOverflow.ellipsis,
-                                                      ),
-                                                    ),
+                                                    Expanded(child: Text(awayTeam, style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w500), textAlign: TextAlign.end, overflow: TextOverflow.ellipsis)),
                                                     const SizedBox(width: 8),
-                                                    // Away team badge
                                                     ClipRRect(
                                                       borderRadius: BorderRadius.circular(4),
                                                       child: Image.network(
                                                         getProxiedImageUrl(match['awayTeam']['crest']),
                                                         width: 24,
                                                         height: 24,
-                                                        headers: kIsWeb ? {
-                                                          'Origin': 'null',
-                                                        } : {
-                                                          'User-Agent': 'Mozilla/5.0',
-                                                        },
+                                                        headers: kIsWeb ? {'Origin': 'null'} : {'User-Agent': 'Mozilla/5.0'},
                                                         errorBuilder: (context, error, stackTrace) => Container(
                                                           width: 24,
                                                           height: 24,
-                                                          decoration: BoxDecoration(
-                                                            color: colorScheme.surfaceVariant,
-                                                            borderRadius: BorderRadius.circular(4),
-                                                          ),
-                                                          child: Icon(
-                                                            Icons.sports_soccer,
-                                                            size: 16,
-                                                            color: colorScheme.onSurface,
-                                                          ),
+                                                          decoration: BoxDecoration(color: colorScheme.surfaceVariant, borderRadius: BorderRadius.circular(4)),
+                                                          child: Icon(Icons.sports_soccer, size: 16, color: colorScheme.onSurface),
                                                         ),
                                                       ),
                                                     ),
@@ -687,12 +512,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
               },
             );
           } else {
-            return Center(
-              child: Text(
-                'No data available',
-                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-              ),
-            );
+            return Center(child: Text('No data available', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)));
           }
         },
       ),
@@ -702,12 +522,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
   String getScoreText(dynamic match) {
     final homeScore = match['score']['fullTime']['home'];
     final awayScore = match['score']['fullTime']['away'];
-    
-    if (homeScore != null && awayScore != null) {
-      return '$homeScore - $awayScore';
-    } else {
-      return 'vs';
-    }
+    return (homeScore != null && awayScore != null) ? '$homeScore - $awayScore' : 'vs';
   }
 }
 
@@ -716,7 +531,7 @@ class Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(); // Empty container for now
+    return Container();
   }
 }
 
@@ -724,33 +539,25 @@ class CustomSearchDelegate extends SearchDelegate {
   @override
   ThemeData appBarTheme(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
     return ThemeData(
       fontFamily: 'Lexend',
-      appBarTheme: AppBarTheme(
-        backgroundColor: isDarkMode ? const Color(0xFF1D1D1D) : Colors.white, // Set AppBar background color
-      ),
+      appBarTheme: AppBarTheme(backgroundColor: isDarkMode ? const Color(0xFF1D1D1D) : Colors.white),
       inputDecorationTheme: InputDecorationTheme(
-        hintStyle: TextStyle(color: isDarkMode ? const Color.fromARGB(170, 240, 240, 240) : Colors.black54), // Set hint text color
-        focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFffe6ac), width: 3.0)), // Set focused border color
-        enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFffe6ac), width: 1.7)), // Set enabled border color
+        hintStyle: TextStyle(color: isDarkMode ? const Color.fromARGB(170, 240, 240, 240) : Colors.black54),
+        focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFffe6ac), width: 3.0)),
+        enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFffe6ac), width: 1.7)),
       ),
-      textTheme: TextTheme(
-        titleLarge: TextStyle(color: isDarkMode ? Colors.white : Colors.black), // Set search text color
-      ),
+      textTheme: TextTheme(titleLarge: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
     );
   }
 
   @override
   List<Widget>? buildActions(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
     return [
       IconButton(
-        icon: Icon(Icons.clear, color: isDarkMode ? Colors.white : Colors.black), // Set clear icon color
-        onPressed: () {
-          query = '';
-        },
+        icon: Icon(Icons.clear, color: isDarkMode ? Colors.white : Colors.black),
+        onPressed: () { query = ''; },
       ),
     ];
   }
@@ -758,51 +565,35 @@ class CustomSearchDelegate extends SearchDelegate {
   @override
   Widget? buildLeading(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
     return IconButton(
-      icon: Icon(Icons.arrow_back, color: isDarkMode ? Colors.white : Colors.black), // Set back arrow icon color
-      onPressed: () {
-        close(context, null);
-      },
+      icon: Icon(Icons.arrow_back, color: isDarkMode ? Colors.white : Colors.black),
+      onPressed: () { close(context, null); },
     );
   }
 
   @override
   Widget buildResults(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: isDarkMode
-              ? [const Color(0xFF1D1D1D), const Color(0xFF292929)] // Dark mode gradient
-              : [Colors.white, Colors.white], // Light mode gradient
+          colors: isDarkMode ? [const Color(0xFF1D1D1D), const Color(0xFF292929)] : [Colors.white, Colors.white],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
       ),
-      child: Center(
-        child: Text(
-          query,
-          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black), // Set text color
-        ),
-      ),
+      child: Center(child: Text(query, style: TextStyle(color: isDarkMode ? Colors.white : Colors.black))),
     );
   }
 
   @override
   Widget buildSuggestions(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final suggestions = query.isEmpty
-        ? []
-        : ['Suggestion 1', 'Suggestion 2', 'Suggestion 3']; // Replace with your own suggestions
-
+    final suggestions = query.isEmpty ? [] : ['Suggestion 1', 'Suggestion 2', 'Suggestion 3'];
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: isDarkMode
-              ? [const Color(0xFF1D1D1D), const Color(0xFF292929)] // Dark mode gradient
-              : [Colors.white, Colors.white], // Light mode gradient
+          colors: isDarkMode ? [const Color(0xFF1D1D1D), const Color(0xFF292929)] : [Colors.white, Colors.white],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
@@ -811,10 +602,7 @@ class CustomSearchDelegate extends SearchDelegate {
         itemCount: suggestions.length,
         itemBuilder: (context, index) {
           return ListTile(
-            title: Text(
-              suggestions[index],
-              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black), // Set text color
-            ),
+            title: Text(suggestions[index], style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
             onTap: () {
               query = suggestions[index];
               showResults(context);
