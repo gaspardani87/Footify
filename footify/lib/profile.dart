@@ -416,6 +416,7 @@ class _ProfilePageState extends State<ProfilePage> {
           name: name,
           username: username,
           favoriteTeam: team['name'] ?? '',
+          favoriteTeamId: team['id'] ?? '',
           favoriteLeague: league['name'] ?? '',
         );
         if (success && context.mounted) {

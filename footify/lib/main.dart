@@ -23,9 +23,9 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:io';
 import 'package:http/io_client.dart';
+import 'package:footify/match_details.dart';
 
 
-// Define fetchData as a global variable
 late Future<Map<String, dynamic>> Function() fetchData;
 
 Future<Map<String, dynamic>> fetchDataFirebase() async {
@@ -215,6 +215,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
   int _selectedIndex = 0;
   late Future<Map<String, dynamic>> _futureData = fetchData();
   Map<String, bool> _expandedCompetitions = {};
+  Map<String, bool> _expandedMatches = {};
   late AnimationController _blinkController;
   late Animation<double> _blinkAnimation;
 
@@ -391,7 +392,16 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                                     final formattedTime = '${matchDate.hour.toString().padLeft(2, '0')}:${matchDate.minute.toString().padLeft(2, '0')}';
                                     final scoreText = (homeScore != null && awayScore != null) ? '$homeScore - $awayScore' : 'vs';
                                     
-                                    return Padding(
+                                    return InkWell(
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => MatchDetailsPage(matchData: match),
+                                          ),
+                                        );
+                                      },
+                                      child: Padding(
                                       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                                       child: Column(
                                         children: [
@@ -496,7 +506,8 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                                               ),
                                             ],
                                           ),
-                                        ],
+                                          ],
+                                        ),
                                       ),
                                     );
                                   },

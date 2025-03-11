@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class FirebaseProvider with ChangeNotifier {
   final FirebaseService _firebaseService = FirebaseService();
@@ -67,9 +68,16 @@ class FirebaseProvider with ChangeNotifier {
       final doc = await _firestore.collection('users').doc(_user!.uid).get();
 
       if (doc.exists) {
-        _userData = doc.data();
+        _userData = Map<String, dynamic>.from(doc.data()!);
+        // Handle the joinDate field specifically
         if (_userData!['joinDate'] != null) {
-          _userData!['joinDate'] = (_userData!['joinDate'] as Timestamp).toDate();
+          if (_userData!['joinDate'] is Timestamp) {
+            _userData!['joinDate'] = (_userData!['joinDate'] as Timestamp).toDate();
+          }
+          // Skip conversion if it's a FieldValue (during creation)
+          else if (_userData!['joinDate'] is FieldValue) {
+            _userData!.remove('joinDate');
+          }
         }
         print('Retrieved user data: $_userData');
       } else {
@@ -106,8 +114,8 @@ class FirebaseProvider with ChangeNotifier {
     required String name,
     required String username,
     required String favoriteTeam,
+    required String favoriteTeamId,  // Make sure this parameter exists
     required String favoriteLeague,
-    String? phoneNumber,
   }) async {
     try {
       // Create the user account with email and password
@@ -118,31 +126,31 @@ class FirebaseProvider with ChangeNotifier {
       _user = userCredential.user;
 
       if (_user != null) {
+        // Create user data document
         final userData = {
+          'email': email,
           'name': name,
           'username': username,
-          'phoneNumber': phoneNumber ?? '',
           'favoriteTeam': favoriteTeam,
+          'favoriteTeamId': favoriteTeamId,  // Make sure this field is included
           'favoriteLeague': favoriteLeague,
           'joinDate': FieldValue.serverTimestamp(),
-          'email': email,
           'uid': _user!.uid,
         };
 
-        // Store data in Firestore
+        // Store user data in Firestore
         await _firestore.collection('users').doc(_user!.uid).set(userData);
-
-        // Update display name in Firebase Auth
-        await _user!.updateDisplayName(name);
-
-        print('User data saved successfully: $userData');
-        await _fetchUserData(); // Fetch the newly created user data
+        
+        // Update local user data
+        _userData = userData;
+        notifyListeners();
+        
         return true;
       }
       return false;
     } catch (e) {
-      print('Complete sign up error: $e');
-      return false;
+      print('Error in completeSignUp: $e');
+      rethrow;
     }
   }
 
