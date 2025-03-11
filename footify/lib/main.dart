@@ -21,6 +21,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'language_provider.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
+
 // Define fetchData as a global variable
 late Future<Map<String, dynamic>> Function() fetchData;
 

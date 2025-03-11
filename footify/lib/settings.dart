@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'theme_provider.dart';
 import 'font_size_provider.dart';
 import 'color_blind_mode_provider.dart';
@@ -8,7 +9,6 @@ import 'language_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -20,17 +20,38 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   bool notificationsEnabled = false;
   late String selectedLanguage;
+  late SharedPreferences prefs;
 
   @override
   void initState() {
     super.initState();
-    // Initialize selectedLanguage based on current locale
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    prefs = await SharedPreferences.getInstance();
+    
+    setState(() {
+      notificationsEnabled = prefs.getBool('notifications_enabled') ?? false;
+      selectedLanguage = prefs.getString('selected_language') ?? 'English';
+    });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
-      final currentLocale = languageProvider.currentLocale.languageCode;
-      setState(() {
-        selectedLanguage = _getLanguageName(currentLocale);
-      });
+      final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+      final fontSizeProvider = Provider.of<FontSizeProvider>(context, listen: false);
+      final colorBlindModeProvider = Provider.of<ColorBlindModeProvider>(context, listen: false);
+
+      // Load saved settings
+      bool isDarkMode = prefs.getBool('is_dark_mode') ?? false;
+      double fontSize = prefs.getDouble('font_size') ?? 16.0;
+      bool isColorBlind = prefs.getBool('is_color_blind') ?? false;
+
+      // Apply saved settings
+      themeProvider.toggleTheme(isDarkMode);
+      fontSizeProvider.setFontSize(fontSize);
+      colorBlindModeProvider.toggleColorBlindMode(isColorBlind);
+      languageProvider.setLocale(selectedLanguage);
     });
   }
 
@@ -58,10 +79,11 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
-  void _updateLanguage(String newLanguage) {
+  void _updateLanguage(String newLanguage) async {
     setState(() {
       selectedLanguage = newLanguage;
     });
+    await prefs.setString('selected_language', newLanguage);
     final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
     languageProvider.setLocale(newLanguage);
   }
@@ -72,7 +94,6 @@ class _SettingsPageState extends State<SettingsPage> {
     final fontSizeProvider = Provider.of<FontSizeProvider>(context);
     final colorBlindModeProvider = Provider.of<ColorBlindModeProvider>(context);
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
 
     return CommonLayout(
       selectedIndex: 4,
@@ -94,14 +115,16 @@ class _SettingsPageState extends State<SettingsPage> {
               children: [
                 IconButton(
                   icon: Icon(Icons.wb_sunny, color: isDarkMode ? Colors.grey : const Color(0xFFFFE6AC)),
-                  onPressed: () {
-                    themeProvider.toggleTheme(false); // Set to light mode
+                  onPressed: () async {
+                    themeProvider.toggleTheme(false);
+                    await prefs.setBool('is_dark_mode', false);
                   },
                 ),
                 IconButton(
                   icon: Icon(Icons.nights_stay, color: isDarkMode ? const Color(0xFFFFE6AC) : Colors.black),
-                  onPressed: () {
-                    themeProvider.toggleTheme(true); // Set to dark mode
+                  onPressed: () async {
+                    themeProvider.toggleTheme(true);
+                    await prefs.setBool('is_dark_mode', true);
                   },
                 ),
               ],
@@ -148,10 +171,11 @@ class _SettingsPageState extends State<SettingsPage> {
               style: TextStyle(color: isDarkMode ? Colors.grey : Colors.black54)),
             trailing: Switch(
               value: notificationsEnabled,
-              onChanged: (bool value) {
+              onChanged: (bool value) async {
                 setState(() {
                   notificationsEnabled = value;
                 });
+                await prefs.setBool('notifications_enabled', value);
               },
               activeColor: const Color(0xFFFFE6AC),
               activeTrackColor: isDarkMode ? Colors.grey : Colors.grey[400],
@@ -177,8 +201,9 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             trailing: Switch(
               value: colorBlindModeProvider.isColorBlindMode,
-              onChanged: (bool value) {
+              onChanged: (bool value) async {
                 colorBlindModeProvider.toggleColorBlindMode(value);
+                await prefs.setBool('is_color_blind', value);
               },
               activeColor: const Color(0xFFFFE6AC),
               activeTrackColor: isDarkMode ? Colors.grey : Colors.grey[400],
@@ -202,15 +227,17 @@ class _SettingsPageState extends State<SettingsPage> {
                     activeColor: const Color(0xFFFFE6AC),
                     inactiveColor: isDarkMode ? Colors.grey : Colors.grey[400],
                     label: fontSizeProvider.fontSize.round().toString(),
-                    onChanged: (double value) {
+                    onChanged: (double value) async {
                       fontSizeProvider.setFontSize(value);
+                      await prefs.setDouble('font_size', value);
                     },
                   ),
                 ),
                 IconButton(
                   icon: Icon(Icons.refresh, color: isDarkMode ? Colors.white : Colors.black),
-                  onPressed: () {
+                  onPressed: () async {
                     fontSizeProvider.setFontSize(16.0);
+                    await prefs.setDouble('font_size', 16.0);
                   },
                 ),
               ],
