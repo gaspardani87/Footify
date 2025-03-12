@@ -45,6 +45,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                         color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                         fontWeight: FontWeight.bold,
+                        fontFamily: 'Lexend',
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -52,6 +53,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       AppLocalizations.of(context)!.welcomeText,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54,
+                        fontFamily: 'Lexend',
                       ),
                       textAlign: TextAlign.center,
                     ),

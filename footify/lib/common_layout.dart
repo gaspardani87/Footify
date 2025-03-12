@@ -14,8 +14,14 @@ import 'providers/firebase_provider.dart';
 class CommonLayout extends StatelessWidget {
   final Widget child;
   final int selectedIndex;
+  final bool useMaxWidth;
 
-  const CommonLayout({super.key, required this.child, required this.selectedIndex});
+  const CommonLayout({
+    Key? key, 
+    required this.child,
+    required this.selectedIndex,
+    this.useMaxWidth = true,
+  }) : super(key: key);
 
   void _onItemTapped(BuildContext context, int index) {
     Widget page;
@@ -57,6 +63,28 @@ class CommonLayout extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final isLoggedIn = Provider.of<FirebaseProvider>(context).currentUser != null;
+    final isWeb = MediaQuery.of(context).size.width > 800;
+
+    Widget mainContent = child;
+
+    if (isWeb && useMaxWidth) {
+      mainContent = Row(
+        children: [
+          Expanded(
+            flex: 1,
+            child: Container(),
+          ),
+          Container(
+            width: 1200,
+            child: child,
+          ),
+          Expanded(
+            flex: 1,
+            child: Container(),
+          ),
+        ],
+      );
+    }
 
     return Scaffold(
       body: Container(
@@ -68,7 +96,7 @@ class CommonLayout extends StatelessWidget {
                   end: Alignment.bottomCenter,
                 )
               : const LinearGradient(
-                  colors: [Colors.white, Colors.white], // Light mode background
+                  colors: [Colors.white, Colors.white],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
@@ -157,19 +185,19 @@ class CommonLayout extends StatelessWidget {
               color: Color(0xFFFFE6AC),
               thickness: 3,
             ),
-            Expanded(child: child),
+            Expanded(child: mainContent),
           ],
         ),
       ),
       bottomNavigationBar: Theme(
         data: Theme.of(context).copyWith(
-          canvasColor: isDarkMode ? const Color(0xFF1D1D1B) : Colors.white, // Light mode background
+          canvasColor: isDarkMode ? const Color(0xFF1D1D1B) : Colors.white,
         ),
         child: BottomNavigationBar(
           currentIndex: selectedIndex,
           onTap: (index) => _onItemTapped(context, index),
-          selectedItemColor: isDarkMode ? const Color(0xFFFFE6AC) : Colors.black, // Light mode accent color
-          unselectedItemColor: isDarkMode ? Colors.white : Colors.black, // Light mode text color
+          selectedItemColor: isDarkMode ? const Color(0xFFFFE6AC) : Colors.black,
+          unselectedItemColor: isDarkMode ? Colors.white : Colors.black,
           items: [
             BottomNavigationBarItem(
               icon: const Icon(Icons.home),

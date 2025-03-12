@@ -1,5 +1,5 @@
 // ignore_for_file: unused_element, deprecated_member_use, prefer_final_fields, library_private_types_in_public_api
-
+//Csomagok, Fileok importálása a funckiók működése érdekében
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
@@ -234,7 +234,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     _blinkController.dispose();
     super.dispose();
   }
-
+  //Alső navigációs sáv
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
@@ -260,7 +260,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
       default:
         page = const HomePage();
     }
-
+  //Animációk az oldalak váltása közben
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
@@ -295,7 +295,45 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(child: CircularProgressIndicator(color: isDarkMode ? Colors.white : Colors.black));
           } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)));
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.wifi_off,
+                      size: 64,
+                      color: isDarkMode ? Colors.white70 : Colors.black54,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Please turn on your WiFi/Mobile Data to use the app!',
+                      style: TextStyle(
+                        color: isDarkMode ? Colors.white : Colors.black,
+                        fontSize: 18,
+                        fontFamily: 'Lexend',
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          _futureData = fetchData();
+                        });
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: colorScheme.primary,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      ),
+                      child: const Text('Retry', style: TextStyle(fontFamily: 'Lexend')),
+                    ),
+                  ],
+                ),
+              ),
+            );
           } else if (snapshot.hasData) {
             final data = snapshot.data!;
             if (data['matches'] == null || data['matches'].isEmpty) {
