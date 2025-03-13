@@ -49,3 +49,7 @@ flutter:
         - asset: assets/fonts/Lexend-Medium.ttf
         - asset: assets/fonts/Lexend-SemiBold.ttf
 
+flutter_localizations:
+  sdk: flutter
+  generate: true
+
