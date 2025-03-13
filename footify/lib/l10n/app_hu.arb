@@ -26,5 +26,13 @@
     "deleteAccount": "Fiók törlés",
     "profileName": "Név",
     "favTeam": "Kedvenc Csapat",
-    "favLeague": "Kedvenc Bajnokság"
+    "favLeague": "Kedvenc Bajnokság",
+    "stats" : "Statisztikák",
+    "lineups": "Összeállítások",
+    "timeline": "Idővonal",
+    "h2h": "Egymás ellen",
+    "detailedStats": "Döntőbb statisztikák",
+    "possession": "Labdairtoklás",
+    "shotsOnTarget": "Kapura lövések",
+    "matchDetails": "Mérkőzés részletek"
 }

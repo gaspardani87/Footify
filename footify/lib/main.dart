@@ -1,5 +1,4 @@
-// ignore_for_file: unused_element, deprecated_member_use, prefer_final_fields, library_private_types_in_public_api
-//Csomagok, Fileok importálása a funckiók működése érdekében
+//main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';

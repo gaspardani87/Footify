@@ -26,5 +26,13 @@
     "deleteAccount": "Eliminar cuenta",
     "profileName": "Nombre",
     "favTeam": "Equipo favorito",
-    "favLeague": "Liga favorita"
+    "favLeague": "Liga favorita",
+    "stats" : "Estadísticas", 
+    "lineups": "Alineaciones",
+    "timeline": "Cronología",
+    "h2h": "H2H",
+    "detailedStats": "Estadísticas detalladas",
+    "possession": "Posesión",
+    "shotsOnTarget": "Tiros a puerta",
+    "matchDetails": "Detalles del partido"
 }

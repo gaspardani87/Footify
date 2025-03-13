@@ -26,5 +26,13 @@
     "deleteAccount": "Delete Account",
     "profileName": "Name",
     "favTeam": "Favorite Team",
-    "favLeague": "Favorite League"
+    "favLeague": "Favorite League",
+    "stats" : "Stats",
+    "lineups": "Lineups",
+    "timeline": "Timeline",
+    "h2h": "Head to Head",
+    "detailedStats": "Detailed Stats",
+    "possession": "Posession",
+    "shotsOnTarget": "Shots on Target",
+    "matchDetails": "Match Details"
 }

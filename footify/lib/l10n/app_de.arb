@@ -26,5 +26,14 @@
     "deleteAccount": "Konto löschen",
     "profileName": "Name",
     "favTeam": "Lieblingsteam",
-    "favLeague": "Lieblingsliga"
+    "favLeague": "Lieblingsliga",
+    "stats" : "Statistiken",
+    "lineups": "Aufstellungen",
+    "timeline": "Zeitstrahl",
+    "h2h": "Direktvergleich",
+    "detailedStats": "Detaillierte Statistiken",
+    "possession": "Ballbesitz",
+    "shotsOnTarget": "Torschüsse",
+    "matchDetails": "Spiel Details"
+
 }
