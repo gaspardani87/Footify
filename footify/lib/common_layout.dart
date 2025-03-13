@@ -15,12 +15,14 @@ class CommonLayout extends StatelessWidget {
   final Widget child;
   final int selectedIndex;
   final bool useMaxWidth;
+  final bool showBackButton;
 
   const CommonLayout({
     Key? key, 
     required this.child,
     required this.selectedIndex,
     this.useMaxWidth = true,
+    this.showBackButton = false,
   }) : super(key: key);
 
   void _onItemTapped(BuildContext context, int index) {
@@ -91,12 +93,18 @@ class CommonLayout extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: isDarkMode
               ? const LinearGradient(
-                  colors: [Color(0xFF1D1D1D), Color(0xFF292929)],
+                  colors: [
+                    Color(0xFF1D1D1D),
+                    Color(0xFF232323),
+                    Color(0xFF262626),
+                    Color(0xFF292929)
+                  ],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
+                  stops: [0.0, 0.3, 0.7, 1.0],
                 )
               : const LinearGradient(
-                  colors: [Colors.white, Colors.white],
+                  colors: [Colors.white, Color(0xFFF8F8F8)],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
@@ -106,25 +114,45 @@ class CommonLayout extends StatelessWidget {
             AppBar(
               backgroundColor: isDarkMode ? Colors.transparent : Colors.white,
               elevation: 0,
+              toolbarHeight: 80,
+              automaticallyImplyLeading: false,
+              titleSpacing: 0,
+              leading: showBackButton 
+                ? IconButton(
+                    icon: Icon(
+                      Icons.arrow_back,
+                      color: isDarkMode ? Colors.white : Colors.black,
+                      size: 30,
+                    ),
+                    padding: const EdgeInsets.only(top: 20),
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                  )
+                : null,
               title: Padding(
                 padding: const EdgeInsets.only(top: 20),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(builder: (context) => const HomePage()),
-                        );
-                      },
-                      child: Image.asset(
-                        isDarkMode ? 'assets/images/kicsiFootify-Logo-NoBG-LightMode.png' : 'assets/images/Footify-Logo-NoBG_szerk_hosszu_logo-01.png',
-                        width: 120,
-                        height: 120,
+                    Padding(
+                      padding: EdgeInsets.only(left: showBackButton ? 0 : 16),
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(builder: (context) => const HomePage()),
+                          );
+                        },
+                        child: Image.asset(
+                          isDarkMode ? 'assets/images/kicsiFootify-Logo-NoBG-LightMode.png' : 'assets/images/Footify-Logo-NoBG_szerk_hosszu_logo-01.png',
+                          width: 120,
+                          height: 120,
+                        ),
                       ),
                     ),
                     Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
                           icon: Icon(Icons.search, color: isDarkMode ? Colors.white : Colors.black),
@@ -147,30 +175,28 @@ class CommonLayout extends StatelessWidget {
                             },
                           )
                         else
-                          Padding(
-                            padding: const EdgeInsets.only(right: 16.0),
-                            child: TextButton(
-                              onPressed: () {
-                                // Navigate to profile/login page
-                                Navigator.pushReplacement(
-                                  context,
-                                  PageRouteBuilder(
-                                    pageBuilder: (context, animation, secondaryAnimation) => const ProfilePage(),
-                                    transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                                      return FadeTransition(
-                                        opacity: animation,
-                                        child: child,
-                                      );
-                                    },
-                                  ),
-                                );
-                              },
-                              child: Text(
-                                'Login/Register',
-                                style: TextStyle(
-                                  color: isDarkMode ? Colors.white : Colors.black,
-                                  fontWeight: FontWeight.bold,
+                          TextButton(
+                            onPressed: () {
+                              // Navigate to profile/login page
+                              Navigator.pushReplacement(
+                                context,
+                                PageRouteBuilder(
+                                  pageBuilder: (context, animation, secondaryAnimation) => const ProfilePage(),
+                                  transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                                    return FadeTransition(
+                                      opacity: animation,
+                                      child: child,
+                                    );
+                                  },
                                 ),
+                              );
+                            },
+                            child: Text(
+                              'Login/Register',
+                              style: TextStyle(
+                                color: isDarkMode ? Colors.white : Colors.black,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
                               ),
                             ),
                           ),

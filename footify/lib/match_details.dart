@@ -99,22 +99,36 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
     
     return CommonLayout(
       selectedIndex: 0, // Required parameter
+      showBackButton: true, // Enable back button for match details page
       child: Column(
         children: [
-          TabBar(
-            controller: _tabController,
-            isScrollable: true,
-            tabs: [
-              Tab(text: AppLocalizations.of(context)!.stats),
-              Tab(text: AppLocalizations.of(context)!.lineups),
-              Tab(text: AppLocalizations.of(context)!.timeline),
-              Tab(text: "H2H"), // Use string directly
-              Tab(text: AppLocalizations.of(context)!.detailedStats),
-              Tab(text: AppLocalizations.of(context)!.recentMatches),
-            ],
-            labelColor: isDarkMode ? primaryColor : Colors.black,
-            indicatorColor: primaryColor,
-            unselectedLabelColor: isDarkMode ? Colors.grey : Colors.grey[600],
+          Container(
+            height: 45,
+            alignment: Alignment.centerLeft,
+            child: Row(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        _buildTabButton(0, AppLocalizations.of(context)!.stats, isDarkMode, primaryColor),
+                        _buildTabButton(1, AppLocalizations.of(context)!.lineups, isDarkMode, primaryColor),
+                        _buildTabButton(2, AppLocalizations.of(context)!.timeline, isDarkMode, primaryColor),
+                        _buildTabButton(3, "H2H", isDarkMode, primaryColor),
+                        _buildTabButton(4, AppLocalizations.of(context)!.detailedStats, isDarkMode, primaryColor),
+                        _buildTabButton(5, AppLocalizations.of(context)!.recentMatches, isDarkMode, primaryColor),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            height: 2,
+            color: primaryColor,
           ),
           Expanded(
             child: TabBarView(
@@ -130,6 +144,38 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
             ),
           ),
         ],
+      ),
+    );
+  }
+  
+  Widget _buildTabButton(int index, String title, bool isDarkMode, Color primaryColor) {
+    bool isSelected = _tabController.index == index;
+    
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _tabController.animateTo(index);
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: isSelected ? primaryColor : Colors.transparent,
+              width: 2,
+            ),
+          ),
+        ),
+        child: Text(
+          title,
+          style: TextStyle(
+            color: isSelected
+                ? (isDarkMode ? primaryColor : Colors.black)
+                : (isDarkMode ? Colors.grey : Colors.grey[600]),
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
       ),
     );
   }
@@ -178,7 +224,12 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
   Widget _buildMatchHeader() {
     final homeTeam = widget.matchData['homeTeam'];
     final awayTeam = widget.matchData['awayTeam'];
-    final score = widget.matchData['score']['fullTime'] ?? {'homeTeam': 0, 'awayTeam': 0};
+    
+    // Itt van a probléma - javítsuk ki az eredmény lekérését
+    final score = widget.matchData['score'] ?? {};
+    final homeGoals = score['fullTime']?['homeTeam'] ?? score['homeTeam'] ?? 0;
+    final awayGoals = score['fullTime']?['awayTeam'] ?? score['awayTeam'] ?? 0;
+    
     final status = widget.matchData['status'] ?? '';
     final minute = widget.matchData['minute']?.toString() ?? '';
     final injuryTime = widget.matchData['injuryTime'] ?? 0;
@@ -238,15 +289,15 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
               children: [
                 // Home team
                 Expanded(
-                  flex: 2,
+                  flex: 3,
                   child: Column(
                     children: [
-                      _buildTeamLogo(homeTeam['crest'], size: 80),
-                      const SizedBox(height: 8),
+                      _buildTeamLogo(homeTeam['crest'], size: 50),
+                      const SizedBox(height: 4),
                       Text(
                         homeTeam['name'] ?? 'Home',
                         style: const TextStyle(
-                          fontSize: 16,
+                          fontSize: 14,
                           fontWeight: FontWeight.bold,
                         ),
                         textAlign: TextAlign.center,
@@ -259,17 +310,17 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
                 
                 // Score
                 Expanded(
-                  flex: 1,
+                  flex: 2,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                     decoration: BoxDecoration(
                       color: colors['primary']!.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      '${score['homeTeam'] ?? 0} - ${score['awayTeam'] ?? 0}',
+                      '$homeGoals - $awayGoals',
                       style: const TextStyle(
-                        fontSize: 24,
+                        fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
                       textAlign: TextAlign.center,
@@ -279,15 +330,15 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
                 
                 // Away team
                 Expanded(
-                  flex: 2,
+                  flex: 3,
                   child: Column(
                     children: [
-                      _buildTeamLogo(awayTeam['crest'], size: 80),
-                      const SizedBox(height: 8),
+                      _buildTeamLogo(awayTeam['crest'], size: 50),
+                      const SizedBox(height: 4),
                       Text(
                         awayTeam['name'] ?? 'Away',
                         style: const TextStyle(
-                          fontSize: 16,
+                          fontSize: 14,
                           fontWeight: FontWeight.bold,
                         ),
                         textAlign: TextAlign.center,
