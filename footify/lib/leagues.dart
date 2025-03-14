@@ -58,22 +58,36 @@ class _LeaguePageState extends State<LeaguePage> {
   }
 
   Future<List<League>> fetchLeagues() async {
-    // Közvetlenül adjuk meg a bajnokságokat és a logóikat
-    return [
-      League(id: 2013, name: 'Brasileiro Série A', logo: 'https://crests.football-data.org/BSA.png'),
-      League(id: 2016, name: 'EFL Championship', logo: 'https://crests.football-data.org/ELC.png'),
-      League(id: 2021, name: 'Premier League', logo: 'https://crests.football-data.org/PL.png'),
-      League(id: 2001, name: 'UEFA Champions League', logo: 'https://crests.football-data.org/CL.png'),
-      League(id: 2018, name: 'European Championship', logo: 'https://crests.football-data.org/EUR.png'),
-      League(id: 2015, name: 'Ligue 1', logo: 'https://crests.football-data.org/FL1.png'),
-      League(id: 2002, name: 'Bundesliga', logo: 'https://crests.football-data.org/BL1.png'),
-      League(id: 2019, name: 'Serie A', logo: 'https://crests.football-data.org/SA.png'),
-      League(id: 2003, name: 'Eredivisie', logo: 'https://crests.football-data.org/DED.png'),
-      League(id: 2017, name: 'Primeira Liga', logo: 'https://crests.football-data.org/PPL.png'),
-      League(id: 2152, name: 'Copa Libertadores', logo: 'https://crests.football-data.org/CLI.png'),
-      League(id: 2014, name: 'La Liga', logo: 'https://crests.football-data.org/PD.png'),
-      League(id: 2000, name: 'FIFA World Cup', logo: 'https://crests.football-data.org/WC.png'),
-    ];
+    try {
+      final response = await http.get(
+        Uri.parse('https://us-central1-footify-13da4.cloudfunctions.net/fetchLeagues'),
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.map((json) => League.fromJson(json)).toList();
+      } else {
+        throw Exception('Failed to load leagues');
+      }
+    } catch (e) {
+      print('Error fetching leagues: $e');
+      // Fallback to the original hardcoded list if the API call fails
+      return [
+        League(id: 2013, name: 'Brasileiro Série A', logo: 'https://crests.football-data.org/BSA.png'),
+        League(id: 2016, name: 'EFL Championship', logo: 'https://crests.football-data.org/ELC.png'),
+        League(id: 2021, name: 'Premier League', logo: 'https://crests.football-data.org/PL.png'),
+        League(id: 2001, name: 'UEFA Champions League', logo: 'https://crests.football-data.org/CL.png'),
+        League(id: 2018, name: 'European Championship', logo: 'https://crests.football-data.org/EUR.png'),
+        League(id: 2015, name: 'Ligue 1', logo: 'https://crests.football-data.org/FL1.png'),
+        League(id: 2002, name: 'Bundesliga', logo: 'https://crests.football-data.org/BL1.png'),
+        League(id: 2019, name: 'Serie A', logo: 'https://crests.football-data.org/SA.png'),
+        League(id: 2003, name: 'Eredivisie', logo: 'https://crests.football-data.org/DED.png'),
+        League(id: 2017, name: 'Primeira Liga', logo: 'https://crests.football-data.org/PPL.png'),
+        League(id: 2152, name: 'Copa Libertadores', logo: 'https://crests.football-data.org/CLI.png'),
+        League(id: 2014, name: 'La Liga', logo: 'https://crests.football-data.org/PD.png'),
+        League(id: 2000, name: 'FIFA World Cup', logo: 'https://crests.football-data.org/WC.png'),
+      ];
+    }
   }
 
   @override
