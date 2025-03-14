@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'common_layout.dart';
 import 'league_details.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 // Liga adatmodell
 class League {
@@ -33,9 +34,20 @@ class League {
       print("Hiba a logo keresése közben: $e");
     }
 
+    // Bajnokság nevének javítása, ha szükséges
+    String leagueName = json['name'] ?? 'Ismeretlen bajnokság';
+    int leagueId = json['id'] ?? 0;
+    
+    // Ha ez a spanyol liga, vagy a neve tartalmazza a "Primera Division"-t, javítjuk
+    if (leagueId == 2014 || leagueName.toLowerCase().contains("primera") || 
+        leagueName.toLowerCase().contains("primiera") || 
+        leagueName.toLowerCase().contains("division")) {
+      leagueName = "LaLiga";
+    }
+    
     return League(
       id: json['id'],
-      name: json['name'] ?? 'Ismeretlen bajnokság',
+      name: leagueName,
       logo: logoUrl,
     );
   }
@@ -55,6 +67,17 @@ class _LeaguePageState extends State<LeaguePage> {
   void initState() {
     super.initState();
     futureLeagues = fetchLeagues();
+  }
+
+  // Proxy képek URL-jét a webes verzióban
+  String getProxiedImageUrl(String? originalUrl) {
+    if (originalUrl == null || originalUrl.isEmpty) return '';
+    if (kIsWeb) {
+      // Proxy a Firebase funkción keresztül webes verzió esetén
+      return 'https://us-central1-footify-13da4.cloudfunctions.net/proxyImage?url=${Uri.encodeComponent(originalUrl)}';
+    }
+    // Közvetlen URL használata mobil verzióban
+    return originalUrl;
   }
 
   Future<List<League>> fetchLeagues() async {
@@ -84,7 +107,7 @@ class _LeaguePageState extends State<LeaguePage> {
         League(id: 2003, name: 'Eredivisie', logo: 'https://crests.football-data.org/DED.png'),
         League(id: 2017, name: 'Primeira Liga', logo: 'https://crests.football-data.org/PPL.png'),
         League(id: 2152, name: 'Copa Libertadores', logo: 'https://crests.football-data.org/CLI.png'),
-        League(id: 2014, name: 'La Liga', logo: 'https://crests.football-data.org/PD.png'),
+        League(id: 2014, name: 'LaLiga', logo: 'https://crests.football-data.org/PD.png'),
         League(id: 2000, name: 'FIFA World Cup', logo: 'https://crests.football-data.org/WC.png'),
       ];
     }
@@ -205,6 +228,14 @@ class LeagueTile extends StatelessWidget {
       2152: 'https://upload.wikimedia.org/wikipedia/en/thumb/a/a1/Copa_Libertadores_logo.svg/800px-Copa_Libertadores_logo.svg.png', // Copa Libertadores
     };
     
+    // Proxy használata a webes verzióban
+    String getProxiedUrl(String url) {
+      if (kIsWeb) {
+        return 'https://us-central1-footify-13da4.cloudfunctions.net/proxyImage?url=${Uri.encodeComponent(url)}';
+      }
+      return url;
+    }
+    
     // Eredivisie esetén fehérre színezzük sötét módban
     if (leagueId == 2003 && isDarkMode && replacementLogos.containsKey(leagueId)) {
       return ColorFiltered(
@@ -213,8 +244,9 @@ class LeagueTile extends StatelessWidget {
           BlendMode.srcIn,
         ),
         child: Image.network(
-          replacementLogos[leagueId]!,
+          getProxiedUrl(replacementLogos[leagueId]!),
           fit: BoxFit.contain,
+          headers: kIsWeb ? {'Origin': 'null'} : null,
           errorBuilder: (context, error, stackTrace) {
             print("Helyettesítő kép betöltési hiba (ID: $leagueId): $error");
             return Icon(
@@ -230,8 +262,9 @@ class LeagueTile extends StatelessWidget {
     // Ellenőrizzük, hogy van-e helyettesítő online kép
     if (replacementLogos.containsKey(leagueId)) {
       return Image.network(
-        replacementLogos[leagueId]!,
+        getProxiedUrl(replacementLogos[leagueId]!),
         fit: BoxFit.contain,
+        headers: kIsWeb ? {'Origin': 'null'} : null,
         errorBuilder: (context, error, stackTrace) {
           print("Helyettesítő kép betöltési hiba (ID: $leagueId): $error");
           return Icon(
@@ -268,9 +301,16 @@ class LeagueTile extends StatelessWidget {
       );
     }
     
+    // Proxy használata a webes verzióban
+    String proxyUrl = logoUrl;
+    if (kIsWeb) {
+      proxyUrl = 'https://us-central1-footify-13da4.cloudfunctions.net/proxyImage?url=${Uri.encodeComponent(logoUrl)}';
+    }
+    
     return Image.network(
-      logoUrl,
+      proxyUrl,
       fit: BoxFit.contain,
+      headers: kIsWeb ? {'Origin': 'null'} : null,
       errorBuilder: (context, error, stackTrace) {
         print("Eredeti logó betöltési hiba: $error");
         return Icon(
