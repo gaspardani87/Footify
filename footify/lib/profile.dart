@@ -587,13 +587,12 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<Map<String, String>?> _showTeamSelectionDialog(BuildContext context) async {
-    final footballApiService = FootballApiService();
     List<Map<String, String>>? teams;
     Map<String, String>? selectedTeam;
     bool isLoading = true;
 
     try {
-      teams = await footballApiService.getTeams();
+      teams = await FootballApiService.getTeams();
       isLoading = false;
     } catch (e) {
       print('Error loading teams: $e');
@@ -675,13 +674,12 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<Map<String, String>?> _showLeagueSelectionDialog(BuildContext context) async {
-    final footballApiService = FootballApiService();
     List<Map<String, String>>? leagues;
     Map<String, String>? selectedLeague;
     bool isLoading = true;
 
     try {
-      leagues = await footballApiService.getLeagues();
+      leagues = await FootballApiService.getLeagues();
       isLoading = false;
     } catch (e) {
       print('Error loading leagues: $e');

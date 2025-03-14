@@ -1,6 +1,6 @@
 //main.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, Uint8List;
 import 'package:provider/provider.dart';
 import 'package:footify/calendar.dart';
 import 'package:footify/leagues.dart';
@@ -8,6 +8,8 @@ import 'package:footify/profile.dart';
 import 'package:footify/settings.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:async';
+import 'dart:typed_data' show Uint8List;
 import 'common_layout.dart';
 import 'theme_provider.dart';
 import 'font_size_provider.dart';
@@ -19,44 +21,111 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'language_provider.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:io';
-import 'package:http/io_client.dart';
 import 'package:footify/match_details.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'loading_screen.dart';
 
+// A simple in-memory image cache
+class ImageCache {
+  static final Map<String, Uint8List> _cache = {};
+  
+  static Uint8List? getImage(String url) {
+    return _cache[url];
+  }
+  
+  static void cacheImage(String url, Uint8List bytes) {
+    _cache[url] = bytes;
+  }
+  
+  static bool hasImage(String url) {
+    return _cache.containsKey(url);
+  }
+}
 
 late Future<Map<String, dynamic>> Function() fetchData;
+bool isDataPreloaded = false;
+Map<String, dynamic>? preloadedData;
 
 Future<Map<String, dynamic>> fetchDataFirebase() async {
   const String url = 'https://us-central1-footify-13da4.cloudfunctions.net/fetchFootballData';
+  
+  // First, check if we have preloaded data
+  if (isDataPreloaded && preloadedData != null) {
+    return preloadedData!;
+  }
+  
   try {
+    // Add a longer timeout for initial load
     final response = await http.get(
       Uri.parse(url),
       headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-    ).timeout(const Duration(seconds: 10));
+    ).timeout(const Duration(seconds: 20)); // Increased timeout for more stability
+    
     print('Status: ${response.statusCode}');
+    
     if (response.statusCode == 200) {
-      return json.decode(response.body) as Map<String, dynamic>;
+      final jsonData = json.decode(response.body) as Map<String, dynamic>;
+      
+      // Validate that the data contains matches
+      if (jsonData['matches'] == null) {
+        throw Exception('Invalid data format: missing matches');
+      }
+      
+      // Count total matches to ensure all are loaded
+      int totalMatches = (jsonData['matches'] as List).length;
+      print('Loaded $totalMatches matches');
+      
+      // Cache the data for future use
+      preloadedData = jsonData;
+      isDataPreloaded = true;
+      
+      return jsonData;
     } else {
       throw Exception('Failed: ${response.statusCode} - ${response.body}');
     }
   } on http.ClientException catch (e) {
     print('ClientException: ${e.message}, URI: ${e.uri}');
     throw Exception('ClientException: Failed to fetch data - ${e.message}');
+  } on TimeoutException catch (_) {
+    print('Timeout: Request took too long to complete');
+    throw Exception('Connection timeout. Please check your internet connection and try again.');
   } catch (e) {
     print('Error: $e');
     throw Exception('Error: $e');
   }
 }
 
-void main() async {
+// Add a function to preload data in background
+Future<void> preloadData() async {
+  try {
+    preloadedData = await fetchDataFirebase();
+    isDataPreloaded = true;
+  } catch (e) {
+    print('Preload error: $e');
+    isDataPreloaded = false;
+  }
+}
+
+Future<void> initializeApp() async {
+  // Initialize Flutter
   WidgetsFlutterBinding.ensureInitialized();
   
+  // Initialize Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
   fetchData = fetchDataFirebase;
+  
+  // We're not using native splash screen anymore
+  // Just initialize and let the custom loading screen handle everything
+}
+
+void main() async {
+  await initializeApp();
 
   runApp(
     MultiProvider(
@@ -67,13 +136,29 @@ void main() async {
         ChangeNotifierProvider(create: (_) => FirebaseProvider()),
         ChangeNotifierProvider(create: (_) => LanguageProvider()),
       ],
-      child: const HomePage(),
+      child: const FootifyApp(),
     ),
   );
 }
 
-class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+class FootifyApp extends StatefulWidget {
+  const FootifyApp({super.key});
+
+  @override
+  _FootifyAppState createState() => _FootifyAppState();
+}
+
+class _FootifyAppState extends State<FootifyApp> {
+  @override
+  void initState() {
+    super.initState();
+    // Start data loading in the background
+    preloadData().then((_) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -90,7 +175,7 @@ class HomePage extends StatelessWidget {
       locale: languageProvider.currentLocale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
-      home: const MainScreen(),
+      home: isDataPreloaded ? const MainScreen() : const LoadingScreen(),
     );
   }
 
@@ -212,11 +297,13 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateMixin {
   int _selectedIndex = 0;
-  late Future<Map<String, dynamic>> _futureData = fetchData();
+  late Future<Map<String, dynamic>> _futureData;
   Map<String, bool> _expandedCompetitions = {};
   Map<String, bool> _expandedMatches = {};
   late AnimationController _blinkController;
   late Animation<double> _blinkAnimation;
+  bool _hasError = false;
+  String _errorMessage = '';
 
   @override
   void initState() {
@@ -226,6 +313,9 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
       duration: const Duration(milliseconds: 600),
     )..repeat(reverse: true);
     _blinkAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(_blinkController);
+    
+    // Always use preloaded data - the loading screen should have handled this
+    _futureData = Future.value(preloadedData ?? {});
   }
 
   @override
@@ -233,7 +323,8 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     _blinkController.dispose();
     super.dispose();
   }
-  //Alső navigációs sáv
+
+  // Home button handling - no loading indicator needed
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
@@ -242,7 +333,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     Widget page;
     switch (index) {
       case 0:
-        page = const HomePage();
+        page = const MainScreen();
         break;
       case 1:
         page = const CalendarPage();
@@ -257,9 +348,8 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
         page = const SettingsPage();
         break;
       default:
-        page = const HomePage();
+        page = const FootifyApp();
     }
-  //Animációk az oldalak váltása közben
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
@@ -271,15 +361,87 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     );
   }
 
+  // Update getProxiedImageUrl to manage the caching mechanism
   String getProxiedImageUrl(String? originalUrl) {
-  if (originalUrl == null || originalUrl.isEmpty) return '';
-  if (kIsWeb) {
-    // Proxy through Firebase function for web
-    return 'https://us-central1-footify-13da4.cloudfunctions.net/proxyImage?url=${Uri.encodeComponent(originalUrl)}';
+    if (originalUrl == null || originalUrl.isEmpty) return '';
+    if (kIsWeb) {
+      // Proxy through Firebase function for web
+      return 'https://us-central1-footify-13da4.cloudfunctions.net/proxyImage?url=${Uri.encodeComponent(originalUrl)}';
+    }
+    // Use direct URL for mobile
+    return originalUrl;
   }
-  // Use direct URL for mobile
-  return originalUrl;
-}
+
+  // Add a new method to load and cache images
+  Future<Uint8List?> getImageBytes(String url) async {
+    // Check cache first
+    if (ImageCache.hasImage(url)) {
+      return ImageCache.getImage(url);
+    }
+    
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final bytes = response.bodyBytes;
+        // Cache image for future use
+        ImageCache.cacheImage(url, bytes);
+        return bytes;
+      }
+    } catch (e) {
+      print('Failed to load image: $e');
+    }
+    return null;
+  }
+
+  // Replace the existing team logo image widget with an optimized version that uses caching
+  Widget buildTeamLogoImage(String? logoUrl, ColorScheme colorScheme) {
+    if (logoUrl == null || logoUrl.isEmpty) {
+      return Container(
+        width: 24,
+        height: 24,
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceVariant,
+          borderRadius: BorderRadius.circular(4)
+        ),
+        child: Icon(Icons.sports_soccer, size: 16, color: colorScheme.onSurface),
+      );
+    }
+    
+    final proxyUrl = getProxiedImageUrl(logoUrl);
+    
+    // Use CachedNetworkImage for better caching and performance
+    return CachedNetworkImage(
+      imageUrl: proxyUrl,
+      width: 24,
+      height: 24,
+      fit: BoxFit.cover,
+      placeholder: (context, url) => Container(
+        width: 24,
+        height: 24,
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceVariant,
+          borderRadius: BorderRadius.circular(4)
+        ),
+        child: const SizedBox(
+          width: 12,
+          height: 12,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      ),
+      errorWidget: (context, url, error) => Container(
+        width: 24,
+        height: 24,
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceVariant,
+          borderRadius: BorderRadius.circular(4)
+        ),
+        child: Icon(Icons.sports_soccer, size: 16, color: colorScheme.onSurface),
+      ),
+      memCacheWidth: 48, // For high-res displays
+      memCacheHeight: 48,
+      cacheKey: proxyUrl, // Use the URL as cache key
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -291,279 +453,353 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
       child: FutureBuilder<Map<String, dynamic>>(
         future: _futureData,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator(color: isDarkMode ? Colors.white : Colors.black));
-          } else if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.wifi_off,
-                      size: 64,
-                      color: isDarkMode ? Colors.white70 : Colors.black54,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Please turn on your WiFi/Mobile Data to use the app!',
-                      style: TextStyle(
-                        color: isDarkMode ? Colors.white : Colors.black,
-                        fontSize: 18,
-                        fontFamily: 'Lexend',
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: () {
-                        setState(() {
-                          _futureData = fetchData();
-                        });
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: colorScheme.primary,
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                      ),
-                      child: const Text('Retry', style: TextStyle(fontFamily: 'Lexend')),
-                    ),
-                  ],
+          // Handle error case
+          if (snapshot.hasError || _hasError) {
+            return _buildErrorWidget(isDarkMode, colorScheme);
+          }
+          
+          // Show data immediately
+          if (snapshot.hasData && snapshot.data!['matches'] != null) {
+            return _buildMatchesList(snapshot.data!, isDarkMode, colorScheme);
+          }
+          
+          // Fallback for empty data (should rarely happen)
+          return Center(
+            child: Text(
+              'No matches available', 
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)
+            )
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildErrorWidget(bool isDarkMode, ColorScheme colorScheme) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.wifi_off,
+              size: 64,
+              color: isDarkMode ? Colors.white70 : Colors.black54,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _errorMessage.contains('No matches available') 
+                  ? 'No matches available at the moment. Please try again later.'
+                  : 'Please check your internet connection!',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black,
+                fontSize: 18,
+                fontFamily: 'Lexend',
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            if (_errorMessage.isNotEmpty && !_errorMessage.contains('No matches available'))
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Text(
+                  _errorMessage,
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white70 : Colors.black54,
+                    fontSize: 14,
+                    fontFamily: 'Lexend',
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-            );
-          } else if (snapshot.hasData) {
-            final data = snapshot.data!;
-            if (data['matches'] == null || data['matches'].isEmpty) {
-              return Center(child: Text('No matches available', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)));
-            }
-            
-            final Map<String, List<dynamic>> matchesByCompetition = {};
-            for (var match in data['matches']) {
-              final competitionName = match['competition']['name'] ?? 'Other Competitions';
-              if (!matchesByCompetition.containsKey(competitionName)) {
-                matchesByCompetition[competitionName] = [];
-              }
-              matchesByCompetition[competitionName]!.add(match);
-            }
-            
-            final sortedCompetitions = matchesByCompetition.keys.toList()..sort();
-            
-            return ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: sortedCompetitions.length,
-              itemBuilder: (context, index) {
-                final competitionName = sortedCompetitions[index];
-                final matches = matchesByCompetition[competitionName]!;
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () {
+                // Properly reload data when retry is pressed
+                setState(() {
+                  _hasError = false;
+                });
                 
-                return StatefulBuilder(
-                  builder: (context, setState) {
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 20),
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      color: colorScheme.surface,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                // Try to load fresh data
+                preloadData().then((_) {
+                  if (mounted) {
+                    setState(() {
+                      _futureData = Future.value(preloadedData ?? {});
+                    });
+                  }
+                });
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: colorScheme.primary,
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+              child: const Text('Retry', style: TextStyle(fontFamily: 'Lexend')),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMatchesList(Map<String, dynamic> data, bool isDarkMode, ColorScheme colorScheme) {
+    // Process the data in chunks to avoid UI jank
+    if (data.containsKey('_processedMatches')) {
+      // Data is already processed, use the cached result
+      Map<String, List<dynamic>> matchesByCompetition = data['_processedMatches'];
+      List<String> sortedCompetitions = data['_sortedCompetitions'];
+      
+      return _buildMatchesListUI(matchesByCompetition, sortedCompetitions, isDarkMode, colorScheme);
+    } else {
+      // Data needs processing - do it once and cache the result
+      return FutureBuilder<Map<String, dynamic>>(
+        future: _processMatchesData(data),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return _buildLoadingIndicator(isDarkMode, colorScheme);
+          } else if (snapshot.hasError) {
+            return Center(child: Text('Error processing data: ${snapshot.error}', 
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)));
+          } else if (snapshot.hasData) {
+            final processedData = snapshot.data!;
+            Map<String, List<dynamic>> matchesByCompetition = processedData['_processedMatches'];
+            List<String> sortedCompetitions = processedData['_sortedCompetitions'];
+            
+            return _buildMatchesListUI(matchesByCompetition, sortedCompetitions, isDarkMode, colorScheme);
+          } else {
+            return Center(child: Text('No match data available', 
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)));
+          }
+        },
+      );
+    }
+  }
+  
+  // Process matches data in an isolate to avoid UI freezes
+  Future<Map<String, dynamic>> _processMatchesData(Map<String, dynamic> data) async {
+    // Create a copy of the data to avoid modifying the original
+    final result = Map<String, dynamic>.from(data);
+    
+    // Group matches by competition
+    final Map<String, List<dynamic>> matchesByCompetition = {};
+    for (var match in data['matches']) {
+      final competitionName = match['competition']['name'] ?? 'Other Competitions';
+      if (!matchesByCompetition.containsKey(competitionName)) {
+        matchesByCompetition[competitionName] = [];
+      }
+      matchesByCompetition[competitionName]!.add(match);
+    }
+    
+    // Sort competitions by name
+    final sortedCompetitions = matchesByCompetition.keys.toList()..sort();
+    
+    // Store processed data
+    result['_processedMatches'] = matchesByCompetition;
+    result['_sortedCompetitions'] = sortedCompetitions;
+    result['_processedTimestamp'] = DateTime.now().millisecondsSinceEpoch;
+    
+    // Cache the processed data
+    if (preloadedData != null) {
+      preloadedData!['_processedMatches'] = matchesByCompetition;
+      preloadedData!['_sortedCompetitions'] = sortedCompetitions;
+      preloadedData!['_processedTimestamp'] = result['_processedTimestamp'];
+    }
+    
+    return result;
+  }
+  
+  // Build the actual list UI with processed data
+  Widget _buildMatchesListUI(Map<String, List<dynamic>> matchesByCompetition, List<String> sortedCompetitions, bool isDarkMode, ColorScheme colorScheme) {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: sortedCompetitions.length,
+      itemBuilder: (context, index) {
+        final competitionName = sortedCompetitions[index];
+        final matches = matchesByCompetition[competitionName]!;
+        
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Card(
+              margin: const EdgeInsets.only(bottom: 20),
+              elevation: 4,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              color: colorScheme.surface,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  InkWell(
+                    onTap: () {
+                      setState(() {
+                        _expandedCompetitions[competitionName] = !(_expandedCompetitions[competitionName] ?? true);
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary,
+                        borderRadius: BorderRadius.only(
+                          topLeft: const Radius.circular(12),
+                          topRight: const Radius.circular(12),
+                          bottomLeft: (_expandedCompetitions[competitionName] ?? true) ? Radius.zero : const Radius.circular(12),
+                          bottomRight: (_expandedCompetitions[competitionName] ?? true) ? Radius.zero : const Radius.circular(12),
+                        ),
+                      ),
+                      child: Row(
                         children: [
-                          InkWell(
-                            onTap: () {
-                              setState(() {
-                                _expandedCompetitions[competitionName] = !(_expandedCompetitions[competitionName] ?? true);
-                              });
-                            },
-                            borderRadius: BorderRadius.circular(12),
-                            child: Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: colorScheme.primary,
-                                borderRadius: BorderRadius.only(
-                                  topLeft: const Radius.circular(12),
-                                  topRight: const Radius.circular(12),
-                                  bottomLeft: (_expandedCompetitions[competitionName] ?? true) ? Radius.zero : const Radius.circular(12),
-                                  bottomRight: (_expandedCompetitions[competitionName] ?? true) ? Radius.zero : const Radius.circular(12),
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.emoji_events, color: Colors.black, size: 24),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      competitionName,
-                                      style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18),
-                                    ),
-                                  ),
-                                  AnimatedRotation(
-                                    turns: (_expandedCompetitions[competitionName] ?? true) ? 0.0 : 0.5,
-                                    duration: const Duration(milliseconds: 300),
-                                    child: Icon(Icons.keyboard_arrow_up, color: Colors.black),
-                                  ),
-                                ],
-                              ),
+                          Icon(Icons.emoji_events, color: Colors.black, size: 24),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              competitionName,
+                              style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18),
                             ),
                           ),
-                          AnimatedContainer(
+                          AnimatedRotation(
+                            turns: (_expandedCompetitions[competitionName] ?? true) ? 0.0 : 0.5,
                             duration: const Duration(milliseconds: 300),
-                            curve: Curves.easeInOut,
-                            height: (_expandedCompetitions[competitionName] ?? true) ? null : 0,
-                            child: ClipRect(
-                              child: Align(
-                                alignment: Alignment.topCenter,
-                                heightFactor: (_expandedCompetitions[competitionName] ?? true) ? 1.0 : 0.0,
-                                child: ListView.separated(
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  itemCount: matches.length,
-                                  separatorBuilder: (context, index) => Divider(height: 1, color: colorScheme.onSurface.withOpacity(0.1)),
-                                  itemBuilder: (context, matchIndex) {
-                                    final match = matches[matchIndex];
-                                    final homeTeam = match['homeTeam']['name'] ?? 'Unknown Team';
-                                    final awayTeam = match['awayTeam']['name'] ?? 'Unknown Team';
-                                    final homeScore = match['score']['fullTime']['home'];
-                                    final awayScore = match['score']['fullTime']['away'];
-                                    final matchStatus = match['status'] ?? '';
-                                    final matchDate = DateTime.parse(match['utcDate']).add(const Duration(hours: 1));
-                                    final formattedDate = '${matchDate.year}/${matchDate.month.toString().padLeft(2, '0')}/${matchDate.day.toString().padLeft(2, '0')}';
-                                    final formattedTime = '${matchDate.hour.toString().padLeft(2, '0')}:${matchDate.minute.toString().padLeft(2, '0')}';
-                                    final scoreText = (homeScore != null && awayScore != null) ? '$homeScore - $awayScore' : 'vs';
-                                    
-                                    return InkWell(
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => MatchDetailsPage(matchData: match),
-                                          ),
-                                        );
-                                      },
-                                      child: Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                                      child: Column(
-                                        children: [
-                                          Row(
-                                            children: [
-                                              Expanded(flex: 1, child: Text(formattedDate, style: TextStyle(color: colorScheme.onSurface.withOpacity(0.7), fontSize: 12))),
-                                              Expanded(flex: 1, child: Text(formattedTime, style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14), textAlign: TextAlign.center)),
-                                              Expanded(
-                                                flex: 1,
-                                                child: Row(
-                                                  mainAxisAlignment: MainAxisAlignment.end,
-                                                  children: [
-                                                    if (matchStatus == 'IN_PLAY')
-                                                      Padding(
-                                                        padding: const EdgeInsets.only(right: 4.0),
-                                                        child: FadeTransition(
-                                                          opacity: _blinkAnimation,
-                                                          child: Container(
-                                                            width: 8,
-                                                            height: 8,
-                                                            decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    Text(
-                                                      matchStatus == 'FINISHED' ? 'FINISHED' : matchStatus == 'IN_PLAY' ? 'LIVE' : matchStatus == 'TIMED' ? 'UPCOMING' : matchStatus,
-                                                      style: TextStyle(
-                                                        color: matchStatus == 'FINISHED' ? Colors.green : matchStatus == 'IN_PLAY' ? Colors.red : colorScheme.onSurface.withOpacity(0.7),
-                                                        fontSize: 12,
-                                                        fontWeight: FontWeight.w500,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Row(
-                                            children: [
-                                              Expanded(
-                                                child: Row(
-                                                  children: [
-                                                    ClipRRect(
-                                                      borderRadius: BorderRadius.circular(4),
-                                                      child: Image.network(
-                                                        getProxiedImageUrl(match['homeTeam']['crest']),
-                                                        width: 24,
-                                                        height: 24,
-                                                        headers: kIsWeb ? {'Origin': 'null'} : {'User-Agent': 'Mozilla/5.0'},
-                                                        errorBuilder: (context, error, stackTrace) => Container(
-                                                          width: 24,
-                                                          height: 24,
-                                                          decoration: BoxDecoration(color: colorScheme.surfaceVariant, borderRadius: BorderRadius.circular(4)),
-                                                          child: Icon(Icons.sports_soccer, size: 16, color: colorScheme.onSurface),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    Expanded(child: Text(homeTeam, style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)),
-                                                  ],
-                                                ),
-                                              ),
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                margin: const EdgeInsets.symmetric(horizontal: 8),
-                                                decoration: BoxDecoration(
-                                                  color: matchStatus == 'FINISHED' ? colorScheme.primaryContainer : colorScheme.surfaceVariant,
-                                                  borderRadius: BorderRadius.circular(4),
-                                                ),
-                                                child: Text(
-                                                  scoreText,
-                                                  style: TextStyle(
-                                                    color: scoreText == 'vs' ? (isDarkMode ? Colors.white : Colors.black) : (matchStatus == 'IN_PLAY' && isDarkMode ? Colors.white : Colors.black),
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                              ),
-                                              Expanded(
-                                                child: Row(
-                                                  mainAxisAlignment: MainAxisAlignment.end,
-                                                  children: [
-                                                    Expanded(child: Text(awayTeam, style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w500), textAlign: TextAlign.end, overflow: TextOverflow.ellipsis)),
-                                                    const SizedBox(width: 8),
-                                                    ClipRRect(
-                                                      borderRadius: BorderRadius.circular(4),
-                                                      child: Image.network(
-                                                        getProxiedImageUrl(match['awayTeam']['crest']),
-                                                        width: 24,
-                                                        height: 24,
-                                                        headers: kIsWeb ? {'Origin': 'null'} : {'User-Agent': 'Mozilla/5.0'},
-                                                        errorBuilder: (context, error, stackTrace) => Container(
-                                                          width: 24,
-                                                          height: 24,
-                                                          decoration: BoxDecoration(color: colorScheme.surfaceVariant, borderRadius: BorderRadius.circular(4)),
-                                                          child: Icon(Icons.sports_soccer, size: 16, color: colorScheme.onSurface),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          ],
-                                        ),
-                                      ),
-                                    );
-                                  },
+                            child: Icon(Icons.keyboard_arrow_up, color: Colors.black),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // Use AnimatedSize for smoother transitions
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                    child: _expandedCompetitions[competitionName] ?? true
+                        ? _buildMatchesListView(matches, isDarkMode, colorScheme)
+                        : const SizedBox.shrink(),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Build the list of matches for a competition
+  Widget _buildMatchesListView(List<dynamic> matches, bool isDarkMode, ColorScheme colorScheme) {
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: matches.length,
+      separatorBuilder: (context, index) => Divider(height: 1, color: colorScheme.onSurface.withOpacity(0.1)),
+      itemBuilder: (context, matchIndex) {
+        final match = matches[matchIndex];
+        final homeTeam = match['homeTeam']['name'] ?? 'Unknown Team';
+        final awayTeam = match['awayTeam']['name'] ?? 'Unknown Team';
+        final homeScore = match['score']['fullTime']['home'];
+        final awayScore = match['score']['fullTime']['away'];
+        final matchStatus = match['status'] ?? '';
+        final matchDate = DateTime.parse(match['utcDate']).add(const Duration(hours: 1));
+        final formattedDate = '${matchDate.year}/${matchDate.month.toString().padLeft(2, '0')}/${matchDate.day.toString().padLeft(2, '0')}';
+        final formattedTime = '${matchDate.hour.toString().padLeft(2, '0')}:${matchDate.minute.toString().padLeft(2, '0')}';
+        final scoreText = (homeScore != null && awayScore != null) ? '$homeScore - $awayScore' : 'vs';
+        
+        return InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => MatchDetailsPage(matchData: match),
+              ),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(flex: 1, child: Text(formattedDate, style: TextStyle(color: colorScheme.onSurface.withOpacity(0.7), fontSize: 12))),
+                    Expanded(flex: 1, child: Text(formattedTime, style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14), textAlign: TextAlign.center)),
+                    Expanded(
+                      flex: 1,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          if (matchStatus == 'IN_PLAY')
+                            Padding(
+                              padding: const EdgeInsets.only(right: 4.0),
+                              child: FadeTransition(
+                                opacity: _blinkAnimation,
+                                child: Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
                                 ),
                               ),
+                            ),
+                          Text(
+                            matchStatus == 'FINISHED' ? 'FINISHED' : matchStatus == 'IN_PLAY' ? 'LIVE' : matchStatus == 'TIMED' ? 'UPCOMING' : matchStatus,
+                            style: TextStyle(
+                              color: matchStatus == 'FINISHED' ? Colors.green : matchStatus == 'IN_PLAY' ? Colors.red : colorScheme.onSurface.withOpacity(0.7),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ],
                       ),
-                    );
-                  },
-                );
-              },
-            );
-          } else {
-            return Center(child: Text('No data available', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)));
-          }
-        },
-      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: buildTeamLogoImage(match['homeTeam']['crest'], colorScheme),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(child: Text(homeTeam, style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      margin: const EdgeInsets.symmetric(horizontal: 8),
+                      decoration: BoxDecoration(
+                        color: matchStatus == 'FINISHED' ? colorScheme.primaryContainer : colorScheme.surfaceVariant,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        scoreText,
+                        style: TextStyle(
+                          color: scoreText == 'vs' ? (isDarkMode ? Colors.white : Colors.black) : (matchStatus == 'IN_PLAY' && isDarkMode ? Colors.white : Colors.black),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Expanded(child: Text(awayTeam, style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w500), textAlign: TextAlign.end, overflow: TextOverflow.ellipsis)),
+                          const SizedBox(width: 8),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: buildTeamLogoImage(match['awayTeam']['crest'], colorScheme),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -571,6 +807,15 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     final homeScore = match['score']['fullTime']['home'];
     final awayScore = match['score']['fullTime']['away'];
     return (homeScore != null && awayScore != null) ? '$homeScore - $awayScore' : 'vs';
+  }
+
+  // Add the simplified loading indicator method
+  Widget _buildLoadingIndicator(bool isDarkMode, ColorScheme colorScheme) {
+    return Center(
+      child: CircularProgressIndicator(
+        color: colorScheme.primary,
+      ),
+    );
   }
 }
 
@@ -657,6 +902,89 @@ class CustomSearchDelegate extends SearchDelegate {
             },
           );
         },
+      ),
+    );
+  }
+}
+
+// A clean loading screen with just a pulsating SVG logo
+class LoadingScreen extends StatefulWidget {
+  const LoadingScreen({Key? key}) : super(key: key);
+
+  @override
+  _LoadingScreenState createState() => _LoadingScreenState();
+}
+
+class _LoadingScreenState extends State<LoadingScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    // Create a subtle pulsating animation
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    )..repeat(reverse: true);
+    
+    // Subtle pulsating effect (0.85 to 1.1)
+    _animation = Tween<double>(begin: 0.85, end: 1.1).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+    
+    // Start loading data in background
+    _startDataLoading();
+  }
+
+  void _startDataLoading() async {
+    if (!isDataPreloaded) {
+      try {
+        await preloadData();
+        if (mounted && isDataPreloaded) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const MainScreen()),
+          );
+        }
+      } catch (e) {
+        print('Loading error: $e');
+        // Keep showing loading screen, retry loading in background
+        Future.delayed(Duration(seconds: 2), () {
+          if (mounted) {
+            _startDataLoading();
+          }
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    // Determine logo path based on theme
+    final String logoPath = isDarkMode 
+        ? 'assets/images/footify_logo_optimized_dark.svg'
+        : 'assets/images/footify_logo_optimized_light.svg';
+    
+    return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.background,
+      body: Center(
+        child: ScaleTransition(
+          scale: _animation,
+          child: SvgPicture.asset(
+            logoPath,
+            width: 250,
+            height: 150,
+            fit: BoxFit.contain,
+          ),
+        ),
       ),
     );
   }

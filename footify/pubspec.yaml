@@ -27,6 +27,9 @@ dependencies:
     sdk: flutter
   intl: ^0.19.0
   table_calendar: ^3.0.9
+  flutter_native_splash: ^2.3.10
+  cached_network_image: ^3.3.1
+  connectivity_plus: ^5.0.2
 
 dev_dependencies:
   flutter_test:
@@ -52,4 +55,22 @@ flutter:
 flutter_localizations:
   sdk: flutter
   generate: true
+
+flutter_native_splash:
+  color_dark: "#1D1D1D"  # Dark mode background
+  color: "#FFFFFF"       # Light mode background
+  image: assets/images/Footify-Logo-NoBG_szerk_hosszu_logo-01.png
+  image_dark: assets/images/Footify-Logo-NoBG.png
+  android: true
+  ios: true
+  web: true
+  android_gravity: center
+  ios_content_mode: center
+  web_image_mode: contain
+  fullscreen: true
+  android_12:
+    image: assets/images/Footify-Logo-NoBG_szerk_hosszu_logo-01.png
+    image_dark: assets/images/Footify-Logo-NoBG.png
+    icon_background_color: "#FFFFFF"
+    icon_background_color_dark: "#1D1D1D"
 

@@ -7,11 +7,113 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:footify/common_layout.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
+
+// This is the local variable with the correct methods
+class FootballApiService {
+  static String baseUrl = 'https://us-central1-footify-13da4.cloudfunctions.net';
+  static bool _initialized = true;
+
+  static void initialize(String firebaseProjectId) {
+    baseUrl = 'https://us-central1-$firebaseProjectId.cloudfunctions.net';
+    _initialized = true;
+    print('FootballApiService initialized with base URL: $baseUrl');
+  }
+
+  static Future<Map<String, dynamic>> getTeamMatches(
+    int teamId, {
+    String? status,
+    String? dateFrom,
+    String? dateTo,
+    int limit = 10
+  }) async {
+    try {
+      Map<String, String> queryParams = {
+        'id': teamId.toString(),
+        'limit': limit.toString(),
+      };
+      
+      if (status != null) queryParams['status'] = status;
+      if (dateFrom != null) queryParams['dateFrom'] = dateFrom;
+      if (dateTo != null) queryParams['dateTo'] = dateTo;
+      
+      final response = await http.get(
+        Uri.parse('$baseUrl/fetchTeamMatches').replace(
+          queryParameters: queryParams
+        )
+      ).timeout(const Duration(seconds: 10));
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data is Map<String, dynamic> && data.containsKey('matches')) {
+          return data;
+        } else {
+          print('Invalid data format from team matches API for team $teamId');
+          return {'matches': []};
+        }
+      } else {
+        print('Team matches API error: ${response.statusCode}');
+        return {'matches': []};
+      }
+    } catch (e) {
+      print('Error in getTeamMatches: $e');
+      return {'matches': []};
+    }
+  }
+
+  static Future<Map<String, dynamic>> getHeadToHead(int team1Id, int team2Id, {int limit = 10}) async {
+    try {
+      // Get matches for the first team
+      final team1Matches = await getTeamMatches(team1Id, limit: limit * 2);
+      
+      if (!team1Matches.containsKey('matches') || team1Matches['matches'] is! List) {
+        return {'matches': []};
+      }
+      
+      // Filter for matches against the second team
+      final List<dynamic> allMatches = team1Matches['matches'];
+      final List<dynamic> h2hMatches = allMatches.where((match) {
+        final int homeTeamId = match['homeTeam']?['id'] ?? 0;
+        final int awayTeamId = match['awayTeam']?['id'] ?? 0;
+        return (homeTeamId == team1Id && awayTeamId == team2Id) || 
+               (homeTeamId == team2Id && awayTeamId == team1Id);
+      }).take(limit).toList();
+      
+      return {'matches': h2hMatches};
+    } catch (e) {
+      print('Error in getHeadToHead: $e');
+      return {'matches': []};
+    }
+  }
+
+  static Future<Map<String, dynamic>> getMatchStatistics(int matchId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/fetchMatchById').replace(
+          queryParameters: {'id': matchId.toString()}
+        )
+      ).timeout(const Duration(seconds: 10));
+      
+      if (response.statusCode == 200) {
+        final matchData = json.decode(response.body);
+        return {'statistics': matchData['statistics'] ?? {}};
+      } else {
+        return {'statistics': {}};
+      }
+    } catch (e) {
+      print('Error in getMatchStatistics: $e');
+      return {'statistics': {}};
+    }
+  }
+}
 
 class MatchDetailsPage extends StatefulWidget {
   final Map<String, dynamic> matchData;
 
-  const MatchDetailsPage({Key? key, required this.matchData}) : super(key: key);
+  const MatchDetailsPage({
+    Key? key,
+    required this.matchData,
+  }) : super(key: key);
 
   @override
   _MatchDetailsPageState createState() => _MatchDetailsPageState();
@@ -23,9 +125,9 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
   bool _isLoading = true;
   
   // Variables to store related match data
-  List<Map<String, dynamic>> _homeTeamRecentMatches = [];
-  List<Map<String, dynamic>> _awayTeamRecentMatches = [];
-  List<Map<String, dynamic>> _headToHeadMatches = [];
+  List<dynamic> _homeTeamRecentMatches = [];
+  List<dynamic> _awayTeamRecentMatches = [];
+  List<dynamic> _headToHeadMatches = [];
   
   // Statistics calculated from recent matches
   Map<String, dynamic> _homeTeamStats = {
@@ -47,8 +149,9 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
   @override
   void initState() {
     super.initState();
+    // Create a TabController with 5 tabs: Overview, Timeline, Stats, Lineups, H2H, Players
     _tabController = TabController(length: 6, vsync: this);
-    
+
     // Initialize the FootballAPIService with the correct Firebase project ID
     // This should match your Firebase project ID where the functions are deployed
     FootballApiService.initialize('footify-13da4'); // Update this with your actual project ID
@@ -61,6 +164,23 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  dynamic _getNestedValue(Map<String, dynamic> map, List<String> keys, dynamic defaultValue) {
+    dynamic current = map;
+    for (String key in keys) {
+      if (current is! Map || !current.containsKey(key)) {
+        return defaultValue;
+      }
+      current = current[key];
+    }
+    return current ?? defaultValue;
+  }
+
+  // Format date in standard format
+  String _formatDate(DateTime date) {
+    final DateFormat formatter = DateFormat('dd MMM yyyy');
+    return formatter.format(date);
   }
 
   @override
@@ -81,100 +201,210 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
     };
   }
 
-  dynamic _getNestedValue(Map<String, dynamic> map, List<String> keys, dynamic defaultValue) {
-    dynamic current = map;
-    for (String key in keys) {
-      if (current is! Map || !current.containsKey(key)) {
-        return defaultValue;
-      }
-      current = current[key];
-    }
-    return current ?? defaultValue;
-  }
-
   @override
   Widget build(BuildContext context) {
+    // Get theme brightness for background color
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final primaryColor = const Color(0xFFFFE6AC);
+    final bgColor = isDarkMode ? Colors.grey[900] : Colors.grey[100];
     
-    return CommonLayout(
-      selectedIndex: 0, // Required parameter
-      showBackButton: true, // Enable back button for match details page
-      child: Column(
-        children: [
-          Container(
-            height: 45,
-            alignment: Alignment.centerLeft,
-            child: Row(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: [
-                        _buildTabButton(0, AppLocalizations.of(context)!.stats, isDarkMode, primaryColor),
-                        _buildTabButton(1, AppLocalizations.of(context)!.lineups, isDarkMode, primaryColor),
-                        _buildTabButton(2, AppLocalizations.of(context)!.timeline, isDarkMode, primaryColor),
-                        _buildTabButton(3, "H2H", isDarkMode, primaryColor),
-                        _buildTabButton(4, AppLocalizations.of(context)!.detailedStats, isDarkMode, primaryColor),
-                        _buildTabButton(5, AppLocalizations.of(context)!.recentMatches, isDarkMode, primaryColor),
-                      ],
+    final homeTeamName = widget.matchData['homeTeam']['name'];
+    final awayTeamName = widget.matchData['awayTeam']['name'];
+    final homeTeamColor = _generateTeamColor(homeTeamName);
+    final awayTeamColor = _generateTeamColor(awayTeamName);
+    
+    // Extract score
+    final score = widget.matchData['score'] ?? {};
+    final fullTimeScore = score['fullTime'] ?? {};
+    final homeScore = fullTimeScore['home'] ?? 0;
+    final awayScore = fullTimeScore['away'] ?? 0;
+    
+    return Scaffold(
+      backgroundColor: Theme.of(context).brightness == Brightness.dark 
+          ? const Color(0xFF121212) 
+          : const Color(0xFFF5F5F5),
+      body: SafeArea(
+        child: NestedScrollView(
+          headerSliverBuilder: (context, innerBoxIsScrolled) {
+            return [
+              SliverAppBar(
+                expandedHeight: 240.0,
+                floating: false,
+                pinned: true,
+                backgroundColor: Theme.of(context).brightness == Brightness.dark 
+                    ? const Color(0xFF1D1D1D) 
+                    : Colors.white,
+                flexibleSpace: FlexibleSpaceBar(
+                  background: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          homeTeamColor.withOpacity(0.7),
+                          awayTeamColor.withOpacity(0.7),
+                        ],
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Competition name and match day
+                          Text(
+                            _getCompetitionName(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          
+                          // Teams and score
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              // Home team
+                              Expanded(
+                                child: Column(
+                                  children: [
+                                    _buildTeamLogo(widget.matchData['homeTeam']['crest'], size: 60),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      homeTeamName,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              
+                              // Score
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  '$homeScore - $awayScore',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              
+                              // Away team
+                              Expanded(
+                                child: Column(
+                                  children: [
+                                    _buildTeamLogo(widget.matchData['awayTeam']['crest'], size: 60),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      awayTeamName,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          
+                          // Match status and time
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              _getMatchStatusAndTime(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                          
+                          // Goalscorers (if any)
+                          const SizedBox(height: 8),
+                          _buildGoalscorersTextSummary(),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ],
-            ),
-          ),
-          Container(
-            height: 2,
-            color: primaryColor,
-          ),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildMatchStatsTab(),
-                _buildLineupTab(),
-                _buildTimelineTab(),
-                _buildH2HTab(),
-                _buildDetailedStatsTab(),
-                _buildRecentMatchesTab(),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-  
-  Widget _buildTabButton(int index, String title, bool isDarkMode, Color primaryColor) {
-    bool isSelected = _tabController.index == index;
-    
-    return InkWell(
-      onTap: () {
-        setState(() {
-          _tabController.animateTo(index);
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: isSelected ? primaryColor : Colors.transparent,
-              width: 2,
-            ),
-          ),
-        ),
-        child: Text(
-          title,
-          style: TextStyle(
-            color: isSelected
-                ? (isDarkMode ? primaryColor : Colors.black)
-                : (isDarkMode ? Colors.grey : Colors.grey[600]),
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          ),
+                bottom: TabBar(
+                  controller: _tabController,
+                  isScrollable: true,
+                  indicatorColor: Theme.of(context).brightness == Brightness.dark 
+                    ? const Color(0xFFFFE6AC) 
+                    : Colors.blue,
+                  labelColor: Theme.of(context).brightness == Brightness.dark 
+                    ? const Color(0xFFFFE6AC) 
+                    : Colors.blue,
+                  unselectedLabelColor: Colors.grey,
+                  tabs: const [
+                    Tab(
+                      icon: Icon(Icons.sports_soccer),
+                      text: 'Overview',
+                    ),
+                    Tab(
+                      icon: Icon(Icons.timeline),
+                      text: 'Timeline',
+                    ),
+                    Tab(
+                      icon: Icon(Icons.bar_chart),
+                      text: 'Stats',
+                    ),
+                    Tab(
+                      icon: Icon(Icons.people),
+                      text: 'Lineup',
+                    ),
+                    Tab(
+                      icon: Icon(Icons.compare_arrows),
+                      text: 'H2H',
+                    ),
+                    Tab(
+                      icon: Icon(Icons.person),
+                      text: 'Players',
+                    ),
+                  ],
+                ),
+              ),
+            ];
+          },
+          body: _isLoading
+            ? _buildLoadingIndicator()
+            : TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildOverviewTab(),
+                  _buildTimelineTab(),
+                  _buildStatsTab(),
+                  _buildLineupTab(),
+                  _buildH2HTab(),
+                  _buildPlayersTab(),
+                ],
+              ),
         ),
       ),
     );
@@ -207,7 +437,7 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
               // Match header with teams, logos, and score
               _buildMatchHeader(),
               
-              const SizedBox(height: 24),
+          const SizedBox(height: 24),
               
               // Goals section
               _buildGoalsSection(),
@@ -219,202 +449,6 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
             ],
           ),
         );
-  }
-
-  Widget _buildMatchHeader() {
-    final homeTeam = widget.matchData['homeTeam'];
-    final awayTeam = widget.matchData['awayTeam'];
-    
-    // Itt van a probléma - javítsuk ki az eredmény lekérését
-    final score = widget.matchData['score'] ?? {};
-    final homeGoals = score['fullTime']?['homeTeam'] ?? score['homeTeam'] ?? 0;
-    final awayGoals = score['fullTime']?['awayTeam'] ?? score['awayTeam'] ?? 0;
-    
-    final status = widget.matchData['status'] ?? '';
-    final minute = widget.matchData['minute']?.toString() ?? '';
-    final injuryTime = widget.matchData['injuryTime'] ?? 0;
-    
-    // Determine match status text
-    String statusText;
-    Color statusColor;
-    
-    if (status == 'IN_PLAY') {
-      statusText = '$minute\'${injuryTime > 0 ? '+$injuryTime' : ''}';
-      statusColor = Colors.red;
-    } else if (status == 'PAUSED') {
-      statusText = 'HT';
-      statusColor = Colors.orange;
-    } else if (status == 'FINISHED') {
-      statusText = 'FT';
-      statusColor = Colors.green;
-    } else if (status == 'POSTPONED') {
-      statusText = 'Postponed';
-      statusColor = Colors.grey;
-    } else {
-      statusText = widget.matchData['date'] != null 
-        ? '${DateTime.parse(widget.matchData['date']).hour}:${DateTime.parse(widget.matchData['date']).minute}'
-        : 'Scheduled';
-      statusColor = Colors.grey;
-    }
-    
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            // Match status indicator
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: statusColor),
-              ),
-              child: Text(
-                statusText,
-                style: TextStyle(
-                  color: statusColor,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            
-            const SizedBox(height: 24),
-            
-            // Teams and score
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Home team
-                Expanded(
-                  flex: 3,
-                  child: Column(
-                    children: [
-                      _buildTeamLogo(homeTeam['crest'], size: 50),
-                      const SizedBox(height: 4),
-                      Text(
-                        homeTeam['name'] ?? 'Home',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                
-                // Score
-                Expanded(
-                  flex: 2,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                    decoration: BoxDecoration(
-                      color: colors['primary']!.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '$homeGoals - $awayGoals',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-                
-                // Away team
-                Expanded(
-                  flex: 3,
-                  child: Column(
-                    children: [
-                      _buildTeamLogo(awayTeam['crest'], size: 50),
-                      const SizedBox(height: 4),
-                      Text(
-                        awayTeam['name'] ?? 'Away',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Additional match info (venue, date)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.location_on_outlined, size: 16),
-                const SizedBox(width: 4),
-                Text(
-                  widget.matchData['venue'] ?? 'Stadium',
-                  style: const TextStyle(fontSize: 14),
-                ),
-                const SizedBox(width: 16),
-                const Icon(Icons.calendar_today_outlined, size: 16),
-                const SizedBox(width: 4),
-                Text(
-                  widget.matchData['date'] != null
-                      ? _formatDate(DateTime.parse(widget.matchData['date']))
-                      : 'Date not available',
-                  style: const TextStyle(fontSize: 14),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTeamLogo(String? logoUrl, {double size = 60}) {
-    final String? proxyLogoUrl = logoUrl != null ? FootballApiService.getProxyImageUrl(logoUrl) : null;
-    
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 5,
-            spreadRadius: 1,
-          ),
-        ],
-      ),
-      child: ClipOval(
-        child: proxyLogoUrl != null
-            ? Image.network(
-                proxyLogoUrl,
-                fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => const Icon(
-                  Icons.sports_soccer,
-                  size: 30,
-                  color: Colors.grey,
-                ),
-              )
-            : const Icon(
-                Icons.sports_soccer,
-                size: 30,
-                color: Colors.grey,
-              ),
-      ),
-    );
   }
 
   Widget _buildGoalsSection() {
@@ -601,31 +635,83 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
 
   List<Map<String, dynamic>> _extractGoals() {
     final List<Map<String, dynamic>> extractedGoals = [];
-    final goals = widget.matchData['goals'];
+    final goals = widget.matchData['goals'] ?? [];
     
-    if (goals == null || goals is! List) {
+    if (goals is! List) {
       return extractedGoals;
     }
     
     for (final goal in goals) {
       if (goal is Map<String, dynamic>) {
-        extractedGoals.add({
-          'minute': goal['minute'],
-          'playerName': goal['player'],
-          'teamId': goal['team']['id'],
-          'teamName': goal['team']['name'],
-          'isOwnGoal': goal['ownGoal'] ?? false,
-          'isPenalty': goal['penalty'] ?? false,
-          'assistPlayerName': goal['assist'],
-        });
+        final Map<String, dynamic> extractedGoal = {
+          'minute': goal['minute'] ?? 0,
+          'playerName': goal['scorer']?['name'] ?? goal['player']?['name'] ?? 'Unknown Player',
+          'playerId': goal['scorer']?['id'] ?? goal['player']?['id'],
+          'teamId': goal['team']?['id'],
+          'teamName': goal['team']?['name'] ?? 'Unknown Team',
+          'isOwnGoal': goal['type'] == 'OWN' || goal['ownGoal'] == true,
+          'isPenalty': goal['type'] == 'PENALTY' || goal['penalty'] == true,
+          'assistPlayerName': goal['assist']?['name'] ?? goal['assistedBy']?['name'],
+          'assistPlayerId': goal['assist']?['id'] ?? goal['assistedBy']?['id'],
+          'injuryTime': goal['injuryTime'] ?? 0,
+        };
+        extractedGoals.add(extractedGoal);
       }
     }
+    
+    // Sort goals by minute and injury time
+    extractedGoals.sort((a, b) {
+      int minuteComparison = (a['minute'] ?? 0).compareTo(b['minute'] ?? 0);
+      if (minuteComparison == 0) {
+        return (a['injuryTime'] ?? 0).compareTo(b['injuryTime'] ?? 0);
+      }
+      return minuteComparison;
+    });
     
     return extractedGoals;
   }
 
   Widget _buildKeyStatsSection() {
-    final statistics = widget.matchData['statistics'] ?? {};
+    // Get basic match statistics from the match data
+    final basicStats = _getMatchStats();
+    
+    // If we're using our enhanced statistics endpoint, let's get additional stats
+    final Map<String, dynamic> matchData = widget.matchData;
+    
+    // Ensure statistics is a Map<String, dynamic>
+    final Map<String, dynamic> statistics = {};
+    if (matchData['statistics'] is Map) {
+      (matchData['statistics'] as Map).forEach((key, value) {
+        statistics[key.toString()] = value;
+      });
+    }
+    
+    // Additional statistics from our enhanced endpoint
+    final cards = statistics['cards'];
+    final goals = statistics['goals'];
+    final possession = statistics['possession'];
+    
+    Map<String, dynamic> homeCards = {'yellow': 0, 'red': 0};
+    Map<String, dynamic> awayCards = {'yellow': 0, 'red': 0};
+    if (cards is Map) {
+      if (cards['home'] is Map) {
+        homeCards = Map<String, dynamic>.from(cards['home'] as Map);
+      }
+      if (cards['away'] is Map) {
+        awayCards = Map<String, dynamic>.from(cards['away'] as Map);
+      }
+    }
+    
+    Map<String, dynamic> homeGoals = {'total': 0, 'firstHalf': 0, 'secondHalf': 0};
+    Map<String, dynamic> awayGoals = {'total': 0, 'firstHalf': 0, 'secondHalf': 0};
+    if (goals is Map) {
+      if (goals['home'] is Map) {
+        homeGoals = Map<String, dynamic>.from(goals['home'] as Map);
+      }
+      if (goals['away'] is Map) {
+        awayGoals = Map<String, dynamic>.from(goals['away'] as Map);
+      }
+    }
     
     return Card(
       elevation: 2,
@@ -636,62 +722,180 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Key Statistics',
+              'Key Stats',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 16),
-            
-            // Possession
-            _buildStatRow(
-              'Possession',
-              statistics['home_possession']?.toString() ?? '0',
-              statistics['away_possession']?.toString() ?? '0',
-              isPercentage: true,
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Shots on target
-            _buildStatRow(
-              'Shots on Target',
-              statistics['home_shots_on_target']?.toString() ?? '0',
-              statistics['away_shots_on_target']?.toString() ?? '0',
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Total shots
-            _buildStatRow(
-              'Total Shots',
-              statistics['home_shots']?.toString() ?? '0',
-              statistics['away_shots']?.toString() ?? '0',
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Pass accuracy
-            _buildStatRow(
-              'Pass Accuracy',
-              statistics['home_pass_accuracy']?.toString() ?? '0',
-              statistics['away_pass_accuracy']?.toString() ?? '0',
-              isPercentage: true,
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Corners
-            _buildStatRow(
-              'Corners',
-              statistics['home_corners']?.toString() ?? '0',
-              statistics['away_corners']?.toString() ?? '0',
-            ),
+            // Standard stats from original data
+            for (var stat in basicStats) ...[
+              _buildStatRow(
+                stat['label'] ?? '',
+                stat['homeValue'] ?? '0',
+                stat['awayValue'] ?? '0',
+                isPercentage: (stat['label'] ?? '') == 'Possession' || (stat['label'] ?? '') == 'Pass Accuracy',
+              ),
+              const SizedBox(height: 12),
+            ],
+            // Show cards statistics if available
+            if (cards != null) ...[
+              _buildStatRow(
+                'Yellow Cards',
+                homeCards['yellow']?.toString() ?? '0',
+                awayCards['yellow']?.toString() ?? '0',
+                isPercentage: false,
+              ),
+              const SizedBox(height: 12),
+              _buildStatRow(
+                'Red Cards',
+                homeCards['red']?.toString() ?? '0',
+                awayCards['red']?.toString() ?? '0',
+                isPercentage: false,
+              ),
+              const SizedBox(height: 12),
+            ],
+            // Show goals by half if available
+            if (goals != null) ...[
+              _buildStatRow(
+                'Goals (1st Half)',
+                homeGoals['firstHalf']?.toString() ?? '0',
+                awayGoals['firstHalf']?.toString() ?? '0',
+                isPercentage: false,
+              ),
+              const SizedBox(height: 12),
+              _buildStatRow(
+                'Goals (2nd Half)',
+                homeGoals['secondHalf']?.toString() ?? '0',
+                awayGoals['secondHalf']?.toString() ?? '0',
+                isPercentage: false,
+              ),
+              const SizedBox(height: 12),
+            ],
+            // Additional statistics that might be in the enhanced API
+            if (statistics['shotsOnGoal'] != null) ...[
+              _buildStatRow(
+                'Shots on Goal',
+                statistics['shotsOnGoal']?['home']?.toString() ?? '0',
+                statistics['shotsOnGoal']?['away']?.toString() ?? '0',
+                isPercentage: false,
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (statistics['fouls'] != null) ...[
+              _buildStatRow(
+                'Fouls',
+                statistics['fouls']?['home']?.toString() ?? '0',
+                statistics['fouls']?['away']?.toString() ?? '0',
+                isPercentage: false,
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (statistics['corners'] != null) ...[
+              _buildStatRow(
+                'Corners',
+                statistics['corners']?['home']?.toString() ?? '0',
+                statistics['corners']?['away']?.toString() ?? '0',
+                isPercentage: false,
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (statistics['offsides'] != null) ...[
+              _buildStatRow(
+                'Offsides',
+                statistics['offsides']?['home']?.toString() ?? '0',
+                statistics['offsides']?['away']?.toString() ?? '0',
+                isPercentage: false,
+              ),
+              const SizedBox(height: 12),
+            ],
           ],
         ),
       ),
     );
+  }
+
+  List<Map<String, String>> _getMatchStats() {
+    final List<Map<String, String>> stats = [];
+    final homeTeam = widget.matchData['homeTeam'];
+    final awayTeam = widget.matchData['awayTeam'];
+    final statistics = widget.matchData['statistics'] ?? {};
+
+    // Basic match stats
+    stats.add({
+      'label': 'Possession',
+      'homeValue': statistics['home_possession']?.toString() ?? '0',
+      'awayValue': statistics['away_possession']?.toString() ?? '0',
+    });
+
+    stats.add({
+      'label': 'Shots on Target',
+      'homeValue': statistics['home_shots_on_target']?.toString() ?? '0',
+      'awayValue': statistics['away_shots_on_target']?.toString() ?? '0',
+    });
+
+    stats.add({
+      'label': 'Total Shots',
+      'homeValue': statistics['home_shots']?.toString() ?? '0',
+      'awayValue': statistics['away_shots']?.toString() ?? '0',
+    });
+
+    stats.add({
+      'label': 'Pass Accuracy',
+      'homeValue': statistics['home_pass_accuracy']?.toString() ?? '0',
+      'awayValue': statistics['away_pass_accuracy']?.toString() ?? '0',
+    });
+
+    stats.add({
+      'label': 'Total Passes',
+      'homeValue': statistics['home_passes']?.toString() ?? '0',
+      'awayValue': statistics['away_passes']?.toString() ?? '0',
+    });
+
+    stats.add({
+      'label': 'Fouls',
+      'homeValue': statistics['home_fouls']?.toString() ?? '0',
+      'awayValue': statistics['away_fouls']?.toString() ?? '0',
+    });
+
+    stats.add({
+      'label': 'Yellow Cards',
+      'homeValue': (widget.matchData['bookings'] ?? [])
+          .where((booking) => booking['team']['id'] == homeTeam['id'] && booking['card'] == 'YELLOW')
+          .length
+          .toString(),
+      'awayValue': (widget.matchData['bookings'] ?? [])
+          .where((booking) => booking['team']['id'] == awayTeam['id'] && booking['card'] == 'YELLOW')
+          .length
+          .toString(),
+    });
+
+    stats.add({
+      'label': 'Red Cards',
+      'homeValue': (widget.matchData['bookings'] ?? [])
+          .where((booking) => booking['team']['id'] == homeTeam['id'] && booking['card'] == 'RED')
+          .length
+          .toString(),
+      'awayValue': (widget.matchData['bookings'] ?? [])
+          .where((booking) => booking['team']['id'] == awayTeam['id'] && booking['card'] == 'RED')
+          .length
+          .toString(),
+    });
+
+    stats.add({
+      'label': 'Corners',
+      'homeValue': statistics['home_corners']?.toString() ?? '0',
+      'awayValue': statistics['away_corners']?.toString() ?? '0',
+    });
+
+    stats.add({
+      'label': 'Offsides',
+      'homeValue': statistics['home_offsides']?.toString() ?? '0',
+      'awayValue': statistics['away_offsides']?.toString() ?? '0',
+    });
+
+    return stats;
   }
 
   Widget _buildStatRow(String label, String homeValue, String awayValue, {bool isPercentage = false}) {
@@ -708,10 +912,10 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
+      children: [
+        Text(
               isPercentage ? '$homeValue%' : homeValue,
-              style: TextStyle(
+          style: TextStyle(
                 fontWeight: homeNum > awayNum ? FontWeight.bold : FontWeight.normal,
                 color: homeNum > awayNum ? Colors.blue : null,
               ),
@@ -756,24 +960,16 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
     );
   }
 
-  String _formatDate(DateTime date) {
-    final months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-    ];
-    return '${date.day} ${months[date.month - 1]} ${date.year}';
-  }
-
   Widget _buildSectionTitle(String title) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12.0),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       child: Text(
         title,
         style: const TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-      ),
     );
   }
 
@@ -787,7 +983,7 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
           children: [
             Column(
               children: [
-                Text(
+          Text(
                   '${_h2hStats['homeWins'] ?? 0}',
                   style: const TextStyle(
                     fontSize: 24,
@@ -902,7 +1098,7 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
       children: [
         Text(
           value,
-          style: TextStyle(
+            style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
             color: color,
@@ -913,121 +1109,126 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
     );
   }
 
-  Widget _buildRecentMatches(List<Map<String, dynamic>> matches, int teamId) {
+  Widget _buildRecentMatches(List<dynamic> matches, int teamId) {
     if (matches.isEmpty) {
-      return const Text('No recent matches found');
+      return const Padding(
+        padding: EdgeInsets.all(16.0),
+        child: Center(
+          child: Text(
+            'No recent matches available',
+            style: TextStyle(
+              fontStyle: FontStyle.italic,
+              color: Colors.grey,
+            ),
+          ),
+        ),
+      );
     }
-    
-    return Card(
-      elevation: 2,
-      child: ListView.separated(
-        physics: const NeverScrollableScrollPhysics(),
-        shrinkWrap: true,
-        itemCount: matches.length,
-        separatorBuilder: (context, index) => const Divider(height: 1),
-        itemBuilder: (context, index) {
-          try {
-            final match = matches[index];
-            final homeTeamId = match['homeTeam']['id'];
-            final awayTeamId = match['awayTeam']['id'];
-            final homeTeamName = match['homeTeam']['name'] ?? 'Unknown';
-            final awayTeamName = match['awayTeam']['name'] ?? 'Unknown';
-            final homeScore = match['score']['fullTime']['homeTeam'] ?? 0;
-            final awayScore = match['score']['fullTime']['awayTeam'] ?? 0;
-            
-            // Determine if the team of interest won, lost, or drew
-            String result;
-            Color resultColor;
-            
-            if (homeTeamId == teamId) {
-              if (homeScore > awayScore) {
-                result = 'W';
-                resultColor = Colors.green;
-              } else if (homeScore < awayScore) {
-                result = 'L';
-                resultColor = Colors.red;
-              } else {
-                result = 'D';
-                resultColor = Colors.orange;
-              }
-            } else {
-              if (homeScore < awayScore) {
-                result = 'W';
-                resultColor = Colors.green;
-              } else if (homeScore > awayScore) {
-                result = 'L';
-                resultColor = Colors.red;
-              } else {
-                result = 'D';
-                resultColor = Colors.orange;
-              }
-            }
-            
-            String formattedDate = 'Unknown date';
-            try {
-              if (match['utcDate'] != null) {
-                final matchDate = DateTime.parse(match['utcDate']);
-                formattedDate = '${matchDate.day}/${matchDate.month}/${matchDate.year}';
-              }
-            } catch (e) {
-              print('Error formatting date: $e');
-            }
-            
-            return ListTile(
-              leading: CircleAvatar(
-                backgroundColor: resultColor,
-                child: Text(
-                  result,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: matches.length > 5 ? 5 : matches.length,
+      itemBuilder: (context, index) {
+        final match = matches[index];
+        final bool isHome = match['homeTeam']['id'] == teamId;
+        
+        // Extract scores with proper type handling
+        final dynamic rawHomeScore = match['score']?['fullTime']?['home'] ?? 0;
+        final dynamic rawAwayScore = match['score']?['fullTime']?['away'] ?? 0;
+        final int homeScore = rawHomeScore is num ? rawHomeScore.toInt() : 0;
+        final int awayScore = rawAwayScore is num ? rawAwayScore.toInt() : 0;
+        
+        final String scoreText = '$homeScore - $awayScore';
+        final String opponentName = isHome ? match['awayTeam']['name'] : match['homeTeam']['name'];
+        
+        // Determine result
+        String result;
+        Color resultColor;
+        if (isHome) {
+          if (homeScore > awayScore) {
+            result = 'W';
+            resultColor = Colors.green;
+          } else if (homeScore < awayScore) {
+            result = 'L';
+            resultColor = Colors.red;
+          } else {
+            result = 'D';
+            resultColor = Colors.amber;
+          }
+        } else {
+          if (homeScore < awayScore) {
+            result = 'W';
+            resultColor = Colors.green;
+          } else if (homeScore > awayScore) {
+            result = 'L';
+            resultColor = Colors.red;
+          } else {
+            result = 'D';
+            resultColor = Colors.amber;
+          }
+        }
+        
+        return Card(
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: resultColor.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(color: resultColor),
+                  ),
+                  child: Center(
+                    child: Text(
+                      result,
+                      style: TextStyle(
+                        color: resultColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-              title: Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      homeTeamName,
-                      textAlign: TextAlign.end,
-                      style: TextStyle(
-                        fontWeight: homeTeamId == teamId ? FontWeight.bold : FontWeight.normal,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isHome ? 'vs $opponentName (H)' : 'vs $opponentName (A)',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Expanded(
-                    flex: 1,
-                    child: Text(
-                      ' $homeScore - $awayScore ',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      awayTeamName,
-                      style: TextStyle(
-                        fontWeight: awayTeamId == teamId ? FontWeight.bold : FontWeight.normal,
+                      const SizedBox(height: 4),
+                      Text(
+                        match['utcDate'] != null
+                            ? _formatDate(DateTime.parse(match['utcDate']))
+                            : 'Date unknown',
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 12,
+                        ),
                       ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    ],
                   ),
-                ],
-              ),
-              subtitle: Text(formattedDate),
-            );
-          } catch (e) {
-            print('Error rendering match at index $index: $e');
-            return const ListTile(
-              title: Text('Error displaying match'),
-              subtitle: Text('Unable to load match data'),
-            );
-          }
-        },
-      ),
+                ),
+                Text(
+                  scoreText,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+          ),
+      ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -1082,9 +1283,9 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
               style: TextStyle(
                 color: colors['text'],
                 fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
+              fontWeight: FontWeight.bold,
             ),
+          ),
             const SizedBox(height: 8),
             Text(
               label,
@@ -1187,91 +1388,87 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
     if (mounted) setState(() => _isLoading = true);
     
     try {
-      final match = widget.matchData;
-      final homeTeamId = match['homeTeam']['id'];
-      final awayTeamId = match['awayTeam']['id'];
+      final homeTeamId = widget.matchData['homeTeam']['id'];
+      final awayTeamId = widget.matchData['awayTeam']['id'];
       
-      // Fetch both teams' recent matches (last 5)
-      final DateTime today = DateTime.now();
-      final String dateTo = today.toIso8601String().split('T')[0];
-      final String dateFrom = DateTime(today.year - 1, today.month, today.day)
-          .toIso8601String()
-          .split('T')[0];
-          
-      // Use try-catch for each API call separately to handle individual failures
-      try {
-        // Fetch home team matches
-        final homeTeamMatchesResponse = await FootballApiService.getTeamMatches(
-          homeTeamId,
-          status: 'FINISHED',
-          dateFrom: dateFrom,
-          dateTo: dateTo,
-          limit: 5
-        );
-        
-        if (mounted) {
-          setState(() {
-            _homeTeamRecentMatches = (homeTeamMatchesResponse['matches'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-          });
-        }
-      } catch (e) {
-        print('Error fetching home team matches: $e');
-      }
+      // Determine date range for fetching matches (last 3 months)
+      final now = DateTime.now();
+      final dateFrom = DateTime(now.year, now.month - 3, now.day);
+      final dateTo = now;
       
-      try {
-        // Fetch away team matches
-        final awayTeamMatchesResponse = await FootballApiService.getTeamMatches(
-          awayTeamId,
-          status: 'FINISHED',
-          dateFrom: dateFrom,
-          dateTo: dateTo,
-          limit: 5
-        );
-        
-        if (mounted) {
-          setState(() {
-            _awayTeamRecentMatches = (awayTeamMatchesResponse['matches'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-          });
-        }
-      } catch (e) {
-        print('Error fetching away team matches: $e');
-      }
+      // Format dates for API
+      final dateFromStr = '${dateFrom.year}-${dateFrom.month.toString().padLeft(2, '0')}-${dateFrom.day.toString().padLeft(2, '0')}';
+      final dateToStr = '${dateTo.year}-${dateTo.month.toString().padLeft(2, '0')}-${dateTo.day.toString().padLeft(2, '0')}';
       
-      try {
-        // Fetch head-to-head matches
-        final h2hMatchesResponse = await FootballApiService.getTeamMatches(
-          homeTeamId,
-          status: 'FINISHED',
-          dateFrom: dateFrom,
-          dateTo: dateTo,
-          limit: 10
-        );
-        
-        if (mounted && h2hMatchesResponse['matches'] != null) {
-          // Filter h2h matches to only include those between these two teams
-          final List<dynamic> allH2hMatches = h2hMatchesResponse['matches'] ?? [];
-          final List<dynamic> h2hMatches = allH2hMatches.where((m) => 
-            (m['homeTeam']['id'] == homeTeamId && m['awayTeam']['id'] == awayTeamId) ||
-            (m['homeTeam']['id'] == awayTeamId && m['awayTeam']['id'] == homeTeamId)
-          ).toList();
-          
-          setState(() {
-            _headToHeadMatches = h2hMatches.cast<Map<String, dynamic>>();
-          });
-        }
-      } catch (e) {
-        print('Error fetching head-to-head matches: $e');
-      }
+      // Create a list of futures to execute in parallel
+      List<Future> futures = [];
       
-      // Calculate stats once we have all the data
+      // Home team matches future
+      final homeTeamMatchesFuture = FootballApiService.getTeamMatches(
+        homeTeamId,
+        status: 'FINISHED',
+        dateFrom: dateFromStr,
+        dateTo: dateToStr,
+        limit: 10,
+      );
+      futures.add(homeTeamMatchesFuture);
+      
+      // Away team matches future
+      final awayTeamMatchesFuture = FootballApiService.getTeamMatches(
+        awayTeamId,
+        status: 'FINISHED',
+        dateFrom: dateFromStr,
+        dateTo: dateToStr,
+        limit: 10,
+      );
+      futures.add(awayTeamMatchesFuture);
+      
+      // Head to head matches future
+      final h2hMatchesFuture = FootballApiService.getHeadToHead(
+        homeTeamId,
+        awayTeamId,
+        limit: 10,
+      );
+      futures.add(h2hMatchesFuture);
+      
+      // Current match detailed stats future
+      final matchId = widget.matchData['id'];
+      print('Fetching statistics for match ID: $matchId');
+      final matchStatsFuture = FootballApiService.getMatchStatistics(matchId);
+      futures.add(matchStatsFuture);
+      
+      // Execute all futures in parallel
+      final results = await Future.wait(futures);
+      
+      // Process results
+      final homeTeamMatches = results[0];
+      final awayTeamMatches = results[1];
+      final h2hMatches = results[2];
+      final matchStats = results[3];
+      
+      print('Received match statistics: $matchStats');
+      
+      // Update state with new data
       if (mounted) {
         setState(() {
+          // Update recent matches
+          _homeTeamRecentMatches = homeTeamMatches['matches'] ?? [];
+          _awayTeamRecentMatches = awayTeamMatches['matches'] ?? [];
+          _headToHeadMatches = h2hMatches['matches'] ?? [];
+          
+          // If we received statistics, update the match data with them
+          if (matchStats != null && matchStats.containsKey('statistics')) {
+            widget.matchData['statistics'] = matchStats['statistics'];
+          }
+          
+          // Calculate stats from recent matches
           _calculateStats();
+          
           _isLoading = false;
         });
       }
     } catch (e) {
-      print('Error in _fetchRelatedMatchData: $e');
+      print('Error fetching related match data: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -1279,115 +1476,134 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
       }
     }
   }
-
-  // Add a method to calculate stats based on recent matches
+  
+  // Calculate statistics from matches data
   void _calculateStats() {
-    try {
-      // Home team stats
-      int homeWins = 0, homeDraws = 0, homeLosses = 0, homeScored = 0, homeConceded = 0;
+    // Initialize counters
+    int homeWins = 0, homeDraws = 0, homeLosses = 0;
+    int awayWins = 0, awayDraws = 0, awayLosses = 0;
+    int homeScored = 0, homeConceded = 0;
+    int awayScored = 0, awayConceded = 0;
+    int h2hHomeWins = 0, h2hAwayWins = 0, h2hDraws = 0;
+    
+    final homeTeamId = widget.matchData['homeTeam']['id'];
+    final awayTeamId = widget.matchData['awayTeam']['id'];
+    
+    // Process home team recent matches
+    for (var match in _homeTeamRecentMatches) {
+      final isHomeGame = match['homeTeam']['id'] == homeTeamId;
+      final dynamic rawHomeScore = match['score']?['fullTime']?['home'] ?? 0;
+      final dynamic rawAwayScore = match['score']?['fullTime']?['away'] ?? 0;
       
-      for (final match in _homeTeamRecentMatches) {
-        try {
-          final bool isHomeTeam = match['homeTeam']['id'] == widget.matchData['homeTeam']['id'];
-          final int goalsFor = isHomeTeam 
-            ? (match['score']['fullTime']['homeTeam'] ?? 0) 
-            : (match['score']['fullTime']['awayTeam'] ?? 0);
-          final int goalsAgainst = isHomeTeam 
-            ? (match['score']['fullTime']['awayTeam'] ?? 0) 
-            : (match['score']['fullTime']['homeTeam'] ?? 0);
-          
-          homeScored += goalsFor;
-          homeConceded += goalsAgainst;
-          
-          if (goalsFor > goalsAgainst) {
-            homeWins++;
-          } else if (goalsFor < goalsAgainst) {
-            homeLosses++;
-          } else {
-            homeDraws++;
-          }
-        } catch (e) {
-          print('Error processing home team match: $e');
+      // Convert scores to int
+      final int homeScore = rawHomeScore is num ? rawHomeScore.toInt() : 0;
+      final int awayScore = rawAwayScore is num ? rawAwayScore.toInt() : 0;
+      
+      if (isHomeGame) {
+        homeScored += homeScore;
+        homeConceded += awayScore;
+        
+        if (homeScore > awayScore) {
+          homeWins++;
+        } else if (homeScore < awayScore) {
+          homeLosses++;
+        } else {
+          homeDraws++;
+        }
+      } else {
+        homeScored += awayScore;
+        homeConceded += homeScore;
+        
+        if (awayScore > homeScore) {
+          homeWins++;
+        } else if (awayScore < homeScore) {
+          homeLosses++;
+        } else {
+          homeDraws++;
         }
       }
-      
-      // Away team stats
-      int awayWins = 0, awayDraws = 0, awayLosses = 0, awayScored = 0, awayConceded = 0;
-      
-      for (final match in _awayTeamRecentMatches) {
-        try {
-          final bool isHomeTeam = match['homeTeam']['id'] == widget.matchData['awayTeam']['id'];
-          final int goalsFor = isHomeTeam 
-            ? (match['score']['fullTime']['homeTeam'] ?? 0) 
-            : (match['score']['fullTime']['awayTeam'] ?? 0);
-          final int goalsAgainst = isHomeTeam 
-            ? (match['score']['fullTime']['awayTeam'] ?? 0) 
-            : (match['score']['fullTime']['homeTeam'] ?? 0);
-          
-          awayScored += goalsFor;
-          awayConceded += goalsAgainst;
-          
-          if (goalsFor > goalsAgainst) {
-            awayWins++;
-          } else if (goalsFor < goalsAgainst) {
-            awayLosses++;
-          } else {
-            awayDraws++;
-          }
-        } catch (e) {
-          print('Error processing away team match: $e');
-        }
-      }
-      
-      // Head to head stats
-      int h2hHomeWins = 0, h2hAwayWins = 0, h2hDraws = 0;
-      
-      for (final match in _headToHeadMatches) {
-        try {
-          final int homeTeamId = match['homeTeam']['id'];
-          final int awayTeamId = match['awayTeam']['id'];
-          final int homeGoals = match['score']['fullTime']['homeTeam'] ?? 0;
-          final int awayGoals = match['score']['fullTime']['awayTeam'] ?? 0;
-          
-          if (homeGoals > awayGoals) {
-            if (homeTeamId == widget.matchData['homeTeam']['id']) {
-              h2hHomeWins++;
-            } else {
-              h2hAwayWins++;
-            }
-          } else if (homeGoals < awayGoals) {
-            if (awayTeamId == widget.matchData['homeTeam']['id']) {
-              h2hHomeWins++;
-            } else {
-              h2hAwayWins++;
-            }
-          } else {
-            h2hDraws++;
-          }
-        } catch (e) {
-          print('Error processing head-to-head match: $e');
-        }
-      }
-      
-      // Update the state variables with calculated stats
-      _homeTeamStats = {
-        'recent': {'wins': homeWins, 'draws': homeDraws, 'losses': homeLosses},
-        'goals': {'scored': homeScored, 'conceded': homeConceded},
-      };
-      
-      _awayTeamStats = {
-        'recent': {'wins': awayWins, 'draws': awayDraws, 'losses': awayLosses},
-        'goals': {'scored': awayScored, 'conceded': awayConceded},
-      };
-      
-      _h2hStats = {
-        'homeWins': h2hHomeWins,
-        'awayWins': h2hAwayWins,
-        'draws': h2hDraws,
-      };
-    } catch (e) {
-      print('Error in _calculateStats: $e');
     }
+    
+    // Process away team recent matches
+    for (var match in _awayTeamRecentMatches) {
+      final isHomeGame = match['homeTeam']['id'] == awayTeamId;
+      final dynamic rawHomeScore = match['score']?['fullTime']?['home'] ?? 0;
+      final dynamic rawAwayScore = match['score']?['fullTime']?['away'] ?? 0;
+      
+      // Convert scores to int
+      final int homeScore = rawHomeScore is num ? rawHomeScore.toInt() : 0;
+      final int awayScore = rawAwayScore is num ? rawAwayScore.toInt() : 0;
+      
+      if (isHomeGame) {
+        awayScored += homeScore;
+        awayConceded += awayScore;
+        
+        if (homeScore > awayScore) {
+          awayWins++;
+        } else if (homeScore < awayScore) {
+          awayLosses++;
+        } else {
+          awayDraws++;
+        }
+      } else {
+        awayScored += awayScore;
+        awayConceded += homeScore;
+        
+        if (awayScore > homeScore) {
+          awayWins++;
+        } else if (awayScore < homeScore) {
+          awayLosses++;
+        } else {
+          awayDraws++;
+        }
+      }
+    }
+    
+    // Process head-to-head matches
+    for (var match in _headToHeadMatches) {
+      final isHomeTeamHome = match['homeTeam']['id'] == homeTeamId;
+      final dynamic rawHomeScore = match['score']?['fullTime']?['home'] ?? 0;
+      final dynamic rawAwayScore = match['score']?['fullTime']?['away'] ?? 0;
+      
+      // Convert scores to int
+      final int homeScore = rawHomeScore is num ? rawHomeScore.toInt() : 0;
+      final int awayScore = rawAwayScore is num ? rawAwayScore.toInt() : 0;
+      
+      if (isHomeTeamHome) {
+        if (homeScore > awayScore) {
+          h2hHomeWins++;
+        } else if (homeScore < awayScore) {
+          h2hAwayWins++;
+        } else {
+          h2hDraws++;
+        }
+      } else {
+        if (homeScore < awayScore) {
+          h2hHomeWins++;
+        } else if (homeScore > awayScore) {
+          h2hAwayWins++;
+        } else {
+          h2hDraws++;
+        }
+      }
+    }
+    
+    // Update the state variables with calculated stats
+    _homeTeamStats = {
+      'recent': {'wins': homeWins, 'draws': homeDraws, 'losses': homeLosses},
+      'goals': {'scored': homeScored, 'conceded': homeConceded},
+    };
+    
+    _awayTeamStats = {
+      'recent': {'wins': awayWins, 'draws': awayDraws, 'losses': awayLosses},
+      'goals': {'scored': awayScored, 'conceded': awayConceded},
+    };
+    
+    _h2hStats = {
+      'homeWins': h2hHomeWins,
+      'awayWins': h2hAwayWins,
+      'draws': h2hDraws,
+    };
   }
 
   Widget _buildH2HTab() {
@@ -1460,7 +1676,7 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
     return Card(
       elevation: 2,
       child: ListView.separated(
-        physics: const NeverScrollableScrollPhysics(),
+          physics: const NeverScrollableScrollPhysics(),
         shrinkWrap: true,
         itemCount: _headToHeadMatches.length,
         separatorBuilder: (context, index) => const Divider(height: 1),
@@ -1527,7 +1743,7 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
               ),
             ),
             title: Row(
-              children: [
+          children: [
                 Expanded(
                   flex: 2,
                   child: Text(
@@ -1749,8 +1965,8 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
                       // Aerial duels won
                       _buildStatRow(
                         'Aerial Duels Won',
-                        widget.matchData['statistics']?['home_aerial_won']?.toString() ?? '0',
-                        widget.matchData['statistics']?['away_aerial_won']?.toString() ?? '0',
+              widget.matchData['statistics']?['home_aerial_won']?.toString() ?? '0', 
+              widget.matchData['statistics']?['away_aerial_won']?.toString() ?? '0', 
                       ),
                     ],
                   ),
@@ -1826,7 +2042,7 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
                 Container(
                   width: 12,
                   height: 16,
-                  decoration: BoxDecoration(
+        decoration: BoxDecoration(
                     color: cardColor,
                     borderRadius: BorderRadius.circular(2),
                   ),
@@ -1864,8 +2080,8 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
           borderRadius: BorderRadius.circular(2.5),
           child: SizedBox(
             height: 5,
-            child: Row(
-              children: [
+        child: Row(
+          children: [
                 // Determine the ratio of cards
                 Expanded(
                   flex: homeValue > 0 || awayValue > 0 
@@ -1883,9 +2099,9 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
                     color: Colors.red,
                   ),
                 ),
-              ],
-            ),
-          ),
+          ],
+        ),
+      ),
         ),
       ],
     );
@@ -1914,9 +2130,9 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
       ? _buildLoadingIndicator() 
       : SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
-          child: Column(
+      child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        children: [
               const Text(
                 'Starting Lineups',
                 style: TextStyle(
@@ -1952,7 +2168,7 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
                 ],
               ),
               
-              const SizedBox(height: 32),
+          const SizedBox(height: 32),
               
               // Substitutes
               const Text(
@@ -1985,9 +2201,9 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
                   ),
                 ],
               ),
-            ],
-          ),
-        );
+        ],
+      ),
+    );
   }
 
   Widget _buildTeamLineup(String teamName, String? formation, List<dynamic> players, {required bool isHomeTeam}) {
@@ -2291,6 +2507,8 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
 
   List<Map<String, dynamic>> _getAllEvents() {
     final List<Map<String, dynamic>> allEvents = [];
+    final homeTeamId = widget.matchData['homeTeam']['id'];
+    final awayTeamId = widget.matchData['awayTeam']['id'];
     
     // Add goals
     final goals = _extractGoals();
@@ -2299,28 +2517,32 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
         'type': 'GOAL',
         'minute': goal['minute'],
         'injury': goal['injuryTime'] ?? 0,
-        'playerId': goal['playerId'],
         'playerName': goal['playerName'],
+        'playerId': goal['playerId'],
         'teamId': goal['teamId'],
         'teamName': goal['teamName'],
+        'isHomeTeam': goal['teamId'] == homeTeamId,
         'isPenalty': goal['isPenalty'],
         'isOwnGoal': goal['isOwnGoal'],
+        'assistPlayerName': goal['assistPlayerName'],
+        'assistPlayerId': goal['assistPlayerId'],
       });
     }
     
     // Add bookings (yellow and red cards)
-    final bookings = widget.matchData['bookings'];
-    if (bookings != null && bookings is List) {
+    final bookings = widget.matchData['bookings'] ?? [];
+    if (bookings is List) {
       for (var booking in bookings) {
         if (booking is Map<String, dynamic>) {
           allEvents.add({
             'type': booking['card'] == 'YELLOW' ? 'YELLOW_CARD' : 'RED_CARD',
-            'minute': booking['minute'],
+            'minute': booking['minute'] ?? 0,
             'injury': booking['injuryTime'] ?? 0,
-            'playerId': booking['player']['id'],
-            'playerName': booking['player']['name'],
-            'teamId': booking['team']['id'],
-            'teamName': booking['team']['name'],
+            'playerName': booking['player']?['name'] ?? 'Unknown Player',
+            'playerId': booking['player']?['id'],
+            'teamId': booking['team']?['id'],
+            'teamName': booking['team']?['name'] ?? 'Unknown Team',
+            'isHomeTeam': booking['team']?['id'] == homeTeamId,
             'reason': booking['reason'],
           });
         }
@@ -2328,24 +2550,54 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
     }
     
     // Add substitutions
-    final substitutions = widget.matchData['substitutions'];
-    if (substitutions != null && substitutions is List) {
+    final substitutions = widget.matchData['substitutions'] ?? [];
+    if (substitutions is List) {
       for (var sub in substitutions) {
         if (sub is Map<String, dynamic>) {
           allEvents.add({
             'type': 'SUBSTITUTION',
-            'minute': sub['minute'],
+            'minute': sub['minute'] ?? 0,
             'injury': sub['injuryTime'] ?? 0,
-            'playerInId': sub['playerIn']['id'],
-            'playerInName': sub['playerIn']['name'],
-            'playerOutId': sub['playerOut']['id'],
-            'playerOutName': sub['playerOut']['name'],
-            'teamId': sub['team']['id'],
-            'teamName': sub['team']['name'],
+            'playerInName': sub['playerIn']?['name'] ?? 'Unknown Player',
+            'playerInId': sub['playerIn']?['id'],
+            'playerOutName': sub['playerOut']?['name'] ?? 'Unknown Player',
+            'playerOutId': sub['playerOut']?['id'],
+            'teamId': sub['team']?['id'],
+            'teamName': sub['team']?['name'] ?? 'Unknown Team',
+            'isHomeTeam': sub['team']?['id'] == homeTeamId,
           });
         }
       }
     }
+    
+    // Add VAR decisions if available
+    final varDecisions = widget.matchData['varDecisions'] ?? [];
+    if (varDecisions is List) {
+      for (var decision in varDecisions) {
+        if (decision is Map<String, dynamic>) {
+          allEvents.add({
+            'type': 'VAR',
+            'minute': decision['minute'] ?? 0,
+            'injury': decision['injuryTime'] ?? 0,
+            'decision': decision['decision'] ?? 'VAR Check',
+            'reason': decision['reason'] ?? 'Unknown reason',
+            'teamId': decision['team']?['id'],
+            'teamName': decision['team']?['name'] ?? 'Unknown Team',
+            'isHomeTeam': decision['team']?['id'] == homeTeamId,
+            'playerName': decision['player']?['name'],
+          });
+        }
+      }
+    }
+    
+    // Sort all events by minute and then by injurytime to display them in chronological order
+    allEvents.sort((a, b) {
+      int minuteComparison = (a['minute'] ?? 0).compareTo(b['minute'] ?? 0);
+      if (minuteComparison == 0) {
+        return (a['injury'] ?? 0).compareTo(b['injury'] ?? 0);
+      }
+      return minuteComparison;
+    });
     
     return allEvents;
   }
@@ -2390,6 +2642,8 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
         return 'Red Card: ${event['playerName']}';
       case 'SUBSTITUTION':
         return 'Substitution: ${event['teamName']}';
+      case 'VAR':
+        return 'VAR Decision';
       default:
         return 'Event';
     }
@@ -2405,290 +2659,997 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
         if (event['isOwnGoal'] == true) {
           description += ' (Own Goal)';
         }
+        if (event['assistPlayerName'] != null) {
+          description += '\nAssist: ${event['assistPlayerName']}';
+        }
         return description;
       case 'YELLOW_CARD':
       case 'RED_CARD':
         return '${event['playerName']} (${event['teamName']})${event['reason'] != null ? ' - ${event['reason']}' : ''}';
       case 'SUBSTITUTION':
         return '${event['playerInName']} comes on for ${event['playerOutName']}';
+      case 'VAR':
+        String description = event['decision'] ?? 'VAR Check';
+        if (event['reason'] != null) {
+          description += ' - ${event['reason']}';
+        }
+        if (event['playerName'] != null) {
+          description += '\nPlayer: ${event['playerName']}';
+        }
+        if (event['teamName'] != null) {
+          description += ' (${event['teamName']})';
+        }
+        return description;
       default:
         return '';
     }
   }
-}
 
-// Add the FootballApiService class
-class FootballApiService {
-  // Base URL for Firebase Functions
-  static String baseUrl = '';
-  static bool _initialized = false;
+  Widget _buildTimelineSection() {
+    final events = _getAllEvents();
+    if (events.isEmpty) {
+      return const Center(
+        child: Text('No match events available'),
+      );
+    }
 
-  // Initialize the service with your Firebase project ID
-  static void initialize(String firebaseProjectId) {
-    baseUrl = 'https://us-central1-$firebaseProjectId.cloudfunctions.net';
-    _initialized = true;
-  }
-
-  // Check if service is initialized before making API calls
-  static void _checkInitialized() {
-    if (!_initialized) {
-      throw Exception('FootballApiService has not been initialized. Call initialize(firebaseProjectId) first.');
-    }
-  }
-  
-  // Get all matches
-  static Future<Map<String, dynamic>> getMatches() async {
-    _checkInitialized();
-    try {
-      final response = await http.get(Uri.parse('$baseUrl/fetchFootballData'));
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to load matches: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Error fetching matches: $e');
-    }
-  }
-  
-  // Get specific match by ID
-  static Future<Map<String, dynamic>> getMatchById(int matchId) async {
-    _checkInitialized();
-    try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/fetchMatchById').replace(
-          queryParameters: {'id': matchId.toString()}
-        )
-      );
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to load match: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Error fetching match: $e');
-    }
-  }
-  
-  // Get competitions
-  static Future<Map<String, dynamic>> getCompetitions() async {
-    _checkInitialized();
-    try {
-      final response = await http.get(Uri.parse('$baseUrl/fetchCompetitions'));
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to load competitions: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Error fetching competitions: $e');
-    }
-  }
-  
-  // Get specific competition by code
-  static Future<Map<String, dynamic>> getCompetitionByCode(String code) async {
-    _checkInitialized();
-    try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/fetchCompetitionByCode').replace(
-          queryParameters: {'code': code}
-        )
-      );
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to load competition: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Error fetching competition: $e');
-    }
-  }
-  
-  // Get standings for a competition
-  static Future<Map<String, dynamic>> getStandings(String competitionCode) async {
-    _checkInitialized();
-    try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/fetchStandings').replace(
-          queryParameters: {'code': competitionCode}
-        )
-      );
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to load standings: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Error fetching standings: $e');
-    }
-  }
-  
-  // Get team details
-  static Future<Map<String, dynamic>> getTeam(int teamId) async {
-    _checkInitialized();
-    try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/fetchTeam').replace(
-          queryParameters: {'id': teamId.toString()}
-        )
-      );
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to load team: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Error fetching team: $e');
-    }
-  }
-  
-  // Get matches for a team
-  static Future<Map<String, dynamic>> getTeamMatches(
-    int teamId, {
-    String? status,
-    String? dateFrom,
-    String? dateTo,
-    int limit = 10
-  }) async {
-    _checkInitialized();
-    try {
-      Map<String, String> queryParams = {
-        'id': teamId.toString(),
-        'limit': limit.toString(),
-      };
-      
-      if (status != null) queryParams['status'] = status;
-      if (dateFrom != null) queryParams['dateFrom'] = dateFrom;
-      if (dateTo != null) queryParams['dateTo'] = dateTo;
-      
-      final response = await http.get(
-        Uri.parse('$baseUrl/fetchTeamMatches').replace(
-          queryParameters: queryParams
-        )
-      );
-      
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to load team matches: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Error fetching team matches: $e');
-    }
-  }
-  
-  // Get player details
-  static Future<Map<String, dynamic>> getPlayer(int playerId) async {
-    _checkInitialized();
-    try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/fetchPlayer').replace(
-          queryParameters: {'id': playerId.toString()}
-        )
-      );
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to load player: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Error fetching player: $e');
-    }
-  }
-  
-  // Get proxied image URL
-  static String getProxyImageUrl(String originalUrl) {
-    _checkInitialized();
-    return '$baseUrl/proxyImage?url=${Uri.encodeComponent(originalUrl)}';
-  }
-}
-
-class _PlayerCircle extends StatelessWidget {
-  final Map<String, Color> colors;
-
-  const _PlayerCircle({required this.colors});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: colors['surface'],
-        shape: BoxShape.circle,
-        border: Border.all(color: colors['primary']!, width: 2),
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Match Timeline',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: events.length,
+              itemBuilder: (context, index) {
+                final event = events[index];
+                return _buildTimelineEvent(event);
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
-}
 
-class _PlayerTile extends StatelessWidget {
-  final Map<String, dynamic> player;
-  final Map<String, Color> colors;
-  final VoidCallback? onTap;
+  Widget _buildTimelineEvent(Map<String, dynamic> event) {
+    final minute = event['minute'];
+    final injury = event['injury'];
+    final timeText = injury > 0 ? '$minute+$injury\'' : '$minute\'';
+    final isHomeTeam = event['isHomeTeam'] ?? false;
 
-  const _PlayerTile({
-    required this.player,
-    required this.colors,
-    this.onTap,
-  });
+    Widget eventIcon;
+    String eventText;
+    Color eventColor;
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(
-        minWidth: 100,
-        maxWidth: 120,
-        minHeight: 80,
-        maxHeight: 100,
+    switch (event['type']) {
+      case 'GOAL':
+        eventIcon = const Icon(Icons.sports_soccer, size: 20);
+        eventColor = Colors.green;
+        eventText = _buildGoalText(event);
+        break;
+      case 'YELLOW_CARD':
+        eventIcon = Container(
+          width: 12,
+          height: 16,
+          decoration: BoxDecoration(
+            color: Colors.yellow,
+            border: Border.all(color: Colors.black12),
+          ),
+        );
+        eventColor = Colors.orange;
+        eventText = '${event['playerName']} (${event['teamName']})';
+        if (event['reason'] != null) {
+          eventText += '\nReason: ${event['reason']}';
+        }
+        break;
+      case 'RED_CARD':
+        eventIcon = Container(
+          width: 12,
+          height: 16,
+          decoration: BoxDecoration(
+            color: Colors.red,
+            border: Border.all(color: Colors.black12),
+          ),
+        );
+        eventColor = Colors.red;
+        eventText = '${event['playerName']} (${event['teamName']})';
+        if (event['reason'] != null) {
+          eventText += '\nReason: ${event['reason']}';
+        }
+        break;
+      case 'SUBSTITUTION':
+        eventIcon = const Icon(Icons.swap_horiz, size: 20);
+        eventColor = Colors.blue;
+        eventText = '${event['playerInName']} ↑\n${event['playerOutName']} ↓\n(${event['teamName']})';
+        break;
+      case 'VAR':
+        eventIcon = const Icon(Icons.tv, size: 20);
+        eventColor = Colors.purple;
+        eventText = 'VAR Review: ${event['reason']}\n${event['details']}';
+        break;
+      case 'PENALTY_SCORED':
+        eventIcon = const Icon(Icons.sports_soccer, size: 20);
+        eventColor = Colors.green;
+        eventText = 'Penalty scored by ${event['playerName']} (${event['teamName']})';
+        break;
+      case 'PENALTY_MISSED':
+        eventIcon = const Icon(Icons.sports_soccer, size: 20);
+        eventColor = Colors.red;
+        eventText = 'Penalty missed by ${event['playerName']} (${event['teamName']})';
+        break;
+      default:
+        eventIcon = const Icon(Icons.sports_soccer, size: 20);
+        eventColor = Colors.grey;
+        eventText = 'Unknown event';
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 50,
+            child: Text(
+              timeText,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              color: eventColor.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: IconTheme(
+                data: IconThemeData(
+                  color: eventColor,
+                  size: 16,
+                ),
+                child: eventIcon,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: eventColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: eventColor.withOpacity(0.3),
+                ),
+              ),
+              child: Text(
+                eventText,
+            style: TextStyle(
+                  color: eventColor.withOpacity(0.8),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
-      child: Material(
-        color: colors['surface'],
-        borderRadius: BorderRadius.circular(8),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
+    );
+  }
+
+  String _buildGoalText(Map<String, dynamic> goal) {
+    final List<String> parts = [];
+    
+    // Add player name and team
+    parts.add('${goal['playerName']} (${goal['teamName']})');
+    
+    // Add goal type indicators
+    if (goal['isOwnGoal'] == true) {
+      parts.add('(Own Goal)');
+    }
+    if (goal['isPenalty'] == true) {
+      parts.add('(Penalty)');
+    }
+    
+    // Add assist if available
+    if (goal['assistPlayerName'] != null) {
+      parts.add('\nAssist: ${goal['assistPlayerName']}');
+    }
+    
+    return parts.join(' ');
+  }
+
+  Widget _buildRecentFormSection() {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Recent Form',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
               children: [
-                Text(
-                  player['shirtNumber']?.toString() ?? '',
+                // Home team form
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.matchData['homeTeam']['name'] ?? 'Home Team',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildTeamForm(_homeTeamRecentMatches, widget.matchData['homeTeam']['id']),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                // Away team form
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.matchData['awayTeam']['name'] ?? 'Away Team',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildTeamForm(_awayTeamRecentMatches, widget.matchData['awayTeam']['id']),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTeamForm(List<dynamic> matches, int teamId) {
+    return Row(
+      children: matches.take(5).map((match) {
+        final isHomeTeam = match['homeTeam']['id'] == teamId;
+        final homeScore = match['score']?['fullTime']?['home'] ?? match['score']?['home'] ?? 0;
+        final awayScore = match['score']?['fullTime']?['away'] ?? match['score']?['away'] ?? 0;
+        
+        String result;
+        Color color;
+        
+        if (isHomeTeam) {
+          if (homeScore > awayScore) {
+            result = 'W';
+            color = Colors.green;
+          } else if (homeScore < awayScore) {
+            result = 'L';
+            color = Colors.red;
+          } else {
+            result = 'D';
+            color = Colors.orange;
+          }
+        } else {
+          if (awayScore > homeScore) {
+            result = 'W';
+            color = Colors.green;
+          } else if (awayScore < homeScore) {
+            result = 'L';
+            color = Colors.red;
+          } else {
+            result = 'D';
+            color = Colors.orange;
+          }
+        }
+        
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4.0),
+          child: Container(
+            width: 24,
+            height: 24,
+      decoration: BoxDecoration(
+              color: color.withOpacity(0.2),
+              border: Border.all(color: color),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Center(
+              child: Text(
+                result,
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildHeadToHeadSection() {
+    if (_headToHeadMatches.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final homeTeamId = widget.matchData['homeTeam']['id'];
+    final awayTeamId = widget.matchData['awayTeam']['id'];
+    
+    int homeWins = 0;
+    int awayWins = 0;
+    int draws = 0;
+    int homeGoals = 0;
+    int awayGoals = 0;
+    
+    for (var match in _headToHeadMatches) {
+      final dynamic rawHomeScore = match['score']?['fullTime']?['home'] ?? match['score']?['home'] ?? 0;
+      final dynamic rawAwayScore = match['score']?['fullTime']?['away'] ?? match['score']?['away'] ?? 0;
+      final int homeScore = rawHomeScore is num ? rawHomeScore.toInt() : 0;
+      final int awayScore = rawAwayScore is num ? rawAwayScore.toInt() : 0;
+      
+      if (match['homeTeam']['id'] == homeTeamId) {
+        homeGoals += homeScore;
+        awayGoals += awayScore;
+        if (homeScore > awayScore) {
+          homeWins++;
+        } else if (homeScore < awayScore) {
+          awayWins++;
+        } else {
+          draws++;
+        }
+      } else {
+        homeGoals += awayScore;
+        awayGoals += homeScore;
+        if (awayScore > homeScore) {
+          homeWins++;
+        } else if (awayScore < homeScore) {
+          awayWins++;
+        } else {
+          draws++;
+        }
+      }
+    }
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          child: Padding(
+        padding: const EdgeInsets.all(16.0),
+            child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+            const Text(
+              'Head to Head',
                   style: TextStyle(
-                    color: colors['textSecondary'],
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildH2HStat(
+                  '${widget.matchData['homeTeam']['name']} wins',
+                  homeWins,
+                  Colors.blue,
+                ),
+                _buildH2HStat(
+                  'Draws',
+                  draws,
+                  Colors.orange,
+                ),
+                _buildH2HStat(
+                  '${widget.matchData['awayTeam']['name']} wins',
+                  awayWins,
+                  Colors.red,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildH2HStat(
+                  'Goals scored',
+                  homeGoals,
+                  Colors.green,
+                ),
+                _buildH2HStat(
+                  'Goals scored',
+                  awayGoals,
+                  Colors.green,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Recent Meetings',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Column(
+              children: _headToHeadMatches.take(5).map((match) {
+                final date = DateTime.tryParse(match['utcDate'] ?? '');
+                final dynamic rawHomeScore = match['score']?['fullTime']?['home'] ?? match['score']?['home'] ?? 0;
+                final dynamic rawAwayScore = match['score']?['fullTime']?['away'] ?? match['score']?['away'] ?? 0;
+                final int homeScore = rawHomeScore is num ? rawHomeScore.toInt() : 0;
+                final int awayScore = rawAwayScore is num ? rawAwayScore.toInt() : 0;
+                final isHomeTeamFirst = match['homeTeam']['id'] == homeTeamId;
+                
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4.0),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 80,
+                        child: Text(
+                          date != null ? DateFormat('dd MMM yy').format(date) : '',
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          isHomeTeamFirst
+                              ? '${match['homeTeam']['name']} $homeScore - $awayScore ${match['awayTeam']['name']}'
+                              : '${match['homeTeam']['name']} $homeScore - $awayScore ${match['awayTeam']['name']}',
+                          style: const TextStyle(
                     fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildH2HStat(String label, int value, Color color) {
+    return Column(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: color.withOpacity(0.3),
+            ),
+          ),
+          child: Center(
+            child: Text(
+              value.toString(),
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  player['name'] ?? '',
-                  style: TextStyle(
-                    color: colors['text'],
+          label,
+          style: const TextStyle(
                     fontSize: 12,
-                    fontWeight: FontWeight.w500,
+            color: Colors.grey,
                   ),
-                  maxLines: 2,
                   textAlign: TextAlign.center,
-                  overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTeamLogo(String? logoUrl, {double size = 60}) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 5,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: ClipOval(
+        child: logoUrl != null
+            ? Image.network(
+                logoUrl,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => Icon(
+                  Icons.sports_soccer,
+                  size: size * 0.5,
+                  color: Colors.grey,
                 ),
-                if ((player['goals'] ?? 0) > 0 || (player['yellowCards'] ?? 0) > 0) ...[
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if ((player['goals'] ?? 0) > 0)
-                        const Icon(Icons.sports_soccer, color: Colors.green, size: 16),
-                      if ((player['yellowCards'] ?? 0) > 0)
-                        const Icon(Icons.warning_amber, color: Colors.yellow, size: 16),
-                    ],
-                  ),
-                ],
-              ],
+              )
+            : Icon(
+                Icons.sports_soccer,
+                size: size * 0.5,
+                color: Colors.grey,
+        ),
+      ),
+    );
+  }
+
+  // Generate a team color based on team name
+  Color _generateTeamColor(String teamName) {
+    // Simple hash function to generate color from team name
+    int hash = 0;
+    for (var i = 0; i < teamName.length; i++) {
+      hash = teamName.codeUnitAt(i) + ((hash << 5) - hash);
+    }
+    
+    return Color.fromARGB(
+      255,
+      ((hash & 0xFF0000) >> 16).abs() % 200 + 55,
+      ((hash & 0x00FF00) >> 8).abs() % 200 + 55,
+      (hash & 0x0000FF).abs() % 200 + 55,
+    );
+  }
+
+  // Get the competition name and matchday
+  String _getCompetitionName() {
+    final competition = widget.matchData['competition']?['name'] ?? 'Unknown Competition';
+    final matchday = widget.matchData['matchday'];
+    
+    if (matchday != null && matchday.toString().isNotEmpty) {
+      return '$competition • Matchday $matchday';
+    }
+    return competition;
+  }
+
+  // Get formatted match status and time
+  String _getMatchStatusAndTime() {
+    final status = widget.matchData['status'] ?? 'UNKNOWN';
+    final matchDate = DateTime.tryParse(widget.matchData['utcDate'] ?? '');
+    
+    switch (status) {
+      case 'FINISHED':
+        return 'Full Time';
+      case 'IN_PLAY':
+        return 'Live Now';
+      case 'PAUSED':
+        return 'Half Time';
+      case 'SCHEDULED':
+        return matchDate != null 
+          ? DateFormat('dd MMM yyyy • HH:mm').format(matchDate.toLocal())
+          : 'Scheduled';
+      case 'POSTPONED':
+        return 'Postponed';
+      case 'CANCELLED':
+        return 'Cancelled';
+      default:
+        return status;
+    }
+  }
+
+  // Display goalscorers in a compact summary
+  Widget _buildGoalscorersTextSummary() {
+    final goals = _extractGoals();
+    if (goals.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
+    final homeTeamId = widget.matchData['homeTeam']['id'];
+    final homeGoals = goals.where((goal) => goal['teamId'] == homeTeamId).toList();
+    final awayGoals = goals.where((goal) => goal['teamId'] != homeTeamId).toList();
+    
+    final TextStyle goalScorerStyle = const TextStyle(
+      color: Colors.white,
+      fontSize: 12,
+      fontWeight: FontWeight.normal,
+    );
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+      child: Row(
+        children: [
+          // Home team goalscorers
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: homeGoals.map((goal) {
+                String scorerText = '${goal['playerName']} ${goal['minute']}\'';
+                if (goal['isPenalty'] == true) scorerText += ' (P)';
+                if (goal['isOwnGoal'] == true) scorerText += ' (OG)';
+                return Text(
+                  scorerText,
+                  style: goalScorerStyle,
+                  textAlign: TextAlign.start,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                );
+              }).toList(),
             ),
           ),
+          
+          // Away team goalscorers
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: awayGoals.map((goal) {
+                String scorerText = '${goal['minute']}\' ${goal['playerName']}';
+                if (goal['isPenalty'] == true) scorerText += ' (P)';
+                if (goal['isOwnGoal'] == true) scorerText += ' (OG)';
+                return Text(
+                  scorerText,
+                  style: goalScorerStyle,
+                  textAlign: TextAlign.end,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Basic tab content methods
+  Widget _buildOverviewTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Key stats summary card
+          _buildKeyStatsSection(),
+          const SizedBox(height: 24),
+          
+          // Timeline section with events
+          _buildTimelineSection(),
+          const SizedBox(height: 24),
+          
+          // Recent form for both teams
+          if (_homeTeamRecentMatches.isNotEmpty || _awayTeamRecentMatches.isNotEmpty) ...[
+            _buildRecentFormSection(),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatsTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildKeyStatsSection(),
+        ],
+      ),
+    );
+  }
+
+
+  Widget _buildPlayersTab() {
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.all(20.0),
+        child: Text(
+          "Player statistics will be displayed here when available",
+          style: TextStyle(fontSize: 16),
+        ),
+      ),
+    );
+  }
+
+  // Remove duplicate method declarations and implement missing methods
+  Widget _buildH2HSection() {
+    if (_headToHeadMatches.isEmpty) {
+      return const Center(
+        child: Text('No head-to-head data available'),
+      );
+    }
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${widget.matchData['homeTeam']['name']} vs ${widget.matchData['awayTeam']['name']}',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            // Head to head matches
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _headToHeadMatches.length,
+              itemBuilder: (context, index) {
+                final match = _headToHeadMatches[index];
+                return _buildMatchItem(match);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Fix conflict by removing the duplicate method declarations for tabs
+  // (Delete the duplicate _buildTimelineTab, _buildLineupTab, and _buildH2HTab methods)
+  
+  // Add missing method for building a match header
+  Widget _buildMatchHeader() {
+    final homeTeamName = widget.matchData['homeTeam']['name'];
+    final awayTeamName = widget.matchData['awayTeam']['name'];
+    final homeTeamColor = _generateTeamColor(homeTeamName);
+    final awayTeamColor = _generateTeamColor(awayTeamName);
+    
+    // Extract score
+    final score = _extractScore();
+    final homeScore = score['homeScore'];
+    final awayScore = score['awayScore'];
+    
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            // Competition and matchday
+            Text(
+              _getCompetitionName(),
+              style: const TextStyle(
+                fontSize: 14,
+                color: Colors.grey,
+              ),
+            ),
+            const SizedBox(height: 8),
+            
+            // Teams and score
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                // Home team
+                Expanded(
+                  child: Column(
+                    children: [
+                      // Home team logo placeholder
+                      CircleAvatar(
+                        backgroundColor: homeTeamColor.withOpacity(0.2),
+                        radius: 30,
+                        child: Text(
+                          homeTeamName.substring(0, 1),
+                          style: TextStyle(
+                            color: homeTeamColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 24,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // Home team name
+                      Text(
+                        homeTeamName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Score
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    children: [
+                      // Match status
+                      Text(
+                        _getMatchStatusAndTime(),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      // Score
+                      Text(
+                        '$homeScore - $awayScore',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 24,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Away team
+                Expanded(
+                  child: Column(
+                    children: [
+                      // Away team logo placeholder
+                      CircleAvatar(
+                        backgroundColor: awayTeamColor.withOpacity(0.2),
+                        radius: 30,
+                        child: Text(
+                          awayTeamName.substring(0, 1),
+                          style: TextStyle(
+                            color: awayTeamColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 24,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // Away team name
+                      Text(
+                        awayTeamName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            
+            // Goalscorers
+            const SizedBox(height: 16),
+            _buildGoalscorersTextSummary(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Add missing helper methods
+  Map<String, dynamic> _extractScore() {
+    var homeScore = '0';
+    var awayScore = '0';
+    
+    try {
+      final score = widget.matchData['score'];
+      if (score != null) {
+        // Try to get fullTime score first
+        var scoreType = score['fullTime'];
+        if (scoreType != null && scoreType['homeTeam'] != null && scoreType['awayTeam'] != null) {
+          homeScore = scoreType['homeTeam'].toString();
+          awayScore = scoreType['awayTeam'].toString();
+        }
+        // If fullTime not available, try halfTime
+        else if (score['halfTime'] != null && score['halfTime']['homeTeam'] != null && score['halfTime']['awayTeam'] != null) {
+          homeScore = score['halfTime']['homeTeam'].toString();
+          awayScore = score['halfTime']['awayTeam'].toString();
+        }
+        // If in penalty shootout
+        else if (score['penalties'] != null && score['penalties']['homeTeam'] != null && score['penalties']['awayTeam'] != null) {
+          var regularHomeScore = score['extraTime']?['homeTeam'] ?? score['fullTime']?['homeTeam'] ?? 0;
+          var regularAwayScore = score['extraTime']?['awayTeam'] ?? score['fullTime']?['awayTeam'] ?? 0;
+          homeScore = '$regularHomeScore (${score['penalties']['homeTeam']})';
+          awayScore = '$regularAwayScore (${score['penalties']['awayTeam']})';
+        }
+      }
+    } catch (e) {
+      print('Error extracting score: $e');
+    }
+    
+    return {
+      'homeScore': homeScore,
+      'awayScore': awayScore,
+    };
+  }
+
+  Widget _buildMatchItem(dynamic match) {
+    final String homeTeamName = match['homeTeam']?['name'] ?? 'Unknown';
+    final String awayTeamName = match['awayTeam']?['name'] ?? 'Unknown';
+    
+    // Extract score
+    var homeScore = '0';
+    var awayScore = '0';
+    try {
+      final score = match['score'];
+      if (score != null) {
+        var scoreType = score['fullTime'] ?? score['halfTime'];
+        if (scoreType != null) {
+          homeScore = scoreType['homeTeam']?.toString() ?? '0';
+          awayScore = scoreType['awayTeam']?.toString() ?? '0';
+        }
+      }
+    } catch (e) {
+      print('Error extracting score for match item: $e');
+    }
+    
+    // Format match date
+    final matchDate = DateTime.tryParse(match['utcDate'] ?? '');
+    final formattedDate = matchDate != null ? 
+        DateFormat('dd MMM yyyy').format(matchDate.toLocal()) : 'Unknown date';
+    
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8.0),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                homeTeamName,
+                textAlign: TextAlign.start,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                '$homeScore - $awayScore',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+            Expanded(
+              child: Text(
+                awayTeamName,
+                textAlign: TextAlign.end,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
         ),
       ),
     );

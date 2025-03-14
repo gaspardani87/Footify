@@ -544,3 +544,156 @@ exports.fetchCompetitionImages = functions.https.onRequest(async (req, res) => {
     });
   }
 });
+
+// Function to fetch head-to-head matches between two teams
+exports.fetchHeadToHead = functions.https.onRequest(async (req, res) => {
+  setCorsHeaders(res);
+  
+  if (handleOptions(req, res)) return;
+
+  const team1Id = req.query.team1Id;
+  const team2Id = req.query.team2Id;
+  const limit = req.query.limit || 10;
+
+  if (!team1Id || !team2Id) {
+    res.status(400).json({ error: 'Missing team ID parameters (team1Id and team2Id required)' });
+    return;
+  }
+
+  try {
+    // Get matches for team1 with a higher limit to ensure we find enough head-to-head matches
+    const response = await axios.get(`${BASE_URL}/teams/${team1Id}/matches`, {
+      headers: {
+        'X-Auth-Token': API_KEY,
+      },
+      params: {
+        limit: limit * 2  // Get more matches to filter for head-to-head
+      }
+    });
+
+    if (response.status === 200) {
+      // Filter matches where team2 was involved
+      const allMatches = response.data.matches || [];
+      const h2hMatches = allMatches.filter(match => {
+        return (match.homeTeam.id === parseInt(team1Id) && match.awayTeam.id === parseInt(team2Id)) || 
+               (match.homeTeam.id === parseInt(team2Id) && match.awayTeam.id === parseInt(team1Id));
+      }).slice(0, limit);  // Take only the requested number of matches
+
+      res.status(200).json({ matches: h2hMatches });
+    } else {
+      throw new Error(`API returned status: ${response.status}`);
+    }
+  } catch (error) {
+    console.error(`Error fetching head-to-head matches for teams ${team1Id} and ${team2Id}:`, error.message);
+    res.status(500).json({
+      error: 'Failed to fetch head-to-head matches',
+      details: error.message || 'Unknown error',
+      status: error.response ? error.response.status : null,
+    });
+  }
+});
+
+// Function to fetch detailed match statistics
+exports.fetchMatchStatistics = functions.https.onRequest(async (req, res) => {
+  setCorsHeaders(res);
+  
+  if (handleOptions(req, res)) return;
+
+  const matchId = req.query.id;
+  if (!matchId) {
+    res.status(400).json({ error: 'Missing match ID parameter' });
+    return;
+  }
+
+  try {
+    // Get match details first to extract all relevant data
+    const response = await axios.get(`${BASE_URL}/matches/${matchId}`, {
+      headers: {
+        'X-Auth-Token': API_KEY,
+      }
+    });
+
+    if (response.status === 200) {
+      const matchData = response.data;
+      
+      // Extract existing statistics if available
+      const statistics = matchData.statistics || {};
+      
+      // Process additional statistics
+      const processedStats = {
+        // Include original statistics if available
+        ...statistics,
+        
+        // Calculate cards count
+        cards: {
+          home: { yellow: 0, red: 0 },
+          away: { yellow: 0, red: 0 }
+        },
+        
+        // Extract goal data
+        goals: {
+          home: { total: 0, firstHalf: 0, secondHalf: 0 },
+          away: { total: 0, firstHalf: 0, secondHalf: 0 }
+        }
+      };
+      
+      // Count cards
+      if (matchData.bookings && Array.isArray(matchData.bookings)) {
+        matchData.bookings.forEach(booking => {
+          if (booking.team && booking.team.id) {
+            const isHomeTeam = booking.team.id === matchData.homeTeam.id;
+            const teamKey = isHomeTeam ? 'home' : 'away';
+            
+            if (booking.card === 'YELLOW') {
+              processedStats.cards[teamKey].yellow++;
+            } else if (booking.card === 'RED') {
+              processedStats.cards[teamKey].red++;
+            }
+          }
+        });
+      }
+      
+      // Count goals and when they were scored
+      if (matchData.goals && Array.isArray(matchData.goals)) {
+        matchData.goals.forEach(goal => {
+          if (goal.team && goal.team.id) {
+            const isHomeTeam = goal.team.id === matchData.homeTeam.id;
+            const teamKey = isHomeTeam ? 'home' : 'away';
+            
+            // Increment total goals
+            processedStats.goals[teamKey].total++;
+            
+            // Determine when the goal was scored
+            if (goal.minute <= 45) {
+              processedStats.goals[teamKey].firstHalf++;
+            } else {
+              processedStats.goals[teamKey].secondHalf++;
+            }
+          }
+        });
+      }
+      
+      // Include possession statistics if available in match data
+      if (matchData.homeTeam.statistics && matchData.awayTeam.statistics) {
+        processedStats.possession = {
+          home: matchData.homeTeam.statistics.possession || 0,
+          away: matchData.awayTeam.statistics.possession || 0
+        };
+      }
+      
+      res.status(200).json({ 
+        statistics: processedStats,
+        matchId: matchId
+      });
+    } else {
+      throw new Error(`API returned status: ${response.status}`);
+    }
+  } catch (error) {
+    console.error(`Error fetching statistics for match ${matchId}:`, error.message);
+    res.status(500).json({
+      error: 'Failed to fetch match statistics',
+      details: error.message || 'Unknown error',
+      status: error.response ? error.response.status : null,
+    });
+  }
+});

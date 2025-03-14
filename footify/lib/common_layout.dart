@@ -10,6 +10,7 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'language_provider.dart';
 import 'package:provider/provider.dart';
 import 'providers/firebase_provider.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class CommonLayout extends StatelessWidget {
   final Widget child;
@@ -29,7 +30,7 @@ class CommonLayout extends StatelessWidget {
     Widget page;
     switch (index) {
       case 0:
-        page = const HomePage();
+        page = const MainScreen();
         break;
       case 1:
         page = const CalendarPage();
@@ -44,7 +45,7 @@ class CommonLayout extends StatelessWidget {
         page = const SettingsPage();
         break;
       default:
-        page = const HomePage();
+        page = const MainScreen();
     }
 
     Navigator.pushReplacement(
@@ -134,6 +135,7 @@ class CommonLayout extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 20),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  mainAxisSize: MainAxisSize.max,
                   children: [
                     Padding(
                       padding: EdgeInsets.only(left: showBackButton ? 0 : 16),
@@ -141,67 +143,71 @@ class CommonLayout extends StatelessWidget {
                         onTap: () {
                           Navigator.pushReplacement(
                             context,
-                            MaterialPageRoute(builder: (context) => const HomePage()),
+                            MaterialPageRoute(builder: (context) => const MainScreen()),
                           );
                         },
-                        child: Image.asset(
-                          isDarkMode ? 'assets/images/kicsiFootify-Logo-NoBG-LightMode.png' : 'assets/images/Footify-Logo-NoBG_szerk_hosszu_logo-01.png',
-                          width: 120,
-                          height: 120,
-                        ),
+                        child: _buildResponsiveLogo(context, isDarkMode),
                       ),
                     ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: Icon(Icons.search, color: isDarkMode ? Colors.white : Colors.black),
-                          iconSize: 30,
+                    Spacer(),
+                    IconButton(
+                      icon: Icon(Icons.search, color: isDarkMode ? Colors.white : Colors.black),
+                      iconSize: 24,
+                      constraints: BoxConstraints(maxWidth: 34, maxHeight: 34),
+                      padding: EdgeInsets.zero,
+                      onPressed: () {
+                        showSearch(
+                          context: context,
+                          delegate: CustomSearchDelegate(),
+                        );
+                      },
+                    ),
+                    if (isLoggedIn)
+                      IconButton(
+                        icon: Icon(
+                          Icons.notifications,
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
+                        iconSize: 24,
+                        constraints: BoxConstraints(maxWidth: 34, maxHeight: 34),
+                        padding: EdgeInsets.zero,
+                        onPressed: () {
+                          // Handle notifications
+                        },
+                      )
+                    else
+                      SizedBox(
+                        width: 80,
+                        child: TextButton(
                           onPressed: () {
-                            showSearch(
-                              context: context,
-                              delegate: CustomSearchDelegate(),
+                            // Navigate to profile/login page
+                            Navigator.pushReplacement(
+                              context,
+                              PageRouteBuilder(
+                                pageBuilder: (context, animation, secondaryAnimation) => const ProfilePage(),
+                                transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                                  return FadeTransition(
+                                    opacity: animation,
+                                    child: child,
+                                  );
+                                },
+                              ),
                             );
                           },
-                        ),
-                        if (isLoggedIn)
-                          IconButton(
-                            icon: Icon(
-                              Icons.notifications,
-                              color: isDarkMode ? Colors.white : Colors.black,
-                            ),
-                            onPressed: () {
-                              // Handle notifications
-                            },
-                          )
-                        else
-                          TextButton(
-                            onPressed: () {
-                              // Navigate to profile/login page
-                              Navigator.pushReplacement(
-                                context,
-                                PageRouteBuilder(
-                                  pageBuilder: (context, animation, secondaryAnimation) => const ProfilePage(),
-                                  transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                                    return FadeTransition(
-                                      opacity: animation,
-                                      child: child,
-                                    );
-                                  },
-                                ),
-                              );
-                            },
-                            child: Text(
-                              'Login/Register',
-                              style: TextStyle(
-                                color: isDarkMode ? Colors.white : Colors.black,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.symmetric(horizontal: 8),
                           ),
-                      ],
-                    ),
+                          child: Text(
+                            'Login/Register',
+                            style: TextStyle(
+                              color: isDarkMode ? Colors.white : Colors.black,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -248,6 +254,24 @@ class CommonLayout extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  // Helper method to build a responsive logo
+  Widget _buildResponsiveLogo(BuildContext context, bool isDarkMode) {
+    // Always use the full logo regardless of screen size
+    String logoAsset = isDarkMode 
+      ? 'assets/images/footify_logo_optimized_dark.svg' 
+      : 'assets/images/footify_logo_optimized_light.svg';
+    
+    final logoWidth = 120.0;
+    final logoHeight = 90.0;
+    
+    return SvgPicture.asset(
+      logoAsset,
+      width: logoWidth,
+      height: logoHeight,
+      fit: BoxFit.contain,
     );
   }
 }
