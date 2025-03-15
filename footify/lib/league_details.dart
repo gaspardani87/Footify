@@ -5,8 +5,8 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 
 // Match model for last matches
 class Match {
-  String homeTeam;
-  String awayTeam;
+  final String homeTeam;
+  final String awayTeam;
   final String? homeTeamLogo;
   final String? awayTeamLogo;
   final int homeScore;
@@ -24,29 +24,13 @@ class Match {
   });
 
   factory Match.fromJson(Map<String, dynamic> json) {
-    // A következő forduló mérkőzéseinél a score null lehet
-    final score = json['score'];
-    final fullTime = score != null ? score['fullTime'] : null;
-    
-    // Csapatnevek javítása, ha szükséges
-    String homeTeamName = json['homeTeam']['name'] ?? 'Unknown';
-    String awayTeamName = json['awayTeam']['name'] ?? 'Unknown';
-    
-    // Szélesebb körű javítás
-    if (homeTeamName.toLowerCase().contains("primera") || homeTeamName.toLowerCase().contains("division")) {
-      homeTeamName = "LaLiga";
-    }
-    if (awayTeamName.toLowerCase().contains("primera") || awayTeamName.toLowerCase().contains("division")) {
-      awayTeamName = "LaLiga";
-    }
-    
     return Match(
-      homeTeam: homeTeamName,
-      awayTeam: awayTeamName,
+      homeTeam: json['homeTeam']['name'] ?? 'Unknown',
+      awayTeam: json['awayTeam']['name'] ?? 'Unknown',
       homeTeamLogo: json['homeTeam']['crest'],
       awayTeamLogo: json['awayTeam']['crest'],
-      homeScore: fullTime != null ? (fullTime['home'] ?? 0) : 0,
-      awayScore: fullTime != null ? (fullTime['away'] ?? 0) : 0,
+      homeScore: json['score']['fullTime']['home'] ?? 0,
+      awayScore: json['score']['fullTime']['away'] ?? 0,
       date: DateTime.parse(json['utcDate']),
     );
   }
@@ -54,8 +38,8 @@ class Match {
 
 // Csapat modell a tabellához
 class TeamStanding {
-  String teamName;
   final int position;
+  final String teamName;
   final String? teamLogo;
   final int playedGames;
   final int points;
@@ -79,16 +63,9 @@ class TeamStanding {
   });
 
   factory TeamStanding.fromJson(Map<String, dynamic> json) {
-    String teamName = json['team']['name'] ?? 'Ismeretlen csapat';
-    
-    // Szélesebb körű javítás
-    if (teamName.toLowerCase().contains("primera") || teamName.toLowerCase().contains("division")) {
-      teamName = "LaLiga";
-    }
-    
     return TeamStanding(
       position: json['position'] ?? 0,
-      teamName: teamName,
+      teamName: json['team']['name'] ?? 'Ismeretlen csapat',
       teamLogo: json['team']['crest'],
       playedGames: json['playedGames'] ?? 0,
       points: json['points'] ?? 0,
@@ -114,23 +91,13 @@ class LeagueDetailsPage extends StatefulWidget {
 class _LeagueDetailsPageState extends State<LeagueDetailsPage> {
   late Future<List<TeamStanding>> futureStandings;
   late Future<List<Match>> futureLastMatches;
-  late Future<List<Match>> futureNextMatches;
   bool isWideScreen = false;
-  late String displayLeagueName;
 
   @override
   void initState() {
     super.initState();
-    // Azonnali név javítás
-    displayLeagueName = widget.leagueId == 2014 ? "LaLiga" : widget.leagueName;
-        
-    if (widget.leagueId == 2014) {
-      print("DEBUG: Spanyol liga betöltése. Eredeti név: ${widget.leagueName}, javított név: $displayLeagueName");
-    }
-        
     futureStandings = fetchStandings(widget.leagueId);
     futureLastMatches = fetchLastRoundMatches(widget.leagueId);
-    futureNextMatches = fetchNextRoundMatches(widget.leagueId);
   }
 
   Future<List<Match>> fetchLastRoundMatches(int leagueId) async {
@@ -141,94 +108,13 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        
-        // Rekurzívan javítjuk minden előfordulását a "Primera Division" szövegnek
-        if (leagueId == 2014) {
-          print("DEBUG: Utolsó forduló betöltése, rekurzív javítás indítása");
-          fixPrimeraDivisionName(data);
-          
-          // Direct patch for competition name
-          if (data.containsKey('competition') && data['competition'].containsKey('name')) {
-            data['competition']['name'] = 'LaLiga';
-            print("DEBUG: Verseny nevét közvetlenül javítottam LaLiga-ra");
-          }
-        }
-        
         List<dynamic> matches = data['matches'];
-        var result = matches.map((match) => Match.fromJson(match)).toList();
-        
-        // Még egyszer ellenőrizzük az eredményeket
-        if (leagueId == 2014) {
-          for (var match in result) {
-            if (match.homeTeam.toLowerCase().contains("primera") || 
-                match.homeTeam.toLowerCase().contains("division")) {
-              print("DEBUG: Javítottam a homeTeam nevét: ${match.homeTeam} -> LaLiga");
-              match.homeTeam = "LaLiga";
-            }
-            if (match.awayTeam.toLowerCase().contains("primera") || 
-                match.awayTeam.toLowerCase().contains("division")) {
-              print("DEBUG: Javítottam a awayTeam nevét: ${match.awayTeam} -> LaLiga");
-              match.awayTeam = "LaLiga";
-            }
-          }
-        }
-        
-        return result;
+        return matches.map((match) => Match.fromJson(match)).toList();
       } else {
         throw Exception('Failed to load last matches');
       }
     } catch (e) {
       print('Error fetching last matches: $e');
-      return [];
-    }
-  }
-
-  Future<List<Match>> fetchNextRoundMatches(int leagueId) async {
-    try {
-      final response = await http.get(
-        Uri.parse('https://us-central1-footify-13da4.cloudfunctions.net/fetchNextRoundMatches?id=$leagueId'),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        
-        // Rekurzívan javítjuk minden előfordulását a "Primera Division" szövegnek
-        if (leagueId == 2014) {
-          print("DEBUG: Következő forduló betöltése, rekurzív javítás indítása");
-          fixPrimeraDivisionName(data);
-          
-          // Direct patch for competition name
-          if (data.containsKey('competition') && data['competition'].containsKey('name')) {
-            data['competition']['name'] = 'LaLiga';
-            print("DEBUG: Verseny nevét közvetlenül javítottam LaLiga-ra");
-          }
-        }
-        
-        List<dynamic> matches = data['matches'];
-        var result = matches.map((match) => Match.fromJson(match)).toList();
-        
-        // Még egyszer ellenőrizzük az eredményeket
-        if (leagueId == 2014) {
-          for (var match in result) {
-            if (match.homeTeam.toLowerCase().contains("primera") || 
-                match.homeTeam.toLowerCase().contains("division")) {
-              print("DEBUG: Javítottam a homeTeam nevét: ${match.homeTeam} -> LaLiga");
-              match.homeTeam = "LaLiga";
-            }
-            if (match.awayTeam.toLowerCase().contains("primera") || 
-                match.awayTeam.toLowerCase().contains("division")) {
-              print("DEBUG: Javítottam a awayTeam nevét: ${match.awayTeam} -> LaLiga");
-              match.awayTeam = "LaLiga";
-            }
-          }
-        }
-        
-        return result;
-      } else {
-        throw Exception('Failed to load next matches');
-      }
-    } catch (e) {
-      print('Error fetching next matches: $e');
       return [];
     }
   }
@@ -240,61 +126,14 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> {
       );
 
       if (response.statusCode == 200) {
-        var responseData = jsonDecode(response.body);
-        
-        // Rekurzívan javítjuk minden előfordulását a "Primera Division" szövegnek
-        if (leagueId == 2014) {
-          print("DEBUG: Tabella betöltése, rekurzív javítás indítása");
-          fixPrimeraDivisionName(responseData);
-          
-          // Direct patch for table title
-          if (responseData.containsKey('competition') && responseData['competition'].containsKey('name')) {
-            responseData['competition']['name'] = 'LaLiga';
-            print("DEBUG: Tabella címét közvetlenül javítottam LaLiga-ra");
-          }
-        }
-        
-        List<dynamic> standings = responseData['standings'][0]['table'];
-        var result = standings.map((team) => TeamStanding.fromJson(team)).toList();
-        
-        // Még egyszer ellenőrizzük az eredményeket
-        if (leagueId == 2014) {
-          for (var team in result) {
-            team.teamName = fixPrimeraToLaLiga(team.teamName);
-          }
-        }
-        
-        return result;
+        List<dynamic> standings = jsonDecode(response.body)['standings'][0]['table'];
+        return standings.map((team) => TeamStanding.fromJson(team)).toList();
       } else {
         throw Exception('Nem sikerült betölteni a tabellát');
       }
     } catch (e) {
       print('Error fetching standings: $e');
       throw Exception('Nem sikerült betölteni a tabellát');
-    }
-  }
-
-  // Rekurzívan megkeresi és javítja a "Primera Division" előfordulásait a JSON-ban
-  void fixPrimeraDivisionName(dynamic json) {
-    if (json is Map) {
-      // Map típusok átvizsgálása
-      json.forEach((key, value) {
-        if (value is String) {
-          if (widget.leagueId == 2014 && (value.toLowerCase().contains("primera") || value.toLowerCase().contains("primiera"))) {
-            print("DEBUG: Találtam 'Primera Division'-t az API válaszban: $key = $value");
-            json[key] = "LaLiga";
-          }
-        } else if (value is Map || value is List) {
-          fixPrimeraDivisionName(value);
-        }
-      });
-    } else if (json is List) {
-      // List típusok átvizsgálása
-      for (var item in json) {
-        if (item is Map || item is List) {
-          fixPrimeraDivisionName(item);
-        }
-      }
     }
   }
 
@@ -305,7 +144,7 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> {
       if (position <= 6) return Colors.orange; // Europa League
       if (position >= 18) return Colors.red; // Relegation
     }
-    // LaLiga
+    // La Liga
     else if (leagueId == 2014) {
       if (position <= 4) return Colors.blue; // Champions League
       if (position <= 6) return Colors.orange; // Europa League
@@ -348,7 +187,7 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> {
     switch (leagueId) {
       case 2021: // Premier League
         return 'Top 4: Champions League\n5-6: Europa League\n18-20: Relegation';
-      case 2014: // LaLiga
+      case 2014: // La Liga
         return 'Top 4: Champions League\n5-6: Europa League\n18-20: Relegation';
       case 2002: // Bundesliga
         return 'Top 4: Champions League\n5-6: Europa League\n16-18: Relegation';
@@ -368,7 +207,7 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> {
   List<Map<String, dynamic>> getRelevantColors(int leagueId) {
     switch (leagueId) {
       case 2021: // Premier League
-      case 2014: // LaLiga
+      case 2014: // La Liga
       case 2019: // Serie A
       case 2002: // Bundesliga
         return [
@@ -398,18 +237,46 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> {
   String getProxiedImageUrl(String? originalUrl) {
     if (originalUrl == null || originalUrl.isEmpty) return '';
     if (kIsWeb) {
-      // Direkt módon próbáljuk betölteni a képet webes verzióban (CORS-t figyelmen kívül hagyva)
-      // A közvetlen betöltés gyakran jobb minőséget eredményez
-      // Ha CORS hiba lenne, visszatérünk a proxy-hoz
-      return originalUrl;
+      // Ha SVG formátumú a kép, közvetlenül használjuk
+      if (originalUrl.toLowerCase().endsWith('.svg') || originalUrl.toLowerCase().contains('.svg')) {
+        return originalUrl;
+      }
+      // Proxy a Firebase funkción keresztül webes verzió esetén
+      return 'https://us-central1-footify-13da4.cloudfunctions.net/proxyImage?url=${Uri.encodeComponent(originalUrl)}';
     }
     // Közvetlen URL használata mobil verzióban
     return originalUrl;
   }
 
-  // Fallback proxy URL létrehozása CORS problémák esetén
-  String getFallbackProxyUrl(String originalUrl) {
-    return 'https://us-central1-footify-13da4.cloudfunctions.net/proxyImage?url=${Uri.encodeComponent(originalUrl)}';
+  // Minőségi csapatlogók alternatív URL-jei
+  String getHighQualityTeamLogo(String? logoUrl, String teamName) {
+    if (logoUrl == null || logoUrl.isEmpty) return '';
+    
+    // Ismert csapatok jobb minőségű logói
+    final Map<String, String> teamLogos = {
+      'Arsenal FC': 'https://upload.wikimedia.org/wikipedia/en/5/53/Arsenal_FC.svg',
+      'Manchester United FC': 'https://upload.wikimedia.org/wikipedia/en/7/7a/Manchester_United_FC_crest.svg',
+      'Liverpool FC': 'https://upload.wikimedia.org/wikipedia/en/0/0c/Liverpool_FC.svg',
+      'Chelsea FC': 'https://upload.wikimedia.org/wikipedia/en/c/cc/Chelsea_FC.svg',
+      'Manchester City FC': 'https://upload.wikimedia.org/wikipedia/en/e/eb/Manchester_City_FC_badge.svg',
+      'Tottenham Hotspur FC': 'https://upload.wikimedia.org/wikipedia/en/b/b4/Tottenham_Hotspur.svg',
+      'FC Barcelona': 'https://upload.wikimedia.org/wikipedia/en/4/47/FC_Barcelona_%28crest%29.svg',
+      'Real Madrid CF': 'https://upload.wikimedia.org/wikipedia/en/5/56/Real_Madrid_CF.svg',
+      'FC Bayern München': 'https://upload.wikimedia.org/wikipedia/commons/1/1b/FC_Bayern_M%C3%BCnchen_logo_%282017%29.svg',
+      'Paris Saint-Germain FC': 'https://upload.wikimedia.org/wikipedia/en/a/a7/Paris_Saint-Germain_F.C..svg',
+      'Juventus FC': 'https://upload.wikimedia.org/wikipedia/commons/b/bc/Juventus_FC_2017_icon.svg',
+      'Borussia Dortmund': 'https://upload.wikimedia.org/wikipedia/commons/6/67/Borussia_Dortmund_logo.svg',
+      'AC Milan': 'https://upload.wikimedia.org/wikipedia/commons/d/d0/AC_Milan_logo.svg',
+      'Inter Milan': 'https://upload.wikimedia.org/wikipedia/commons/0/05/FC_Internazionale_Milano_2021.svg',
+      'Atlético Madrid': 'https://upload.wikimedia.org/wikipedia/en/f/f4/Atletico_Madrid_2017_logo.svg',
+    };
+    
+    // Ha találunk jobb minőségű logót a csapathoz
+    if (teamLogos.containsKey(teamName)) {
+      return teamLogos[teamName]!;
+    }
+    
+    return logoUrl;
   }
 
   @override
@@ -418,12 +285,9 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> {
     final screenWidth = MediaQuery.of(context).size.width;
     isWideScreen = screenWidth > 900;
 
-    // Mindig ellenőrizzük és javítjuk a címet, ha spanyol ligáról van szó
-    final String titleText = widget.leagueId == 2014 ? "LaLiga" : displayLeagueName;
-
     return Scaffold(
       appBar: AppBar(
-        title: Text(titleText),
+        title: Text(widget.leagueName),
         backgroundColor: isDarkMode ? Colors.black : Colors.white,
         foregroundColor: isDarkMode ? Colors.white : Colors.black,
       ),
@@ -482,7 +346,7 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> {
         ),
         Expanded(
           flex: 2,
-          child: _buildNextMatches(isDarkMode),
+          child: _buildLastMatches(isDarkMode),
         ),
       ],
     );
@@ -494,8 +358,6 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> {
         _buildStandingsTable(standings, isDarkMode),
         const SizedBox(height: 16),
         _buildLastMatches(isDarkMode),
-        const SizedBox(height: 16),
-        _buildNextMatches(isDarkMode),
       ],
     );
   }
@@ -530,7 +392,7 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Legutóbbi forduló',
+                'Utolsó forduló',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -571,7 +433,7 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    correctLeagueName(match.homeTeam),
+                    match.homeTeam,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: isDarkMode ? Colors.white : Colors.black,
@@ -597,7 +459,7 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> {
               children: [
                 Expanded(
                   child: Text(
-                    correctLeagueName(match.awayTeam),
+                    match.awayTeam,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.end,
                     style: TextStyle(
@@ -616,54 +478,35 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> {
   }
 
   Widget _buildTeamLogo(String? logoUrl, bool isDarkMode) {
+    // Egyedi azonosítót készítünk a logóból
+    String? logoId = logoUrl?.split('/').last.split('.').first;
+    
     return Container(
-      width: 32,
-      height: 32,
+      width: 30, // Kicsit nagyobb méret
+      height: 30, // Kicsit nagyobb méret
       padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
         color: isDarkMode ? Colors.grey[700] : Colors.white,
         shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 2,
+            offset: const Offset(0, 1),
+          ),
+        ],
       ),
       child: logoUrl != null
-          ? kIsWeb 
-            ? Image.network(
-                getProxiedImageUrl(logoUrl),
-                fit: BoxFit.contain,
-                width: 28,
-                height: 28,
-                headers: {'Origin': 'null'},
-                cacheWidth: 64,
-                cacheHeight: 64,
-                filterQuality: FilterQuality.high,
-                errorBuilder: (context, error, stackTrace) {
-                  // Ha közvetlenül nem sikerül betölteni, próbáljuk a proxy-n keresztül
-                  return Image.network(
-                    getFallbackProxyUrl(logoUrl),
-                    fit: BoxFit.contain,
-                    width: 28,
-                    height: 28,
-                    cacheWidth: 64,
-                    cacheHeight: 64,
-                    filterQuality: FilterQuality.high,
-                    errorBuilder: (context, error, stackTrace) {
-                      print("Csapatlogó betöltési hiba: $error");
-                      return const Icon(Icons.sports_soccer, size: 20);
-                    },
-                  );
-                },
-              )
-            : Image.network(
-                getProxiedImageUrl(logoUrl),
-                fit: BoxFit.contain,
-                cacheWidth: 64,
-                cacheHeight: 64,
-                filterQuality: FilterQuality.high,
-                errorBuilder: (context, error, stackTrace) {
-                  print("Csapatlogó betöltési hiba: $error");
-                  return const Icon(Icons.sports_soccer, size: 20);
-                },
-              )
-          : const Icon(Icons.sports_soccer, size: 20),
+          ? Image.network(
+              getProxiedImageUrl(logoUrl),
+              fit: BoxFit.contain,
+              headers: kIsWeb ? {'Origin': 'null'} : null,
+              errorBuilder: (context, error, stackTrace) {
+                print("Csapatlogó betöltési hiba: $error");
+                return const Icon(Icons.sports_soccer, size: 16);
+              },
+            )
+          : const Icon(Icons.sports_soccer, size: 16),
     );
   }
 
@@ -865,66 +708,39 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> {
                           children: [
                             team.teamLogo != null
                               ? Container(
-                                  width: 40, // Megnövelt méret
-                                  height: 40, // Megnövelt méret
+                                  width: 28, // Nagyobb méret a jobb minőséghez
+                                  height: 28, // Nagyobb méret a jobb minőséghez
                                   padding: const EdgeInsets.all(4),
                                   decoration: BoxDecoration(
                                     color: isDarkMode ? Colors.grey[800] : Colors.grey[100],
                                     shape: BoxShape.circle,
                                   ),
-                                  child: kIsWeb 
-                                    ? Image.network(
-                                        getProxiedImageUrl(team.teamLogo),
-                                        fit: BoxFit.contain,
-                                        width: 36,
-                                        height: 36,
-                                        headers: {'Origin': 'null'},
-                                        cacheWidth: 72, // Nagyobb felbontású kép cache-elése
-                                        cacheHeight: 72, // Nagyobb felbontású kép cache-elése
-                                        filterQuality: FilterQuality.high, // Jobb minőségű szűrés
-                                        errorBuilder: (context, error, stackTrace) {
-                                          // Ha közvetlenül nem sikerül betölteni, próbáljuk a proxy-n keresztül
-                                          return Image.network(
-                                            getFallbackProxyUrl(team.teamLogo!),
-                                            fit: BoxFit.contain,
-                                            width: 36, 
-                                            height: 36,
-                                            cacheWidth: 72,
-                                            cacheHeight: 72, 
-                                            filterQuality: FilterQuality.high,
-                                            errorBuilder: (context, error, stackTrace) {
-                                              print("Tabella csapatlogó betöltési hiba: $error");
-                                              return const Icon(Icons.sports_soccer, size: 24);
-                                            },
-                                          );
-                                        },
-                                      )
-                                    : Image.network(
-                                        getProxiedImageUrl(team.teamLogo),
-                                        fit: BoxFit.contain,
-                                        cacheWidth: 72,
-                                        cacheHeight: 72,
-                                        filterQuality: FilterQuality.high,
-                                        errorBuilder: (context, error, stackTrace) {
-                                          print("Tabella csapatlogó betöltési hiba: $error");
-                                          return const Icon(Icons.sports_soccer, size: 24);
-                                        },
-                                      ),
+                                  child: Image.network(
+                                    getProxiedImageUrl(team.teamLogo),
+                                    fit: BoxFit.contain,
+                                    width: 28, // Nagyobb méret a jobb minőséghez
+                                    height: 28, // Nagyobb méret a jobb minőséghez
+                                    headers: kIsWeb ? {'Origin': 'null'} : null,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      print("Tabella csapatlogó betöltési hiba: $error");
+                                      return const Icon(Icons.sports_soccer, size: 20);
+                                    },
+                                  ),
                                 )
                               : Container(
-                                  width: 40, // Megnövelt méret
-                                  height: 40, // Megnövelt méret
+                                  width: 28, // Nagyobb méret a jobb minőséghez
+                                  height: 28, // Nagyobb méret a jobb minőséghez
                                   padding: const EdgeInsets.all(4),
                                   decoration: BoxDecoration(
                                     color: isDarkMode ? Colors.grey[800] : Colors.grey[100],
                                     shape: BoxShape.circle,
                                   ),
-                                  child: const Icon(Icons.sports_soccer, size: 24),
+                                  child: const Icon(Icons.sports_soccer, size: 20),
                                 ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                correctLeagueName(team.teamName),
+                                team.teamName,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(fontWeight: FontWeight.w500),
                               ),
@@ -1022,157 +838,6 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> {
     );
   }
 
-  Widget _buildNextMatches(bool isDarkMode) {
-    return FutureBuilder<List<Match>>(
-      future: futureNextMatches,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        } else if (snapshot.hasError) {
-          return Center(child: Text('Hiba: ${snapshot.error}'));
-        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(child: Text('Nincs elérhető következő mérkőzés'));
-        }
-
-        return Container(
-          margin: const EdgeInsets.all(8),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isDarkMode ? Colors.grey[900] : Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Következő forduló',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-              ),
-              const SizedBox(height: 16),
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: snapshot.data!.length,
-                itemBuilder: (context, index) {
-                  final match = snapshot.data![index];
-                  return _buildNextMatchCard(match, isDarkMode);
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildNextMatchCard(Match match, bool isDarkMode) {
-    // A következő mérkőzések még nem játszódtak le, ezért nincs eredmény
-    String formattedDate = '';
-    try {
-      // Dátum formázása: "márc. 15. 15:30"
-      final day = match.date.day;
-      final month = _getHungarianMonth(match.date.month);
-      final hour = match.date.hour.toString().padLeft(2, '0');
-      final minute = match.date.minute.toString().padLeft(2, '0');
-      formattedDate = '$month $day. $hour:$minute';
-    } catch (e) {
-      formattedDate = 'Időpont ismeretlen';
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey[800] : Colors.grey[100],
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text(
-              formattedDate,
-              style: TextStyle(
-                color: isDarkMode ? Colors.grey[400] : Colors.grey[700],
-                fontSize: 12,
-              ),
-            ),
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    _buildTeamLogo(match.homeTeamLogo, isDarkMode),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        correctLeagueName(match.homeTeam),
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: isDarkMode ? Colors.white : Colors.black,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text(
-                  'VS',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: isDarkMode ? Colors.amber[200] : Colors.amber[800],
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        correctLeagueName(match.awayTeam),
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.end,
-                        style: TextStyle(
-                          color: isDarkMode ? Colors.white : Colors.black,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    _buildTeamLogo(match.awayTeamLogo, isDarkMode),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _getHungarianMonth(int month) {
-    const months = [
-      'jan.', 'febr.', 'márc.', 'ápr.', 'máj.', 'jún.',
-      'júl.', 'aug.', 'szept.', 'okt.', 'nov.', 'dec.'
-    ];
-    return months[month - 1];
-  }
-
   Widget _buildLegend(bool isDarkMode) {
     final relevantColors = getRelevantColors(widget.leagueId);
     if (relevantColors.isEmpty) return const SizedBox.shrink();
@@ -1229,34 +894,4 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> {
       ),
     );
   }
-
-  // Globális segédfüggvény a bajnokságnevek javítására a teljes alkalmazásban
-  String correctLeagueName(String originalName) {
-    // Speciális rövidítés a spanyol liga számára
-    if (widget.leagueId == 2014) {
-      if (originalName.toLowerCase().contains("primera") || 
-          originalName.toLowerCase().contains("primiera") ||
-          originalName.toLowerCase().contains("primavera") || 
-          originalName.toLowerCase().contains("division")) {
-        return "LaLiga";
-      }
-    }
-    
-    // Általános javítás minden esetben
-    if (originalName.toLowerCase().contains("primera division") || 
-        originalName.toLowerCase() == "primera" ||
-        originalName.toLowerCase() == "primera división") {
-      return "LaLiga";
-    }
-    
-    return originalName;
-  }
-}
-
-// Az osztályon kívül, globális függvény a név javítására
-String fixPrimeraToLaLiga(String input) {
-  if (input.toLowerCase().contains("primera") || input.toLowerCase().contains("primiera")) {
-    return "LaLiga";
-  }
-  return input;
 } 
