@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:html' if (dart.library.io) 'dart:io' as platform;
+import 'storage_service.dart';
 
 class LanguageProvider with ChangeNotifier {
   Locale _currentLocale = const Locale('en');
@@ -13,31 +12,14 @@ class LanguageProvider with ChangeNotifier {
   Locale get currentLocale => _currentLocale;
 
   Future<void> _loadLanguage() async {
-    String languageName = 'English'; // Default
-    
-    if (kIsWeb) {
-      // Use localStorage for web platform
-      try {
-        final langStr = platform.window.localStorage['footify_language'];
-        if (langStr != null) {
-          languageName = langStr;
-        }
-      } catch (e) {
-        print('Error loading language from localStorage: $e');
-        // Fallback to default English
+    try {
+      final langStr = await StorageService.getValue('footify_language');
+      if (langStr != null) {
+        await setLocale(langStr);
       }
-    } else {
-      // Use SharedPreferences for mobile/desktop platforms
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        languageName = prefs.getString('selected_language') ?? 'English';
-      } catch (e) {
-        print('Error loading language from SharedPreferences: $e');
-        // Fallback to default English
-      }
+    } catch (e) {
+      print('Error loading language: $e');
     }
-    
-    setLocale(languageName);
   }
 
   Future<void> setLocale(String languageName) async {
@@ -64,21 +46,10 @@ class LanguageProvider with ChangeNotifier {
     
     _currentLocale = Locale(languageCode);
     
-    if (kIsWeb) {
-      // Use localStorage for web platform
-      try {
-        platform.window.localStorage['footify_language'] = languageName;
-      } catch (e) {
-        print('Error saving language to localStorage: $e');
-      }
-    } else {
-      // Use SharedPreferences for mobile/desktop platforms
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('selected_language', languageName);
-      } catch (e) {
-        print('Error saving language to SharedPreferences: $e');
-      }
+    try {
+      await StorageService.setValue('footify_language', languageName);
+    } catch (e) {
+      print('Error saving language: $e');
     }
     
     notifyListeners();

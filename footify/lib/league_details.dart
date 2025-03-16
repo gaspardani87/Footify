@@ -575,21 +575,9 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> {
     // Egyedi azonosítót készítünk a logóból
     String? logoId = logoUrl?.split('/').last.split('.').first;
     
-    return Container(
-      width: 30, // Kicsit nagyobb méret
-      height: 30, // Kicsit nagyobb méret
-      padding: const EdgeInsets.all(2),
-      decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey[700] : Colors.white,
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 2,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
+    return SizedBox(
+      width: 34, // Slightly increased from 30
+      height: 34, // Slightly increased from 30
       child: logoUrl != null
           ? Image.network(
               getProxiedImageUrl(logoUrl),
@@ -597,10 +585,10 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> {
               headers: kIsWeb ? {'Origin': 'null'} : null,
               errorBuilder: (context, error, stackTrace) {
                 print("Csapatlogó betöltési hiba: $error");
-                return const Icon(Icons.sports_soccer, size: 16);
+                return const Icon(Icons.sports_soccer, size: 18);
               },
             )
-          : const Icon(Icons.sports_soccer, size: 16),
+          : const Icon(Icons.sports_soccer, size: 18),
     );
   }
 
@@ -801,35 +789,25 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> {
                         child: Row(
                           children: [
                             team.teamLogo != null
-                              ? Container(
-                                  width: 28, // Nagyobb méret a jobb minőséghez
-                                  height: 28, // Nagyobb méret a jobb minőséghez
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: BoxDecoration(
-                                    color: isDarkMode ? Colors.grey[800] : Colors.grey[100],
-                                    shape: BoxShape.circle,
-                                  ),
+                              ? SizedBox(
+                                  width: 32, // Increased from 28
+                                  height: 32, // Increased from 28
                                   child: Image.network(
                                     getProxiedImageUrl(team.teamLogo),
                                     fit: BoxFit.contain,
-                                    width: 28, // Nagyobb méret a jobb minőséghez
-                                    height: 28, // Nagyobb méret a jobb minőséghez
+                                    width: 32,
+                                    height: 32,
                                     headers: kIsWeb ? {'Origin': 'null'} : null,
                                     errorBuilder: (context, error, stackTrace) {
                                       print("Tabella csapatlogó betöltési hiba: $error");
-                                      return const Icon(Icons.sports_soccer, size: 20);
+                                      return const Icon(Icons.sports_soccer, size: 22);
                                     },
                                   ),
                                 )
-                              : Container(
-                                  width: 28, // Nagyobb méret a jobb minőséghez
-                                  height: 28, // Nagyobb méret a jobb minőséghez
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: BoxDecoration(
-                                    color: isDarkMode ? Colors.grey[800] : Colors.grey[100],
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.sports_soccer, size: 20),
+                              : SizedBox(
+                                  width: 32,
+                                  height: 32,
+                                  child: const Icon(Icons.sports_soccer, size: 22),
                                 ),
                             const SizedBox(width: 8),
                             Expanded(

@@ -9,7 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:html' if (dart.library.io) 'dart:io' as platform;
+import 'storage_service.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -26,49 +26,28 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   void initState() {
     super.initState();
-    // Initialize with defaults (we'll add immediate UI feedback)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Try to load settings from localStorage first
-      if (kIsWeb) {
-        _loadWebSettings();
-      } else {
-        // Just set default dark theme via provider for non-web
-        final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-        themeProvider.toggleTheme(true);
-      }
-      
-      // Set loading to false to show UI
-      setState(() {
-        isLoading = false;
-      });
-    });
+    _loadSettings();
   }
   
-  void _loadWebSettings() {
-    if (!kIsWeb) return;
-    
+  Future<void> _loadSettings() async {
     try {
-      // Get theme setting from localStorage
-      final themeStr = platform.window.localStorage['footify_theme'];
-      final isDark = themeStr == 'dark' || themeStr == null; // Default to dark
+      // Get theme setting
+      final isDark = await StorageService.getBool('footify_theme_dark') ?? true;
       
-      // Get language setting from localStorage
-      final langStr = platform.window.localStorage['footify_language'];
+      // Get language setting
+      final langStr = await StorageService.getValue('footify_language');
       if (langStr != null) {
         selectedLanguage = langStr;
       }
       
-      // Get font size from localStorage
-      final fontSizeStr = platform.window.localStorage['footify_font_size'];
-      final fontSize = fontSizeStr != null ? double.tryParse(fontSizeStr) ?? 16.0 : 16.0;
+      // Get font size
+      final fontSize = await StorageService.getDouble('footify_font_size') ?? 16.0;
       
-      // Get color blind mode from localStorage
-      final colorBlindStr = platform.window.localStorage['footify_color_blind'];
-      final isColorBlind = colorBlindStr == 'true';
+      // Get color blind mode
+      final isColorBlind = await StorageService.getBool('footify_color_blind') ?? false;
       
-      // Get notifications setting from localStorage
-      final notificationsStr = platform.window.localStorage['footify_notifications'];
-      final notificationsEnabled = notificationsStr == 'true';
+      // Get notifications setting
+      final notificationsEnabled = await StorageService.getBool('footify_notifications') ?? false;
       
       // Update state
       setState(() {
@@ -76,94 +55,65 @@ class _SettingsPageState extends State<SettingsPage> {
       });
       
       // Apply settings via providers
+      if (!mounted) return;
+      
       final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
       final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
       final fontSizeProvider = Provider.of<FontSizeProvider>(context, listen: false);
       final colorBlindModeProvider = Provider.of<ColorBlindModeProvider>(context, listen: false);
       
-      themeProvider.toggleTheme(isDark);
-      languageProvider.setLocale(selectedLanguage);
-      fontSizeProvider.setFontSize(fontSize);
-      colorBlindModeProvider.toggleColorBlindMode(isColorBlind);
+      await themeProvider.toggleTheme(isDark);
+      await languageProvider.setLocale(selectedLanguage);
+      await fontSizeProvider.setFontSize(fontSize);
+      await colorBlindModeProvider.toggleColorBlindMode(isColorBlind);
+      
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     } catch (e) {
-      print('Error loading web settings: $e');
-      // Apply default settings on error
-      final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-      themeProvider.toggleTheme(true);
+      print('Error loading settings: $e');
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
   }
 
-  void _toggleTheme(bool isDark) {
+  Future<void> _toggleTheme(bool isDark) async {
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-    themeProvider.toggleTheme(isDark);
-    
-    // Save to localStorage if on web
-    if (kIsWeb) {
-      try {
-        platform.window.localStorage['footify_theme'] = isDark ? 'dark' : 'light';
-      } catch (e) {
-        print('Error saving theme setting: $e');
-      }
-    }
+    await themeProvider.toggleTheme(isDark);
   }
 
-  void _setFontSize(double size) {
+  Future<void> _setFontSize(double size) async {
     final fontSizeProvider = Provider.of<FontSizeProvider>(context, listen: false);
-    fontSizeProvider.setFontSize(size);
-    
-    // Save to localStorage if on web
-    if (kIsWeb) {
-      try {
-        platform.window.localStorage['footify_font_size'] = size.toString();
-      } catch (e) {
-        print('Error saving font size setting: $e');
-      }
-    }
+    await fontSizeProvider.setFontSize(size);
   }
 
-  void _toggleColorBlindMode(bool enabled) {
+  Future<void> _toggleColorBlindMode(bool enabled) async {
     final colorBlindModeProvider = Provider.of<ColorBlindModeProvider>(context, listen: false);
-    colorBlindModeProvider.toggleColorBlindMode(enabled);
-    
-    // Save to localStorage if on web
-    if (kIsWeb) {
-      try {
-        platform.window.localStorage['footify_color_blind'] = enabled.toString();
-      } catch (e) {
-        print('Error saving color blind mode setting: $e');
-      }
-    }
+    await colorBlindModeProvider.toggleColorBlindMode(enabled);
   }
 
-  void _changeLanguage(String language) {
+  Future<void> _changeLanguage(String language) async {
     setState(() {
       selectedLanguage = language;
     });
     final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
-    languageProvider.setLocale(language);
-    
-    // Save to localStorage if on web
-    if (kIsWeb) {
-      try {
-        platform.window.localStorage['footify_language'] = language;
-      } catch (e) {
-        print('Error saving language setting: $e');
-      }
-    }
+    await languageProvider.setLocale(language);
   }
 
-  void _toggleNotifications(bool enabled) {
+  Future<void> _toggleNotifications(bool enabled) async {
     setState(() {
       notificationsEnabled = enabled;
     });
     
-    // Save to localStorage if on web
-    if (kIsWeb) {
-      try {
-        platform.window.localStorage['footify_notifications'] = enabled.toString();
-      } catch (e) {
-        print('Error saving notifications setting: $e');
-      }
+    try {
+      await StorageService.setBool('footify_notifications', enabled);
+    } catch (e) {
+      print('Error saving notifications setting: $e');
     }
   }
 

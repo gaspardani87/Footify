@@ -27,6 +27,7 @@ import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'loading_screen.dart';
+import 'animated_splash_screen.dart';
 
 // A simple in-memory image cache
 class ImageCache {
@@ -175,7 +176,7 @@ class _FootifyAppState extends State<FootifyApp> {
       locale: languageProvider.currentLocale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
-      home: isDataPreloaded ? const MainScreen() : const LoadingScreen(),
+      home: const AnimatedSplashScreen(),
     );
   }
 
