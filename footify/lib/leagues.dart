@@ -105,8 +105,10 @@ class _LeaguePageState extends State<LeaguePage> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    // Webes vagy mobil platform ellenőrzése a kIsWeb segítségével
-    final isWeb = kIsWeb;
+    // Get screen width for responsive layout
+    final screenWidth = MediaQuery.of(context).size.width;
+    // Use 2 columns for small screens, more for larger screens
+    final crossAxisCount = screenWidth < 600 ? 2 : screenWidth < 1200 ? 3 : 5;
 
     return CommonLayout(
       selectedIndex: 2,
@@ -127,78 +129,70 @@ class _LeaguePageState extends State<LeaguePage> {
                     return const Center(child: Text('Nincs elérhető bajnokság'));
                   }
 
-                  // Csak webes verzióban igazítjuk középre az utolsó sor 3 elemét
-                  if (isWeb) {
-                    // Eredeti bajnokság lista
-                    List<League> originalLeagues = snapshot.data!;
-                    // Új lista a középre igazított megjelenítéshez
-                    List<League?> modifiedLeagues = [];
-                    
-                    // A teljes sorok száma (5 elem soronként)
-                    int completeRows = originalLeagues.length ~/ 5;
-                    // A teljes sorokban lévő elemek
-                    int completeRowElements = completeRows * 5;
-                    // A maradék elemek száma
-                    int remainingElements = originalLeagues.length - completeRowElements;
-                    
-                    // Teljes sorok hozzáadása
-                    for (int i = 0; i < completeRowElements; i++) {
-                      modifiedLeagues.add(originalLeagues[i]);
-                    }
-                    
-                    // Az utolsó sor elemei középre igazítva
-                    // Kiszámítjuk hány üres elem kell az utolsó sor elején
-                    int leadingEmptySlots = (5 - remainingElements) ~/ 2;
-                    
-                    // Üres helyőrzők hozzáadása az elejére
-                    for (int i = 0; i < leadingEmptySlots; i++) {
-                      modifiedLeagues.add(null);
-                    }
-                    
-                    // A maradék elemek hozzáadása
-                    for (int i = completeRowElements; i < originalLeagues.length; i++) {
-                      modifiedLeagues.add(originalLeagues[i]);
-                    }
-                    
-                    // Üres helyőrzők hozzáadása a végére
-                    for (int i = 0; i < leadingEmptySlots; i++) {
-                      modifiedLeagues.add(null);
-                    }
-                    
-                    // GridView építése a módosított listával
-                    return GridView.builder(
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 5,
-                        childAspectRatio: 0.85,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                      ),
-                      itemCount: modifiedLeagues.length,
-                      itemBuilder: (context, index) {
-                        // Ha null (üres helyőrző), akkor üres Container-t adunk vissza
-                        if (modifiedLeagues[index] == null) {
-                          return Container();
-                        }
-                        // Egyébként megjelenítjük a ligát
-                        return LeagueTile(league: modifiedLeagues[index]!);
-                      },
-                    );
-                  } else {
-                    // Mobil verzióban marad az eredeti elrendezés
-                    return GridView.builder(
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        childAspectRatio: 1.0,
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
-                      ),
-                      itemCount: snapshot.data!.length,
-                      itemBuilder: (context, index) {
-                        final league = snapshot.data![index];
-                        return LeagueTile(league: league);
-                      },
-                    );
+                  // Get original leagues list
+                  List<League> originalLeagues = snapshot.data!;
+                  
+                  // Create a modified list that includes null placeholders for centering
+                  List<League?> centeredLeagues = [];
+                  
+                  // Calculate how many complete rows we have
+                  int totalItems = originalLeagues.length;
+                  int completeRows = totalItems ~/ crossAxisCount;
+                  int itemsInCompleteRows = completeRows * crossAxisCount;
+                  
+                  // How many items in the last row
+                  int itemsInLastRow = totalItems - itemsInCompleteRows;
+                  
+                  // Add all items from complete rows
+                  for (int i = 0; i < itemsInCompleteRows; i++) {
+                    centeredLeagues.add(originalLeagues[i]);
                   }
+                  
+                  // If we have a partial last row, center it by adding null placeholders
+                  if (itemsInLastRow > 0) {
+                    // Calculate padding needed on each side to center
+                    int leadingPadding = (crossAxisCount - itemsInLastRow) ~/ 2;
+                    
+                    // Add leading placeholders
+                    for (int i = 0; i < leadingPadding; i++) {
+                      centeredLeagues.add(null);
+                    }
+                    
+                    // Add actual items for last row
+                    for (int i = 0; i < itemsInLastRow; i++) {
+                      centeredLeagues.add(originalLeagues[itemsInCompleteRows + i]);
+                    }
+                    
+                    // Add trailing placeholders
+                    for (int i = 0; i < leadingPadding; i++) {
+                      centeredLeagues.add(null);
+                    }
+                    
+                    // If odd number of padding needed, add one more at the end
+                    if ((crossAxisCount - itemsInLastRow) % 2 != 0) {
+                      centeredLeagues.add(null);
+                    }
+                  }
+                  
+                  // Now build the GridView with centered items
+                  return GridView.builder(
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: crossAxisCount,
+                      childAspectRatio: 0.85,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                    ),
+                    itemCount: centeredLeagues.length,
+                    itemBuilder: (context, index) {
+                      // Return empty container for null placeholders
+                      if (centeredLeagues[index] == null) {
+                        return Container();
+                      }
+                      
+                      // Return league tile for actual items
+                      return LeagueTile(league: centeredLeagues[index]!);
+                    },
+                  );
                 },
               ),
             ),
@@ -217,50 +211,54 @@ class LeagueTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    // Web vagy mobil platform ellenőrzése
-    final isWeb = kIsWeb;
+    // Use screen width for responsive sizing
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 600;
     
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => LeagueDetailsPage(leagueId: league.id, leagueName: league.name),
-          ),
-        );
-      },
-      child: Card(
-        elevation: 4,
-        child: Padding(
-          // Webes verzióban kisebb padding
-          padding: EdgeInsets.all(isWeb ? 8.0 : 10.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Center(
-                  child: SizedBox(
-                    // Webes felületen kisebb méretű SizedBox a logóknak
-                    width: isWeb ? 60 : 80,
-                    height: isWeb ? 60 : 80,
-                    child: _buildLogoImage(league.id, league.logo, isDarkMode, isWeb),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => LeagueDetailsPage(leagueId: league.id, leagueName: league.name),
+            ),
+          );
+        },
+        child: Card(
+          elevation: 4,
+          child: Padding(
+            // Adaptive padding based on screen size
+            padding: EdgeInsets.all(isSmallScreen ? 10.0 : 8.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Center(
+                    child: SizedBox(
+                      // Adaptive size based on screen width
+                      width: isSmallScreen ? 80 : 60,
+                      height: isSmallScreen ? 80 : 60,
+                      child: _buildLogoImage(league.id, league.logo, isDarkMode, !isSmallScreen),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                league.name,
-                textAlign: TextAlign.center,
-                overflow: TextOverflow.ellipsis,
-                maxLines: 2,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: isWeb ? 12 : 13,  // Webes verzióban kisebb betűméret
-                  color: isDarkMode ? Colors.white : Colors.black,
-                  fontFamily: 'Lexend',
+                const SizedBox(height: 4),
+                Text(
+                  league.name,
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: isSmallScreen ? 13 : 12,
+                    color: isDarkMode ? Colors.white : Colors.black,
+                    fontFamily: 'Lexend',
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

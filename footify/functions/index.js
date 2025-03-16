@@ -697,3 +697,40 @@ exports.fetchMatchStatistics = functions.https.onRequest(async (req, res) => {
     });
   }
 });
+
+// Function to fetch top scorers for a competition
+exports.fetchTopScorers = functions.https.onRequest(async (req, res) => {
+  setCorsHeaders(res);
+  
+  if (handleOptions(req, res)) return;
+
+  const leagueCode = req.query.leagueCode;
+  if (!leagueCode) {
+    res.status(400).json({ error: 'Missing league code parameter' });
+    return;
+  }
+
+  try {
+    const response = await axios.get(`${BASE_URL}/competitions/${leagueCode}/scorers`, {
+      headers: {
+        'X-Auth-Token': API_KEY,
+      },
+      params: {
+        limit: 20 // Lekérjük a top 20 góllövőt
+      }
+    });
+
+    if (response.status === 200) {
+      res.status(200).json(response.data);
+    } else {
+      throw new Error(`API returned status: ${response.status}`);
+    }
+  } catch (error) {
+    console.error(`Error fetching top scorers for league ${leagueCode}:`, error.message);
+    res.status(500).json({
+      error: 'Failed to fetch top scorers',
+      details: error.message || 'Unknown error',
+      status: error.response ? error.response.status : null,
+    });
+  }
+});
