@@ -59,8 +59,8 @@ flutter_localizations:
 flutter_native_splash:
   color_dark: "#1D1D1D"  # Dark mode background
   color: "#FFFFFF"       # Light mode background
-  image: assets/images/Footify-Logo-NoBG_szerk_hosszu_logo-01.png
-  image_dark: assets/images/Footify-Logo-NoBG.png
+  image: assets/images/footify_logo_optimized_light.svg
+  image_dark: assets/images/footify_logo_optimized_dark.svg
   android: true
   ios: true
   web: true

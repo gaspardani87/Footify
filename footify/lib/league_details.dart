@@ -36,6 +36,30 @@ class Match {
   }
 }
 
+// Góllövő modell
+class Scorer {
+  final String playerName;
+  final String teamName;
+  final String? teamLogo;
+  final int goals;
+
+  Scorer({
+    required this.playerName,
+    required this.teamName,
+    required this.teamLogo,
+    required this.goals,
+  });
+
+  factory Scorer.fromJson(Map<String, dynamic> json) {
+    return Scorer(
+      playerName: json['player']['name'] ?? 'Ismeretlen játékos',
+      teamName: json['team']['name'] ?? 'Ismeretlen csapat',
+      teamLogo: json['team']['crest'],
+      goals: json['goals'] ?? 0,
+    );
+  }
+}
+
 // Csapat modell a tabellához
 class TeamStanding {
   final int position;
@@ -91,13 +115,59 @@ class LeagueDetailsPage extends StatefulWidget {
 class _LeagueDetailsPageState extends State<LeagueDetailsPage> {
   late Future<List<TeamStanding>> futureStandings;
   late Future<List<Match>> futureLastMatches;
+  late Future<List<Scorer>> futureScorers;
   bool isWideScreen = false;
+
+  // Liga ID-k megfeleltetése az API kódokkal
+  String getLeagueCode(int leagueId) {
+    switch (leagueId) {
+      case 2021:
+        return 'PL'; // Premier League
+      case 2014:
+        return 'PD'; // La Liga
+      case 2019:
+        return 'SA'; // Serie A
+      case 2002:
+        return 'BL1'; // Bundesliga
+      case 2015:
+        return 'FL1'; // Ligue 1
+      case 2016:
+        return 'ELC'; // Championship
+      case 2017:
+        return 'EL1'; // League One
+      default:
+        return '';
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     futureStandings = fetchStandings(widget.leagueId);
     futureLastMatches = fetchLastRoundMatches(widget.leagueId);
+    futureScorers = Future.value([]); // Alapértelmezett üres lista
+    _loadScorers();
+  }
+
+  Future<void> _loadScorers() async {
+    try {
+      final leagueCode = getLeagueCode(widget.leagueId);
+      if (leagueCode.isEmpty) {
+        setState(() {
+          futureScorers = Future.value([]);
+        });
+        return;
+      }
+
+      setState(() {
+        futureScorers = fetchScorers(widget.leagueId);
+      });
+    } catch (e) {
+      print('Hiba a góllövőlista betöltésekor: $e');
+      setState(() {
+        futureScorers = Future.value([]);
+      });
+    }
   }
 
   Future<List<Match>> fetchLastRoundMatches(int leagueId) async {
@@ -134,6 +204,34 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> {
     } catch (e) {
       print('Error fetching standings: $e');
       throw Exception('Nem sikerült betölteni a tabellát');
+    }
+  }
+
+  Future<List<Scorer>> fetchScorers(int leagueId) async {
+    try {
+      final leagueCode = getLeagueCode(leagueId);
+      if (leagueCode.isEmpty) return [];
+
+      final response = await http.get(
+        Uri.parse('https://us-central1-footify-13da4.cloudfunctions.net/fetchTopScorers?leagueCode=$leagueCode'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data != null && data['scorers'] != null) {
+          List<dynamic> scorers = data['scorers'];
+          return scorers.map((scorer) => Scorer.fromJson(scorer)).toList();
+        }
+      }
+      print('Nem sikerült betölteni a góllövőlistát: ${response.statusCode}');
+      print('Válasz: ${response.body}');
+      return [];
+    } catch (e) {
+      print('Hiba a góllövőlista betöltésekor: $e');
+      return [];
     }
   }
 
@@ -298,15 +396,6 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Text(
-                    'Tabella',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          color: isDarkMode ? Colors.white : Colors.black,
-                        ),
-                  ),
-                ),
                 FutureBuilder<List<TeamStanding>>(
                   future: futureStandings,
                   builder: (context, snapshot) {
@@ -346,19 +435,24 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> {
         ),
         Expanded(
           flex: 2,
-          child: _buildLastMatches(isDarkMode),
+          child: _buildScorers(isDarkMode),
         ),
       ],
     );
   }
 
   Widget _buildNarrowLayout(List<TeamStanding> standings, bool isDarkMode) {
-    return Column(
-      children: [
-        _buildStandingsTable(standings, isDarkMode),
-        const SizedBox(height: 16),
-        _buildLastMatches(isDarkMode),
-      ],
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          _buildStandingsTable(standings, isDarkMode),
+          const SizedBox(height: 16),
+          _buildLastMatches(isDarkMode),
+          const SizedBox(height: 16),
+          _buildScorers(isDarkMode),
+          const SizedBox(height: 16), // Extra padding az alján
+        ],
+      ),
     );
   }
 
@@ -832,6 +926,143 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> {
                 ),
               );
             },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScorers(bool isDarkMode) {
+    return FutureBuilder<List<Scorer>>(
+      future: futureScorers,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return SizedBox(
+            height: 100,
+            child: const Center(child: CircularProgressIndicator()),
+          );
+        } else if (snapshot.hasError) {
+          return SizedBox(
+            height: 100,
+            child: Center(child: Text('Hiba: ${snapshot.error}')),
+          );
+        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return SizedBox(
+            height: 100,
+            child: const Center(child: Text('Nincs elérhető góllövő')),
+          );
+        }
+
+        return Container(
+          margin: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDarkMode ? Colors.grey[900] : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Góllövőlista',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ...snapshot.data!.map((scorer) => _buildScorerCard(scorer, snapshot.data!.indexOf(scorer) + 1, isDarkMode)).toList(),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildScorerCard(Scorer scorer, int position, bool isDarkMode) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDarkMode ? Colors.grey[800] : Colors.grey[100],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          // Helyezés
+          Container(
+            width: 30,
+            child: Row(
+              children: [
+                Text(
+                  position.toString(),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
+                ),
+                Text(
+                  '.',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Csapat logó
+          _buildTeamLogo(scorer.teamLogo, isDarkMode),
+          const SizedBox(width: 12),
+          // Játékos neve és csapata
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  scorer.playerName,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  scorer.teamName,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Gólok száma
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFE6AC),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              '${scorer.goals} gól',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
           ),
         ],
       ),
