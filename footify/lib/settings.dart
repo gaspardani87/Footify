@@ -10,6 +10,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'storage_service.dart';
+import 'main.dart' show showNotification;
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -297,6 +298,32 @@ class _SettingsPageState extends State<SettingsPage> {
                     activeTrackColor: isDarkMode ? Colors.grey[700] : Colors.grey[400],
                     onChanged: _toggleNotifications,
                   ),
+                  if (notificationsEnabled) 
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.notifications),
+                        label: const Text('Értesítés tesztelése'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFFE6AC),
+                          foregroundColor: Colors.black,
+                        ),
+                        onPressed: () {
+                          showNotification(
+                            'Footify értesítés teszt', 
+                            'Ez egy rendszerszintű értesítés a Footify alkalmazásból. Láthatnod kell ezt az értesítési területen is!',
+                            payload: 'test_notification',
+                          );
+                          
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Rendszerszintű értesítés elküldve. Nézd meg a telefon értesítési területét!'),
+                              duration: Duration(seconds: 3),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                 ],
               ),
             ),

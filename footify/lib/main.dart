@@ -28,6 +28,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'loading_screen.dart';
 import 'animated_splash_screen.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // A simple in-memory image cache
 class ImageCache {
@@ -110,6 +113,123 @@ Future<void> preloadData() async {
   }
 }
 
+// Globális FlutterLocalNotificationsPlugin példány
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = 
+    FlutterLocalNotificationsPlugin();
+
+// Értesítés csatorna azonosító (Android)
+const String androidNotificationChannelId = 'com.gaspar.footify.NOTIFICATION';
+const String androidNotificationChannelName = 'Footify értesítések';
+const String androidNotificationChannelDescription = 'Értesítések a Footify alkalmazásból';
+
+// Értesítési azonosító
+int notificationId = 0;
+
+// Értesítési csatorna inicializálása
+Future<void> setupNotifications() async {
+  if (kIsWeb) return; // Web platformon nem támogatott
+  
+  // Android-specifikus inicializálás
+  const AndroidInitializationSettings initializationSettingsAndroid =
+      AndroidInitializationSettings('@mipmap/ic_launcher');
+
+  // iOS-specifikus inicializálás
+  final DarwinInitializationSettings initializationSettingsIOS =
+      DarwinInitializationSettings(
+    requestSoundPermission: true,
+    requestBadgePermission: true,
+    requestAlertPermission: true,
+  );
+
+  // Inicializálási beállítások létrehozása
+  final InitializationSettings initializationSettings = InitializationSettings(
+    android: initializationSettingsAndroid,
+    iOS: initializationSettingsIOS,
+  );
+
+  // Plugin inicializálása
+  await flutterLocalNotificationsPlugin.initialize(
+    initializationSettings,
+    onDidReceiveNotificationResponse: (NotificationResponse response) async {
+      // Értesítésre kattintás kezelése
+      print('Értesítésre kattintottak: ${response.payload}');
+      // Itt lehet navigálni a megfelelő oldalra a payload alapján
+    },
+  );
+
+  // Android-specifikus csatorna beállítása
+  if (!kIsWeb) {
+    // Android notification channel
+    const AndroidNotificationChannel channel = AndroidNotificationChannel(
+      androidNotificationChannelId,
+      androidNotificationChannelName,
+      description: androidNotificationChannelDescription,
+      importance: Importance.high,
+    );
+
+    // Értesítési csatorna regisztrálása
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(channel);
+  }
+}
+
+// Rendszer értesítés megjelenítése
+Future<void> showNotification(String title, String body, {String? payload}) async {
+  if (kIsWeb) return; // Web platformon nem támogatott
+  
+  // Értesítés részleteinek beállítása
+  final AndroidNotificationDetails androidPlatformChannelSpecifics = AndroidNotificationDetails(
+    androidNotificationChannelId,
+    androidNotificationChannelName,
+    channelDescription: androidNotificationChannelDescription,
+    importance: Importance.max,
+    priority: Priority.high,
+    ticker: 'ticker',
+    styleInformation: BigTextStyleInformation(body),
+    icon: '@mipmap/ic_launcher',
+    color: const Color(0xFFFFE6AC), // Footify sárga szín
+    playSound: true,
+    enableVibration: true,
+    visibility: NotificationVisibility.public,
+    category: AndroidNotificationCategory.message,
+    showWhen: true,
+    autoCancel: true,
+  );
+
+  // iOS beállítások
+  const DarwinNotificationDetails iOSPlatformChannelSpecifics = DarwinNotificationDetails(
+    presentAlert: true,
+    presentBadge: true,
+    presentSound: true,
+    sound: 'default',
+    badgeNumber: 1,
+  );
+  
+  // Platform-specifikus beállítások
+  final NotificationDetails platformChannelSpecifics = NotificationDetails(
+    android: androidPlatformChannelSpecifics,
+    iOS: iOSPlatformChannelSpecifics,
+  );
+  
+  // Generálunk egy egyedi azonosítót az időbélyeg alapján
+  final uniqueId = DateTime.now().millisecondsSinceEpoch.remainder(100000);
+  
+  try {
+    // Értesítés megjelenítése
+    await flutterLocalNotificationsPlugin.show(
+      uniqueId, // Egyedi ID minden értesítéshez
+      title,
+      body,
+      platformChannelSpecifics,
+      payload: payload,
+    );
+    print('Értesítés elküldve (ID: $uniqueId): $title');
+  } catch (e) {
+    print('Hiba az értesítés megjelenítése során: $e');
+  }
+}
+
 Future<void> initializeApp() async {
   // Initialize Flutter
   WidgetsFlutterBinding.ensureInitialized();
@@ -119,14 +239,156 @@ Future<void> initializeApp() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
+  // Értesítések inicializálása
+  await setupNotifications();
+
   fetchData = fetchDataFirebase;
   
   // We're not using native splash screen anymore
   // Just initialize and let the custom loading screen handle everything
 }
 
+// Globális navigatorKey, amit bárhol elérhetünk az alkalmazásban
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+// FCM token kezelése
+class FCMTokenManager {
+  static const String _tokenKey = 'fcm_token';
+
+  // Token mentése SharedPreferences-be
+  static Future<void> saveToken(String token) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_tokenKey, token);
+      print('FCM token sikeresen tárolva: $token');
+    } catch (e) {
+      print('Hiba a token mentése közben: $e');
+    }
+  }
+
+  // Token lekérése SharedPreferences-ből
+  static Future<String?> getSavedToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(_tokenKey);
+    } catch (e) {
+      print('Hiba a token lekérése közben: $e');
+      return null;
+    }
+  }
+
+  // Token megszerzése (cache-elt vagy új)
+  static Future<String?> getToken() async {
+    // Először megpróbáljuk a SharedPreferences-ből lekérni
+    String? savedToken = await getSavedToken();
+    
+    if (savedToken != null && savedToken.isNotEmpty) {
+      print('Meglévő FCM token használata: $savedToken');
+      return savedToken;
+    }
+    
+    // Ha nincs eltárolt token, új token lekérése
+    try {
+      String? newToken = await FirebaseMessaging.instance.getToken();
+      if (newToken != null) {
+        await saveToken(newToken);
+        print('Új FCM token generálva és tárolva: $newToken');
+      }
+      return newToken;
+    } catch (e) {
+      print('Hiba az FCM token generálása közben: $e');
+      return null;
+    }
+  }
+}
+
 void main() async {
   await initializeApp();
+
+  // Értesítési engedélyek kérése (iOS-en kötelező, Androidon opcionális)
+  FirebaseMessaging messaging = FirebaseMessaging.instance;
+
+  NotificationSettings settings = await messaging.requestPermission(
+    alert: true,
+    announcement: false,
+    badge: true,
+    carPlay: false,
+    criticalAlert: false,
+    provisional: false,
+    sound: true,
+  );
+
+  if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+    print('User granted permission');
+  } else if (settings.authorizationStatus == AuthorizationStatus.provisional) {
+    print('User granted provisional permission');
+  } else {
+    print('User declined or has not accepted permission');
+  }
+
+  // Foreground üzenetek kezelése
+  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    print('Got a message whilst in the foreground!');
+    print('Message data: ${message.data}');
+
+    if (message.notification != null) {
+      print('Message also contained a notification: ${message.notification}');
+      
+      // Rendszer értesítés megjelenítése - közvetlen hívás
+      if (!kIsWeb) { 
+        RemoteNotification notification = message.notification!;
+        AndroidNotification? android = message.notification?.android;
+
+        // Ha Android értesítés, akkor külön megjelenítjük
+        if (android != null) {
+          flutterLocalNotificationsPlugin.show(
+            notification.hashCode,
+            notification.title,
+            notification.body,
+            NotificationDetails(
+              android: AndroidNotificationDetails(
+                androidNotificationChannelId,
+                androidNotificationChannelName,
+                channelDescription: androidNotificationChannelDescription,
+                icon: '@mipmap/ic_launcher',
+                priority: Priority.high,
+                importance: Importance.max,
+                color: const Color(0xFFFFE6AC),
+              ),
+              iOS: const DarwinNotificationDetails(
+                presentAlert: true,
+                presentBadge: true,
+                presentSound: true,
+              ),
+            ),
+            payload: message.data.toString(),
+          );
+        }
+      }
+      
+      // Alkalmazáson belüli értesítés is megjelenik, ha előtérben van
+      _showNotificationOverlay(message.notification!);
+    }
+  });
+
+  // Background üzenetek kezelése
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+  // FCM Token kezelése - Cache vagy új token
+  FCMTokenManager.getToken().then((token) {
+    if (token != null) {
+      print('FCM Token használatra kész: $token');
+    } else {
+      print('Nem sikerült FCM tokent szerezni');
+    }
+  });
+
+  // Token frissülésének figyelése - automatikusan frissíti a tárolt tokent
+  messaging.onTokenRefresh.listen((String token) {
+    print('FCM Token refreshed: $token');
+    // Frissített token mentése
+    FCMTokenManager.saveToken(token);
+  });
 
   runApp(
     MultiProvider(
@@ -170,6 +432,8 @@ class _FootifyAppState extends State<FootifyApp> {
     return MaterialApp(
       title: 'Footify',
       debugShowCheckedModeBanner: false,
+      // Adjuk meg a navigatorKey-t a MaterialApp-nak
+      navigatorKey: navigatorKey,
       theme: _buildTheme(ThemeData.light(), fontSizeProvider.fontSize, Provider.of<ColorBlindModeProvider>(context).isColorBlindMode),
       darkTheme: _buildTheme(ThemeData.dark(), fontSizeProvider.fontSize, Provider.of<ColorBlindModeProvider>(context).isColorBlindMode),
       themeMode: themeProvider.themeMode,
@@ -182,9 +446,9 @@ class _FootifyAppState extends State<FootifyApp> {
 
   // Helper function to build a theme with dynamic font size and color blind mode
   ThemeData _buildTheme(ThemeData baseTheme, double fontSize, bool isColorBlindMode) {
-    final isDark = baseTheme.brightness == Brightness.dark;
+    var isDarkMode = baseTheme.brightness == Brightness.dark;
     
-    final colorBlindPalette = isDark ? {
+    final colorBlindPalette = isDarkMode ? {
       'background': const Color(0xFF1A1A2F),
       'surface': const Color(0xFF2A2A4A),
       'primary': const Color(0xFFF4D03F),
@@ -206,7 +470,7 @@ class _FootifyAppState extends State<FootifyApp> {
       'button': const Color(0xFF2E86C1),
     };
 
-    final regularPalette = isDark ? {
+    final regularPalette = isDarkMode ? {
       'background': const Color(0xFF1D1D1D),
       'surface': const Color(0xFF292929),
       'primary': const Color(0xFFFFE6AC),
@@ -235,7 +499,7 @@ class _FootifyAppState extends State<FootifyApp> {
       cardColor: colors['surface'],
       primaryColor: colors['primary'],
       colorScheme: ColorScheme(
-        brightness: isDark ? Brightness.dark : Brightness.light,
+        brightness: isDarkMode ? Brightness.dark : Brightness.light,
         primary: colors['primary']!,
         onPrimary: colors['text']!,
         secondary: colors['secondary']!,
@@ -270,6 +534,16 @@ class _FootifyAppState extends State<FootifyApp> {
       ),
       dividerTheme: DividerThemeData(
         color: colors['divider'],
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        labelStyle: TextStyle(
+          fontSize: fontSize,
+          color: isDarkMode ? Colors.white70 : Colors.black54,
+        ),
+        hintStyle: TextStyle(
+          fontSize: fontSize,
+          color: isDarkMode ? Colors.white30 : Colors.black38,
+        ),
       ),
     );
   }
@@ -1013,13 +1287,21 @@ class CustomSearchDelegate extends SearchDelegate {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return ThemeData(
       fontFamily: 'Lexend',
-      appBarTheme: AppBarTheme(backgroundColor: isDarkMode ? const Color(0xFF1D1D1D) : Colors.white),
+      appBarTheme: AppBarTheme(
+        backgroundColor: isDarkMode ? const Color(0xFF1D1D1D) : Colors.white,
+        iconTheme: IconThemeData(color: isDarkMode ? Colors.white : Colors.black),
+        titleTextStyle: TextStyle(
+          color: isDarkMode ? Colors.white : Colors.black,
+          fontFamily: 'Lexend',
+          fontSize: 18,
+        ),
+      ),
       inputDecorationTheme: InputDecorationTheme(
         hintStyle: TextStyle(color: isDarkMode ? const Color.fromARGB(170, 240, 240, 240) : Colors.black54),
         focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFffe6ac), width: 3.0)),
         enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFffe6ac), width: 1.7)),
+        labelStyle: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
       ),
-      textTheme: TextTheme(titleLarge: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
     );
   }
 
@@ -1167,4 +1449,106 @@ class _LoadingScreenState extends State<LoadingScreen> with SingleTickerProvider
       ),
     );
   }
+}
+
+// Külön függvény a háttérben érkező üzenetek kezelésére
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // A Firebase inicializálása
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  print("Handling a background message: ${message.messageId}");
+  
+  // Háttérben is megjelenítsük az értesítést
+  if (message.notification != null) {
+    await showNotification(
+      message.notification!.title ?? 'Footify értesítés',
+      message.notification!.body ?? '',
+      payload: message.data.toString(),
+    );
+  }
+}
+
+// Értesítés megjelenítése
+void _showNotificationOverlay(RemoteNotification notification) {
+  if (notification.title == null || notification.body == null) return;
+  
+  // Rendszer értesítés megjelenítése
+  showNotification(notification.title!, notification.body!);
+  
+  // Alkalmazáson belüli értesítés is megjelenik, ha előtérben van
+  final context = navigatorKey.currentContext;
+  if (context == null) {
+    print('Nincs elérhető context az értesítés megjelenítéséhez');
+    return;
+  }
+  
+  // Egyedi felső értesítés megjelenítése OverlayEntry segítségével
+  OverlayState? overlay = Navigator.of(context).overlay;
+  if (overlay == null) return;
+  
+  OverlayEntry? entry;
+  entry = OverlayEntry(
+    builder: (context) => Positioned(
+      top: MediaQuery.of(context).viewPadding.top + 10, // Status bar alatt 10 px
+      left: 10,
+      right: 10,
+      child: Material(
+        elevation: 6,
+        borderRadius: BorderRadius.circular(8),
+        color: Theme.of(context).cardColor,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              Icon(
+                Icons.sports_soccer,
+                color: Theme.of(context).colorScheme.primary,
+                size: 24,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      notification.title!,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        fontFamily: 'Lexend',
+                        color: Theme.of(context).textTheme.bodyLarge?.color,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      notification.body!,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontFamily: 'Lexend',
+                        color: Theme.of(context).textTheme.bodyMedium?.color,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () {
+                  entry?.remove();
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+
+  overlay.insert(entry);
+  
+  // 5 másodperc után automatikusan eltűnik
+  Future.delayed(const Duration(seconds: 5), () {
+    entry?.remove();
+  });
 }
