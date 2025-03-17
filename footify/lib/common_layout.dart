@@ -90,6 +90,112 @@ class CommonLayout extends StatelessWidget {
     }
 
     return Scaffold(
+      backgroundColor: const Color(0xFF1F1E1F),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF1F1E1F),
+        elevation: 0,
+        toolbarHeight: 80,
+        automaticallyImplyLeading: false,
+        titleSpacing: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: Colors.transparent,
+        foregroundColor: Colors.transparent,
+        forceMaterialTransparency: false,
+        leading: showBackButton 
+          ? IconButton(
+              icon: Icon(
+                Icons.arrow_back,
+                color: isDarkMode ? Colors.white : Colors.black,
+                size: 30,
+              ),
+              padding: const EdgeInsets.only(top: 20),
+              onPressed: () {
+                Navigator.pop(context);
+              },
+            )
+          : null,
+        title: Padding(
+          padding: const EdgeInsets.only(top: 20),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisSize: MainAxisSize.max,
+            children: [
+              Padding(
+                padding: EdgeInsets.only(left: showBackButton ? 0 : 16),
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (context) => const MainScreen()),
+                    );
+                  },
+                  child: _buildResponsiveLogo(context, isDarkMode),
+                ),
+              ),
+              Spacer(),
+              IconButton(
+                icon: Icon(Icons.search, color: isDarkMode ? Colors.white : Colors.black),
+                iconSize: 24,
+                constraints: BoxConstraints(maxWidth: 34, maxHeight: 34),
+                padding: EdgeInsets.zero,
+                onPressed: () {
+                  showSearch(
+                    context: context,
+                    delegate: CustomSearchDelegate(),
+                  );
+                },
+              ),
+              if (isLoggedIn)
+                IconButton(
+                  icon: Icon(
+                    Icons.notifications,
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
+                  iconSize: 24,
+                  constraints: BoxConstraints(maxWidth: 34, maxHeight: 34),
+                  padding: EdgeInsets.zero,
+                  onPressed: () {
+                    // Handle notifications
+                  },
+                )
+              else
+                SizedBox(
+                  width: 80,
+                  child: TextButton(
+                    onPressed: () {
+                      // Navigate to profile/login page
+                      Navigator.pushReplacement(
+                        context,
+                        PageRouteBuilder(
+                          pageBuilder: (context, animation, secondaryAnimation) => const ProfilePage(),
+                          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                            return FadeTransition(
+                              opacity: animation,
+                              child: child,
+                            );
+                          },
+                        ),
+                      );
+                    },
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                    child: Text(
+                      'Login/Register',
+                      style: TextStyle(
+                        color: isDarkMode ? Colors.white : Colors.black,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
       body: Container(
         decoration: BoxDecoration(
           gradient: isDarkMode
@@ -112,106 +218,6 @@ class CommonLayout extends StatelessWidget {
         ),
         child: Column(
           children: [
-            AppBar(
-              backgroundColor: isDarkMode ? Colors.transparent : Colors.white,
-              elevation: 0,
-              toolbarHeight: 80,
-              automaticallyImplyLeading: false,
-              titleSpacing: 0,
-              leading: showBackButton 
-                ? IconButton(
-                    icon: Icon(
-                      Icons.arrow_back,
-                      color: isDarkMode ? Colors.white : Colors.black,
-                      size: 30,
-                    ),
-                    padding: const EdgeInsets.only(top: 20),
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
-                  )
-                : null,
-              title: Padding(
-                padding: const EdgeInsets.only(top: 20),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  mainAxisSize: MainAxisSize.max,
-                  children: [
-                    Padding(
-                      padding: EdgeInsets.only(left: showBackButton ? 0 : 16),
-                      child: GestureDetector(
-                        onTap: () {
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(builder: (context) => const MainScreen()),
-                          );
-                        },
-                        child: _buildResponsiveLogo(context, isDarkMode),
-                      ),
-                    ),
-                    Spacer(),
-                    IconButton(
-                      icon: Icon(Icons.search, color: isDarkMode ? Colors.white : Colors.black),
-                      iconSize: 24,
-                      constraints: BoxConstraints(maxWidth: 34, maxHeight: 34),
-                      padding: EdgeInsets.zero,
-                      onPressed: () {
-                        showSearch(
-                          context: context,
-                          delegate: CustomSearchDelegate(),
-                        );
-                      },
-                    ),
-                    if (isLoggedIn)
-                      IconButton(
-                        icon: Icon(
-                          Icons.notifications,
-                          color: isDarkMode ? Colors.white : Colors.black,
-                        ),
-                        iconSize: 24,
-                        constraints: BoxConstraints(maxWidth: 34, maxHeight: 34),
-                        padding: EdgeInsets.zero,
-                        onPressed: () {
-                          // Handle notifications
-                        },
-                      )
-                    else
-                      SizedBox(
-                        width: 80,
-                        child: TextButton(
-                          onPressed: () {
-                            // Navigate to profile/login page
-                            Navigator.pushReplacement(
-                              context,
-                              PageRouteBuilder(
-                                pageBuilder: (context, animation, secondaryAnimation) => const ProfilePage(),
-                                transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                                  return FadeTransition(
-                                    opacity: animation,
-                                    child: child,
-                                  );
-                                },
-                              ),
-                            );
-                          },
-                          style: TextButton.styleFrom(
-                            padding: EdgeInsets.symmetric(horizontal: 8),
-                          ),
-                          child: Text(
-                            'Login/Register',
-                            style: TextStyle(
-                              color: isDarkMode ? Colors.white : Colors.black,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
             const SizedBox(height: 12),
             const Divider(
               color: Color(0xFFFFE6AC),

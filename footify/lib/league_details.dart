@@ -112,10 +112,11 @@ class LeagueDetailsPage extends StatefulWidget {
   State<LeagueDetailsPage> createState() => _LeagueDetailsPageState();
 }
 
-class _LeagueDetailsPageState extends State<LeagueDetailsPage> {
+class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTickerProviderStateMixin {
   late Future<List<TeamStanding>> futureStandings;
   late Future<List<Match>> futureLastMatches;
   late Future<List<Scorer>> futureScorers;
+  late TabController _tabController;
   bool isWideScreen = false;
 
   // Liga ID-k megfeleltetése az API kódokkal
@@ -143,10 +144,17 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this);
     futureStandings = fetchStandings(widget.leagueId);
     futureLastMatches = fetchLastRoundMatches(widget.leagueId);
     futureScorers = Future.value([]); // Alapértelmezett üres lista
     _loadScorers();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadScorers() async {
@@ -388,207 +396,136 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> {
         title: Text(widget.leagueName),
         backgroundColor: isDarkMode ? Colors.black : Colors.white,
         foregroundColor: isDarkMode ? Colors.white : Colors.black,
+        bottom: !isWideScreen ? TabBar(
+          controller: _tabController,
+          labelColor: isDarkMode ? Colors.white : Colors.black,
+          unselectedLabelColor: isDarkMode ? Colors.grey : Colors.grey[600],
+          indicatorColor: const Color(0xFFFFE6AC),
+          labelStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          unselectedLabelStyle: const TextStyle(fontSize: 15),
+          indicatorWeight: 3,
+          isScrollable: true,
+          labelPadding: const EdgeInsets.symmetric(horizontal: 16),
+          tabs: const [
+            Tab(
+              child: Text(
+                'Tabella',
+                maxLines: 1,
+                overflow: TextOverflow.visible,
+              ),
+            ),
+            Tab(
+              child: Text(
+                'Előző forduló',
+                maxLines: 1,
+                overflow: TextOverflow.visible,
+              ),
+            ),
+            Tab(
+              child: Text(
+                'Statisztikák',
+                maxLines: 1,
+                overflow: TextOverflow.visible,
+              ),
+            ),
+          ],
+        ) : null,
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                FutureBuilder<List<TeamStanding>>(
-                  future: futureStandings,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    } else if (snapshot.hasError) {
-                      return Center(child: Text('Hiba: ${snapshot.error}'));
-                    } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                      return const Center(child: Text('Nincs elérhető adat'));
-                    }
-
-                    return isWideScreen
-                        ? _buildWideLayout(snapshot.data!, isDarkMode)
-                        : _buildNarrowLayout(snapshot.data!, isDarkMode);
-                  },
-                ),
-                _buildLegend(isDarkMode),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildWideLayout(List<TeamStanding> standings, bool isDarkMode) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          flex: 2,
-          child: _buildLastMatches(isDarkMode),
-        ),
-        Expanded(
-          flex: 3,
-          child: _buildStandingsTable(standings, isDarkMode),
-        ),
-        Expanded(
-          flex: 2,
-          child: _buildScorers(isDarkMode),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildNarrowLayout(List<TeamStanding> standings, bool isDarkMode) {
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          _buildStandingsTable(standings, isDarkMode),
-          const SizedBox(height: 16),
-          _buildLastMatches(isDarkMode),
-          const SizedBox(height: 16),
-          _buildScorers(isDarkMode),
-          const SizedBox(height: 16), // Extra padding az alján
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLastMatches(bool isDarkMode) {
-    return FutureBuilder<List<Match>>(
-      future: futureLastMatches,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        } else if (snapshot.hasError) {
-          return Center(child: Text('Hiba: ${snapshot.error}'));
-        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(child: Text('Nincs elérhető mérkőzés'));
-        }
-
-        return Container(
-          margin: const EdgeInsets.all(8),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isDarkMode ? Colors.grey[900] : Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Utolsó forduló',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-              ),
-              const SizedBox(height: 16),
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: snapshot.data!.length,
-                itemBuilder: (context, index) {
-                  final match = snapshot.data![index];
-                  return _buildMatchCard(match, isDarkMode);
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildMatchCard(Match match, bool isDarkMode) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey[800] : Colors.grey[100],
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Row(
-              children: [
-                _buildTeamLogo(match.homeTeamLogo, isDarkMode),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    match.homeTeam,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: isDarkMode ? Colors.white : Colors.black,
-                    ),
+        child: isWideScreen
+            ? SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: _buildLastMatches(isDarkMode),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        flex: 3,
+                        child: FutureBuilder<List<TeamStanding>>(
+                          future: futureStandings,
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState == ConnectionState.waiting) {
+                              return const Center(child: CircularProgressIndicator());
+                            } else if (snapshot.hasError) {
+                              return Center(child: Text('Hiba: ${snapshot.error}'));
+                            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                              return const Center(child: Text('Nincs elérhető adat'));
+                            }
+                            return Column(
+                              children: [
+                                _buildStandingsTable(snapshot.data!, isDarkMode),
+                                _buildLegend(isDarkMode),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        flex: 2,
+                        child: _buildScorers(isDarkMode),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Text(
-              '${match.homeScore} - ${match.awayScore}',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: Text(
-                    match.awayTeam,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.end,
-                    style: TextStyle(
-                      color: isDarkMode ? Colors.white : Colors.black,
+              )
+            : TabBarView(
+                controller: _tabController,
+                children: [
+                  // Tabella tab
+                  SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        children: [
+                          FutureBuilder<List<TeamStanding>>(
+                            future: futureStandings,
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState == ConnectionState.waiting) {
+                                return const Center(child: CircularProgressIndicator());
+                              } else if (snapshot.hasError) {
+                                return Center(child: Text('Hiba: ${snapshot.error}'));
+                              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                                return const Center(child: Text('Nincs elérhető adat'));
+                              }
+                              return Column(
+                                children: [
+                                  _buildStandingsTable(snapshot.data!, isDarkMode),
+                                  _buildLegend(isDarkMode),
+                                ],
+                              );
+                            },
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                _buildTeamLogo(match.awayTeamLogo, isDarkMode),
-              ],
-            ),
-          ),
-        ],
+                  // Előző forduló tab
+                  SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: _buildLastMatches(isDarkMode),
+                    ),
+                  ),
+                  // Statisztikák tab
+                  SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        children: [
+                          _buildScorers(isDarkMode),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
       ),
-    );
-  }
-
-  Widget _buildTeamLogo(String? logoUrl, bool isDarkMode) {
-    // Egyedi azonosítót készítünk a logóból
-    String? logoId = logoUrl?.split('/').last.split('.').first;
-    
-    return SizedBox(
-      width: 34, // Slightly increased from 30
-      height: 34, // Slightly increased from 30
-      child: logoUrl != null
-          ? Image.network(
-              getProxiedImageUrl(logoUrl),
-              fit: BoxFit.contain,
-              headers: kIsWeb ? {'Origin': 'null'} : null,
-              errorBuilder: (context, error, stackTrace) {
-                print("Csapatlogó betöltési hiba: $error");
-                return const Icon(Icons.sports_soccer, size: 18);
-              },
-            )
-          : const Icon(Icons.sports_soccer, size: 18),
     );
   }
 
@@ -910,6 +847,142 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> {
     );
   }
 
+  Widget _buildLastMatches(bool isDarkMode) {
+    return FutureBuilder<List<Match>>(
+      future: futureLastMatches,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (snapshot.hasError) {
+          return Center(child: Text('Hiba: ${snapshot.error}'));
+        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Center(child: Text('Nincs elérhető mérkőzés'));
+        }
+
+        return Container(
+          margin: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDarkMode ? Colors.grey[900] : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Előző forduló',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: snapshot.data!.length,
+                itemBuilder: (context, index) {
+                  final match = snapshot.data![index];
+                  return _buildMatchCard(match, isDarkMode);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMatchCard(Match match, bool isDarkMode) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDarkMode ? Colors.grey[850] : Colors.grey[200],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                _buildTeamLogo(match.homeTeamLogo, isDarkMode),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    match.homeTeam,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(
+              '${match.homeScore} - ${match.awayScore}',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: Text(
+                    match.awayTeam,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.end,
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _buildTeamLogo(match.awayTeamLogo, isDarkMode),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTeamLogo(String? logoUrl, bool isDarkMode) {
+    // Egyedi azonosítót készítünk a logóból
+    String? logoId = logoUrl?.split('/').last.split('.').first;
+    
+    return SizedBox(
+      width: 34, // Slightly increased from 30
+      height: 34, // Slightly increased from 30
+      child: logoUrl != null
+          ? Image.network(
+              getProxiedImageUrl(logoUrl),
+              fit: BoxFit.contain,
+              headers: kIsWeb ? {'Origin': 'null'} : null,
+              errorBuilder: (context, error, stackTrace) {
+                print("Csapatlogó betöltési hiba: $error");
+                return const Icon(Icons.sports_soccer, size: 18);
+              },
+            )
+          : const Icon(Icons.sports_soccer, size: 18),
+    );
+  }
+
   Widget _buildScorers(bool isDarkMode) {
     return FutureBuilder<List<Scorer>>(
       future: futureScorers,
@@ -971,7 +1044,7 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey[800] : Colors.grey[100],
+        color: isDarkMode ? Colors.grey[850] : Colors.grey[200],
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -1065,39 +1138,41 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> {
           ),
         ],
       ),
-      child: Wrap(
-        spacing: 24,
-        runSpacing: 12,
-        alignment: WrapAlignment.center,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: relevantColors.map((colorInfo) {
-          return Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 16,
-                height: 16,
-                decoration: BoxDecoration(
-                  color: colorInfo['color'],
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: colorInfo['color'].withOpacity(0.3),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 16,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: colorInfo['color'],
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: colorInfo['color'].withOpacity(0.3),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                colorInfo['name'],
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: isDarkMode ? Colors.white : Colors.black87,
+                const SizedBox(width: 8),
+                Text(
+                  colorInfo['name'],
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: isDarkMode ? Colors.white : Colors.black87,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           );
         }).toList(),
       ),
