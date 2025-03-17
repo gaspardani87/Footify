@@ -177,7 +177,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
                       ElevatedButton.icon(
-                        icon: const Icon(Icons.wb_sunny),
+                        icon: Icon(Icons.wb_sunny, color: !isDarkMode ? Colors.black : Colors.black),
                         label: const Text('Light'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: !isDarkMode ? const Color(0xFFFFE6AC) : Colors.grey[300],
@@ -186,10 +186,10 @@ class _SettingsPageState extends State<SettingsPage> {
                         onPressed: () => _toggleTheme(false),
                       ),
                       ElevatedButton.icon(
-                        icon: const Icon(Icons.nights_stay),
+                        icon: Icon(Icons.nights_stay, color: isDarkMode ? Colors.black : null),
                         label: const Text('Dark'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: isDarkMode ? const Color(0xFFFFE6AC) : Colors.grey[700],
+                          backgroundColor: isDarkMode ? const Color(0xFFFFE6AC) : Colors.grey[900],
                           foregroundColor: isDarkMode ? Colors.black : Colors.white,
                         ),
                         onPressed: () => _toggleTheme(true),

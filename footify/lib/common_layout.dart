@@ -90,9 +90,9 @@ class CommonLayout extends StatelessWidget {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF1F1E1F),
+      backgroundColor: isDarkMode ? const Color(0xFF1F1E1F) : Colors.white,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1F1E1F),
+        backgroundColor: isDarkMode ? const Color(0xFF1F1E1F) : Colors.white,
         elevation: 0,
         toolbarHeight: 80,
         automaticallyImplyLeading: false,
@@ -100,7 +100,7 @@ class CommonLayout extends StatelessWidget {
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         shadowColor: Colors.transparent,
-        foregroundColor: Colors.transparent,
+        foregroundColor: isDarkMode ? Colors.white : Colors.black,
         forceMaterialTransparency: false,
         leading: showBackButton 
           ? IconButton(
