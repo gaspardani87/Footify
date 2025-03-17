@@ -293,8 +293,9 @@ exports.fetchLeagues = functions.https.onRequest(async (req, res) => {
       },
     });
 
-    // Process the response to include replacement logos where needed
+    // Process the response to include proper league data
     const leagues = response.data.competitions.map(league => {
+      // Use specific replacement logos for certain leagues
       const replacementLogos = {
         2013: 'https://upload.wikimedia.org/wikipedia/en/0/04/Campeonato_Brasileiro_S%C3%A9rie_A.png',
         2018: 'https://static.wikia.nocookie.net/future/images/8/84/Euro_2028_Logo_Concept_v2.png/revision/latest?cb=20231020120018',
@@ -308,13 +309,19 @@ exports.fetchLeagues = functions.https.onRequest(async (req, res) => {
       };
 
       return {
-        id: league.id,
+        id: league.id.toString(),
         name: league.name,
-        logo: replacementLogos[league.id] || league.emblem || league.crest || league.logo || (league.area && league.area.flag)
+        code: league.code || '',
+        emblem: replacementLogos[league.id] || league.emblem || league.crest || ''
       };
     });
 
-    res.status(200).json(leagues);
+    // Filter out leagues without emblems and sort alphabetically
+    const filteredLeagues = leagues
+      .filter(league => league.emblem || league.name.includes('Premier') || league.name.includes('La Liga') || league.name.includes('Serie A'))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    res.status(200).json(filteredLeagues);
   } catch (error) {
     console.error('Error fetching leagues:', error.message);
     res.status(500).json({
@@ -729,6 +736,68 @@ exports.fetchTopScorers = functions.https.onRequest(async (req, res) => {
     console.error(`Error fetching top scorers for league ${leagueCode}:`, error.message);
     res.status(500).json({
       error: 'Failed to fetch top scorers',
+      details: error.message || 'Unknown error',
+      status: error.response ? error.response.status : null,
+    });
+  }
+});
+
+// Function to fetch all teams
+exports.fetchTeams = functions.https.onRequest(async (req, res) => {
+  setCorsHeaders(res);
+  
+  if (handleOptions(req, res)) return;
+
+  try {
+    // We'll use the competitions endpoint and extract teams from there
+    const competitions = await axios.get(`${BASE_URL}/competitions`, {
+      headers: {
+        'X-Auth-Token': API_KEY,
+      },
+    });
+    
+    // Get a few top competitions
+    const topCompetitionIds = [2021, 2014, 2019, 2002, 2015]; // Premier League, La Liga, Serie A, Bundesliga, Ligue 1
+    
+    // Fetch teams from each competition
+    const teamsPromises = topCompetitionIds.map(async (competitionId) => {
+      try {
+        const response = await axios.get(`${BASE_URL}/competitions/${competitionId}/teams`, {
+          headers: {
+            'X-Auth-Token': API_KEY,
+          },
+        });
+        return response.data.teams || [];
+      } catch (error) {
+        console.error(`Error fetching teams for competition ${competitionId}: ${error.message}`);
+        return [];
+      }
+    });
+    
+    // Wait for all teams to be fetched
+    const teamSets = await Promise.all(teamsPromises);
+    
+    // Combine all teams into a single array and remove duplicates
+    let allTeams = [];
+    const teamIds = new Set();
+    
+    teamSets.forEach(teamSet => {
+      teamSet.forEach(team => {
+        if (!teamIds.has(team.id)) {
+          teamIds.add(team.id);
+          allTeams.push(team);
+        }
+      });
+    });
+    
+    // Sort teams alphabetically by name
+    allTeams.sort((a, b) => a.name.localeCompare(b.name));
+    
+    res.status(200).json({ teams: allTeams });
+  } catch (error) {
+    console.error('Error fetching teams:', error.message);
+    res.status(500).json({
+      error: 'Failed to fetch teams',
       details: error.message || 'Unknown error',
       status: error.response ? error.response.status : null,
     });

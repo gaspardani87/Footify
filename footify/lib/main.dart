@@ -31,6 +31,8 @@ import 'animated_splash_screen.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:math';
+import 'services/football_api_service.dart' as football_api;
 
 // A simple in-memory image cache
 class ImageCache {
@@ -238,6 +240,9 @@ Future<void> initializeApp() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Initialize FootballApiService with your Firebase project ID
+  football_api.FootballApiService.initialize('footify-13da4');
 
   // Értesítések inicializálása
   await setupNotifications();
@@ -579,6 +584,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
   late Animation<double> _blinkAnimation;
   bool _hasError = false;
   String _errorMessage = '';
+  int _totalMatchesLoaded = 0;
 
   @override
   void initState() {
@@ -843,10 +849,16 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
             Map<String, List<dynamic>> matchesByCompetition = processedData['_processedMatches'];
             List<String> sortedCompetitions = processedData['_sortedCompetitions'];
             
+            // Check if there are no matches at all in the data
+            if (data['matches'] == null || (data['matches'] as List).isEmpty) {
+              // Return empty state UI immediately
+              return _buildMatchesListUI({}, [], isDarkMode, colorScheme);
+            }
+            
             return _buildMatchesListUI(matchesByCompetition, sortedCompetitions, isDarkMode, colorScheme);
           } else {
-            return Center(child: Text('No match data available', 
-              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)));
+            // When no data is available, pass empty collections
+            return _buildMatchesListUI({}, [], isDarkMode, colorScheme);
           }
         },
       );
@@ -888,6 +900,128 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
   
   // Build the actual list UI with processed data
   Widget _buildMatchesListUI(Map<String, List<dynamic>> matchesByCompetition, List<String> sortedCompetitions, bool isDarkMode, ColorScheme colorScheme) {
+    // Check if there are any matches (competitions)
+    if (sortedCompetitions.isEmpty) {
+      // Get random message key
+      final random = Random();
+      final int randomIndex = random.nextInt(30) + 1; // 1-30
+      final String titleKey = 'emptyFixtureTitle$randomIndex';
+      
+      // Get random message subtitle for empty competition
+      final subtitleKey = 'emptyFixtureSubtitle$randomIndex';
+      
+      // Get the default message
+      final Map<String, String> defaultMessages = {
+        'emptyFixtureTitle': "Empty fixture list? Let's call it strategic silence. 🧠⚽",
+        'emptyFixtureTitle1': "Stadium seats are empty… 🏟️",
+        'emptyFixtureTitle2': "The whistle hasn't blown… yet! 🎶",
+        'emptyFixtureTitle3': "Even superstars need a timeout. 🌟",
+        'emptyFixtureTitle4': "The playbook is wide open… 📖",
+        'emptyFixtureTitle5': "No live goals? Practice your victory chant! 🎤",
+        'emptyFixtureTitle6': "The trophy is polishing itself… 🏆✨",
+        'emptyFixtureTitle7': "The transfer window is closed… 🚪🔒",
+        'emptyFixtureTitle8': "The grass is growing… quietly. 🌱",
+        'emptyFixtureTitle9': "Offside? Nope—just a breather! 🚩",
+        'emptyFixtureTitle10': "The corner flags are chilling… 🍹",
+        'emptyFixtureTitle11': "The scorekeeper's pencil is sharpened! ✏️",
+        'emptyFixtureTitle12': "The VAR room is quiet… for now. 📺",
+        'emptyFixtureTitle13': "The halftime oranges are being sliced… 🍊",
+        'emptyFixtureTitle14': "The fans are stretching their vocal cords… 📢",
+        'emptyFixtureTitle15': "The red card is hiding… 😈",
+        'emptyFixtureTitle16': "The golden boot is taking a shine… 👟",
+        'emptyFixtureTitle17': "The manager's whiteboard is blank… 🤔",
+        'emptyFixtureTitle18': "The penalty spot is practicing its drama… 🎭",
+        'emptyFixtureTitle19': "The crossbar is enjoying the peace… ⚽❌",
+        'emptyFixtureTitle20': "Your app is in preseason mode… 🏋️♂️",
+        'emptyFixtureTitle21': "The pitch is quiet… for now! ⚽",
+        'emptyFixtureTitle22': "No matches live? Time to warm up! 🏃♂️",
+        'emptyFixtureTitle23': "All calm on the football front. 🌤️",
+        'emptyFixtureTitle24': "Halftime for updates! ☕",
+        'emptyFixtureTitle25': "No games? No problem! 🧘",
+        'emptyFixtureTitle26': "The scoreboard is taking a nap… 😴",
+        'emptyFixtureTitle27': "Shhh… the footballs are resting. 🌙",
+        'emptyFixtureTitle28': "No matches yet?",
+        'emptyFixtureTitle29': "The stadium lights are dimmed… 🌟",
+        'emptyFixtureTitle30': "Football's taking a breather... 🧠",
+      };
+      
+      final String title = defaultMessages[titleKey] ?? "Empty fixture list? Let's call it strategic silence. 🧠⚽";
+      
+      // Get the default subtitle
+      final Map<String, String> defaultSubtitles = {
+        'emptyFixtureSubtitle1': "But don't worry—the fans (and goals) are on their way!",
+        'emptyFixtureSubtitle2': "Use this time to perfect your goal celebration pose.",
+        'emptyFixtureSubtitle3': "Grab a Gatorade—we'll shout when the magic returns!",
+        'emptyFixtureSubtitle4': "Study up! Your next prediction could be legendary.",
+        'emptyFixtureSubtitle5': "(We recommend 'Olé, Olé, Olé!' for maximum vibes.)",
+        'emptyFixtureSubtitle6': "It'll shine even brighter for the next champion!",
+        'emptyFixtureSubtitle7': "But drama always finds its way back. Stay tuned!",
+        'emptyFixtureSubtitle8': "Perfect conditions for future hat-trick heroes!",
+        'emptyFixtureSubtitle9': "Refuel and return for the next heart-stopping match.",
+        'emptyFixtureSubtitle10': "They'll be dancing in the wind again soon!",
+        'emptyFixtureSubtitle11': "Ready to document the next epic comeback.",
+        'emptyFixtureSubtitle12': "Controversy-free zone (temporarily). Enjoy the peace!",
+        'emptyFixtureSubtitle13': "Fresh energy incoming! ⚡",
+        'emptyFixtureSubtitle14': "\"GOOOOOOAL!\" practice sessions in progress.",
+        'emptyFixtureSubtitle15': "Let's hope it stays in the ref's pocket next game!",
+        'emptyFixtureSubtitle16': "Your favorite striker might claim it soon!",
+        'emptyFixtureSubtitle17': "Genius tactics are brewing… we can feel it.",
+        'emptyFixtureSubtitle18': "Cue suspenseful music…",
+        'emptyFixtureSubtitle19': "(For now, no heartbreaking near-misses.)",
+        'emptyFixtureSubtitle20': "Training hard to deliver top-tier updates!",
+        'emptyFixtureSubtitle21': "Check back soon—goals are just around the corner!",
+        'emptyFixtureSubtitle22': "Grab a snack and stay tuned—action is coming.",
+        'emptyFixtureSubtitle23': "Perfect time to predict your next win!",
+        'emptyFixtureSubtitle24': "Relax, recharge, and return for the next kickoff.",
+        'emptyFixtureSubtitle25': "Use this break to plan your victory dance.",
+        'emptyFixtureSubtitle26': "Wake it up later with live matches!",
+        'emptyFixtureSubtitle27': "They'll be back soon, louder than ever!",
+        'emptyFixtureSubtitle28': "Pro Tip: Pretend you're the referee—everyone will listen. 😉",
+        'emptyFixtureSubtitle29': "But don't worry—the next showdown is being prepped!",
+        'emptyFixtureSubtitle30': "Like all great stories, there's a pause before the action!",
+      };
+      
+      final String subtitle = defaultSubtitles[subtitleKey] ?? "Greatness awaits—we'll notify you when it's game time!";
+      
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.sports_soccer,
+                size: 64,
+                color: colorScheme.primary,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                style: TextStyle(
+                  color: colorScheme.onBackground,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Lexend',
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  color: colorScheme.onBackground.withOpacity(0.7),
+                  fontSize: 16,
+                  fontFamily: 'Lexend',
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    // Continue with existing code for the case when matches exist
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: sortedCompetitions.length,
@@ -966,6 +1100,75 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
 
   // Build the list of matches for a competition
   Widget _buildMatchesListView(List<dynamic> matches, bool isDarkMode, ColorScheme colorScheme) {
+    // Check if the competition has any matches
+    if (matches.isEmpty) {
+      // Get random message subtitle for empty competition
+      final random = Random();
+      final int randomIndex = random.nextInt(30) + 1; // 1-30
+      final String subtitleKey = 'emptyFixtureSubtitle$randomIndex';
+      
+      // Get the default message
+      final Map<String, String> defaultSubtitles = {
+        'emptyFixtureSubtitle1': "But don't worry—the fans (and goals) are on their way!",
+        'emptyFixtureSubtitle2': "Use this time to perfect your goal celebration pose.",
+        'emptyFixtureSubtitle3': "Grab a Gatorade—we'll shout when the magic returns!",
+        'emptyFixtureSubtitle4': "Study up! Your next prediction could be legendary.",
+        'emptyFixtureSubtitle5': "(We recommend 'Olé, Olé, Olé!' for maximum vibes.)",
+        'emptyFixtureSubtitle6': "It'll shine even brighter for the next champion!",
+        'emptyFixtureSubtitle7': "But drama always finds its way back. Stay tuned!",
+        'emptyFixtureSubtitle8': "Perfect conditions for future hat-trick heroes!",
+        'emptyFixtureSubtitle9': "Refuel and return for the next heart-stopping match.",
+        'emptyFixtureSubtitle10': "They'll be dancing in the wind again soon!",
+        'emptyFixtureSubtitle11': "Ready to document the next epic comeback.",
+        'emptyFixtureSubtitle12': "Controversy-free zone (temporarily). Enjoy the peace!",
+        'emptyFixtureSubtitle13': "Fresh energy incoming! ⚡",
+        'emptyFixtureSubtitle14': "\"GOOOOOOAL!\" practice sessions in progress.",
+        'emptyFixtureSubtitle15': "Let's hope it stays in the ref's pocket next game!",
+        'emptyFixtureSubtitle16': "Your favorite striker might claim it soon!",
+        'emptyFixtureSubtitle17': "Genius tactics are brewing… we can feel it.",
+        'emptyFixtureSubtitle18': "Cue suspenseful music…",
+        'emptyFixtureSubtitle19': "(For now, no heartbreaking near-misses.)",
+        'emptyFixtureSubtitle20': "Training hard to deliver top-tier updates!",
+        'emptyFixtureSubtitle21': "Check back soon—goals are just around the corner!",
+        'emptyFixtureSubtitle22': "Grab a snack and stay tuned—action is coming.",
+        'emptyFixtureSubtitle23': "Perfect time to predict your next win!",
+        'emptyFixtureSubtitle24': "Relax, recharge, and return for the next kickoff.",
+        'emptyFixtureSubtitle25': "Use this break to plan your victory dance.",
+        'emptyFixtureSubtitle26': "Wake it up later with live matches!",
+        'emptyFixtureSubtitle27': "They'll be back soon, louder than ever!",
+        'emptyFixtureSubtitle28': "Pro Tip: Pretend you're the referee—everyone will listen. 😉",
+        'emptyFixtureSubtitle29': "But don't worry—the next showdown is being prepped!",
+        'emptyFixtureSubtitle30': "Like all great stories, there's a pause before the action!",
+      };
+      
+      final String subtitle = defaultSubtitles[subtitleKey] ?? "Greatness awaits—we'll notify you when it's game time!";
+      
+      return Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.sports_soccer,
+              size: 32,
+              color: colorScheme.primary.withOpacity(0.7),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              subtitle,
+              style: TextStyle(
+                color: colorScheme.onSurface.withOpacity(0.7),
+                fontSize: 14,
+                fontFamily: 'Lexend',
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+    
+    // The rest of the existing code - make sure this block ALWAYS returns a Widget
     return ListView.separated(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -1081,12 +1284,6 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
         );
       },
     );
-  }
-
-  String getScoreText(dynamic match) {
-    final homeScore = match['score']['fullTime']['home'];
-    final awayScore = match['score']['fullTime']['away'];
-    return (homeScore != null && awayScore != null) ? '$homeScore - $awayScore' : 'vs';
   }
 
   // Add the simplified loading indicator method

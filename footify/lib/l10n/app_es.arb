@@ -34,5 +34,97 @@
     "detailedStats": "Estadísticas detalladas",
     "possession": "Posesión",
     "shotsOnTarget": "Tiros a puerta",
-    "matchDetails": "Detalles del partido"
+    "matchDetails": "Detalles del partido",
+    "emptyFixtureTitle": "¿Lista de partidos vacía? Llamémoslo silencio estratégico. 🧠⚽",
+    "emptyFixtureSubtitle": "La grandeza espera—¡te avisaremos cuando sea hora de jugar!",
+    
+    "emptyFixtureTitle1": "Los asientos del estadio están vacíos... 🏟️",
+    "emptyFixtureSubtitle1": "¡Pero no te preocupes—los aficionados (y los goles) están en camino!",
+    
+    "emptyFixtureTitle2": "¡El silbato aún no ha sonado... todavía! 🎶",
+    "emptyFixtureSubtitle2": "Usa este tiempo para perfeccionar tu pose de celebración de gol.",
+    
+    "emptyFixtureTitle3": "Incluso las superestrellas necesitan un descanso. 🌟",
+    "emptyFixtureSubtitle3": "Toma un refresco—¡gritaremos cuando regrese la magia!",
+    
+    "emptyFixtureTitle4": "El libro de jugadas está abierto... 📖",
+    "emptyFixtureSubtitle4": "¡Estudia! Tu próxima predicción podría ser legendaria.",
+    
+    "emptyFixtureTitle5": "¿No hay goles en vivo? ¡Practica tu canto de victoria! 🎤",
+    "emptyFixtureSubtitle5": "(Recomendamos 'Olé, Olé, Olé' para máxima vibración.)",
+    
+    "emptyFixtureTitle6": "El trofeo se está puliendo solo... 🏆✨",
+    "emptyFixtureSubtitle6": "¡Brillará aún más para el próximo campeón!",
+    
+    "emptyFixtureTitle7": "La ventana de transferencias está cerrada... 🚪🔒",
+    "emptyFixtureSubtitle7": "Pero el drama siempre encuentra su camino de regreso. ¡Mantente atento!",
+    
+    "emptyFixtureTitle8": "El césped está creciendo... silenciosamente. 🌱",
+    "emptyFixtureSubtitle8": "¡Condiciones perfectas para futuros héroes del hat-trick!",
+    
+    "emptyFixtureTitle9": "¿Fuera de juego? ¡No—solo un respiro! 🚩",
+    "emptyFixtureSubtitle9": "Recarga energías y regresa para el próximo partido emocionante.",
+    
+    "emptyFixtureTitle10": "Las banderas de córner están relajándose... 🍹",
+    "emptyFixtureSubtitle10": "¡Pronto estarán bailando en el viento de nuevo!",
+    
+    "emptyFixtureTitle11": "¡El lápiz del anotador está afilado! ✏️",
+    "emptyFixtureSubtitle11": "Listo para documentar la próxima remontada épica.",
+    
+    "emptyFixtureTitle12": "La sala del VAR está tranquila... por ahora. 📺",
+    "emptyFixtureSubtitle12": "Zona libre de controversias (temporalmente). ¡Disfruta la paz!",
+    
+    "emptyFixtureTitle13": "Las naranjas del medio tiempo se están cortando... 🍊",
+    "emptyFixtureSubtitle13": "¡Energía fresca en camino! ⚡",
+    
+    "emptyFixtureTitle14": "Los aficionados están estirando sus cuerdas vocales... 📢",
+    "emptyFixtureSubtitle14": "Sesiones de práctica de \"¡GOOOOOOL!\" en progreso.",
+    
+    "emptyFixtureTitle15": "La tarjeta roja se está escondiendo... 😈",
+    "emptyFixtureSubtitle15": "¡Esperemos que se quede en el bolsillo del árbitro en el próximo partido!",
+    
+    "emptyFixtureTitle16": "La bota de oro se está abrillantando... 👟",
+    "emptyFixtureSubtitle16": "¡Tu delantero favorito podría reclamarla pronto!",
+    
+    "emptyFixtureTitle17": "La pizarra del entrenador está en blanco... 🤔",
+    "emptyFixtureSubtitle17": "Se están gestando tácticas geniales... lo sentimos.",
+    
+    "emptyFixtureTitle18": "El punto de penalti está practicando su drama... 🎭",
+    "emptyFixtureSubtitle18": "Música de suspenso, por favor...",
+    
+    "emptyFixtureTitle19": "El travesaño está disfrutando de la paz... ⚽❌",
+    "emptyFixtureSubtitle19": "(Por ahora, no hay casi-goles desgarradores.)",
+    
+    "emptyFixtureTitle20": "Tu app está en modo pretemporada... 🏋️♂️",
+    "emptyFixtureSubtitle20": "¡Entrenando duro para ofrecer actualizaciones de primera!",
+    
+    "emptyFixtureTitle21": "¡El campo está tranquilo... por ahora! ⚽",
+    "emptyFixtureSubtitle21": "Vuelve pronto—¡los goles están a la vuelta de la esquina!",
+    
+    "emptyFixtureTitle22": "¿No hay partidos en vivo? ¡Hora de calentar! 🏃♂️",
+    "emptyFixtureSubtitle22": "Toma un aperitivo y mantente atento—la acción está en camino.",
+    
+    "emptyFixtureTitle23": "Todo en calma en el frente futbolístico. 🌤️",
+    "emptyFixtureSubtitle23": "¡Momento perfecto para predecir tu próxima victoria!",
+    
+    "emptyFixtureTitle24": "¡Medio tiempo para actualizaciones! ☕",
+    "emptyFixtureSubtitle24": "Relájate, recarga y regresa para el próximo saque inicial.",
+    
+    "emptyFixtureTitle25": "¿No hay partidos? ¡No hay problema! 🧘",
+    "emptyFixtureSubtitle25": "Usa este descanso para planificar tu baile de victoria.",
+    
+    "emptyFixtureTitle26": "El marcador está tomando una siesta... 😴",
+    "emptyFixtureSubtitle26": "¡Despiértalo más tarde con partidos en vivo!",
+    
+    "emptyFixtureTitle27": "Shhh... los balones están descansando. 🌙",
+    "emptyFixtureSubtitle27": "¡Volverán pronto, más ruidosos que nunca!",
+    
+    "emptyFixtureTitle28": "¿Aún no hay partidos?",
+    "emptyFixtureSubtitle28": "Consejo profesional: Finge ser el árbitro—todos te escucharán. 😉",
+    
+    "emptyFixtureTitle29": "Las luces del estadio están tenues... 🌟",
+    "emptyFixtureSubtitle29": "¡Pero no te preocupes—el próximo enfrentamiento está en preparación!",
+    
+    "emptyFixtureTitle30": "El fútbol está tomando aire... 🧠",
+    "emptyFixtureSubtitle30": "¡Como todas las grandes historias, hay una pausa antes de la acción!"
 }

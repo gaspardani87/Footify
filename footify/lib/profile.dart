@@ -10,6 +10,12 @@ import 'dart:io';
 import 'language_provider.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Added for email availability check
+import 'package:cloud_firestore/cloud_firestore.dart'; // Added for Timestamp
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:intl/intl.dart';
+// Import for web support
+// We'll use a different approach for conditional imports
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -24,330 +30,355 @@ class _ProfilePageState extends State<ProfilePage> {
 
   File? _profileImage;
   final ImagePicker _picker = ImagePicker();
+  bool _isLoadingImage = false;
+
+  // Track the temporary image path for web
+  String? _webImagePath;
 
   @override
   Widget build(BuildContext context) {
-    return CommonLayout(
-      selectedIndex: 3,
-      child: Consumer<FirebaseProvider>(
-        builder: (context, provider, _) {
-          final user = provider.currentUser;
-
-          if (user == null) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      AppLocalizations.of(context)!.welcomeToFootify,
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Lexend',
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      AppLocalizations.of(context)!.welcomeText,
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54,
-                        fontFamily: 'Lexend',
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 32),
-                    _buildLoginButton(context),
-                    const SizedBox(height: 16),
-                    _buildRegisterButton(context),
-                  ],
-                ),
-              ),
-            );
-          }
-
-          return Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
+    final provider = Provider.of<FirebaseProvider>(context);
+    final userData = provider.userData;
+    final String displayName = userData?['displayName'] ?? 'User';
+    final String? bio = userData?['bio'];
+    final String? favoriteTeam = userData?['favoriteTeam'];
+    
+    // Handle the joinDate which could be either DateTime or Timestamp
+    String joinDate = 'Loading...';
+    if (userData != null && userData.containsKey('joinDate')) {
+      final dynamic joinDateValue = userData['joinDate'];
+      if (joinDateValue is Timestamp) {
+        joinDate = DateFormat('MMMM d, yyyy').format(joinDateValue.toDate());
+      } else if (joinDateValue is DateTime) {
+        joinDate = DateFormat('MMMM d, yyyy').format(joinDateValue);
+      }
+    }
+    
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Profile'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit),
+            onPressed: () => _editProfile(context),
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () => _signOut(context),
+          ),
+        ],
+      ),
+      body: userData == null
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const SizedBox(height: 24),
+                  GestureDetector(
+                    onTap: () => _showImageOptions(context),
+                    child: Stack(
+                      alignment: Alignment.bottomRight,
                       children: [
-                        if (provider.userData != null) ...[
-                          _buildProfileData(context, provider.userData!),
-                        ] else ...[
-                          Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(20),
-                              child: Text(
-                                AppLocalizations.of(context)!.errorLoading,
-                                style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
-                              ),
-                            ),
-                          ),
-                        ],
+                        _buildProfileAvatar(),
+                        IconButton(
+                          icon: Icon(Icons.camera_alt, size: 20, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
+                          onPressed: () => _pickImage(context),
+                        ),
                       ],
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    ElevatedButton(
-                      onPressed: () async {
-                        await provider.signOut();
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: goldColor,
-                        foregroundColor: darkColor,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 50,
-                          vertical: 16,
-                        ),
-                        shape: const StadiumBorder(),
-                      ),
-                      child: Text(
-                        AppLocalizations.of(context)!.logOut,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
+                  const SizedBox(height: 12),
+                  Text(
+                    '@${userData['username'] ?? 'username'}',
+                    style: TextStyle(
+                      color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFFFFE6AC) : Colors.black,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Joined $joinDate',
+                    style: TextStyle(
+                      color: Theme.of(context).brightness == Brightness.dark ? Colors.grey[400] : Colors.black54,
+                      fontSize: 14,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20),
+                  Card(
+                    color: Theme.of(context).brightness == Brightness.dark ? const Color.fromARGB(255, 32, 32, 32) : Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildProfileItem(
+                            context,
+                            'Email',
+                            userData['email'] ?? 'No email provided',
+                            Icons.email,
+                            Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                          ),
+                          const Divider(color: Color(0xFFFFE6AC)),
+                          _buildProfileItem(
+                            context,
+                            AppLocalizations.of(context)!.profileName,
+                            userData['name'] ?? 'No name provided',
+                            Icons.person,
+                            Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                          ),
+                          const Divider(color: Color(0xFFFFE6AC)),
+                          _buildProfileItem(
+                            context,
+                            AppLocalizations.of(context)!.favTeam,
+                            userData['favoriteTeam'] ?? 'No team selected',
+                            Icons.sports_soccer,
+                            Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                          ),
+                          const Divider(color: Color(0xFFFFE6AC)),
+                          _buildProfileItem(
+                            context,
+                            AppLocalizations.of(context)!.favLeague,
+                            userData['favoriteLeague'] ?? 'No league selected',
+                            Icons.emoji_events,
+                            Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                          ),
+                        ],
                       ),
                     ),
-                    OutlinedButton(
-                      onPressed: () => _showDeleteAccountDialog(context),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.red,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 26,
-                          vertical: 16,
-                        ),
-                        side: const BorderSide(color: Colors.red),
-                        shape: const StadiumBorder(),
-                      ),
-                      child: Text(
-                        AppLocalizations.of(context)!.deleteAccount,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
-          );
-        },
-      ),
     );
   }
 
-  Widget _buildProfileData(BuildContext context, Map<String, dynamic> userData) {
-    final textColor = Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black;
-    final subTextColor = Theme.of(context).brightness == Brightness.dark ? Colors.grey[400] : Colors.black54;
-
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            IconButton(
-              icon: Icon(Icons.camera_alt, size: 20, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
-              onPressed: () => _pickImage(context),
-            ),
-            Stack(
-              alignment: Alignment.center,
-              children: [
-                CircleAvatar(
-                  radius: 50,
-                  backgroundColor: Colors.grey[800],
-                  backgroundImage: _profileImage != null
-                      ? FileImage(_profileImage!)
-                      : (userData['profilePictureUrl'] != null
-                          ? NetworkImage(userData['profilePictureUrl']) as ImageProvider
-                          : null),
-                  child: (_profileImage == null && (userData['profilePictureUrl'] == null || userData['profilePictureUrl'].isEmpty))
-                      ? const Icon(Icons.person, size: 50, color: Colors.white70)
-                      : null,
-                ),
-              ],
-            ),
-            IconButton(
-              icon: Icon(Icons.close, size: 20, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
-              onPressed: () => _deleteProfilePicture(context),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Text(
-          '@${userData['username'] ?? 'username'}',
-          style: TextStyle(
-            color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFFFFE6AC) : Colors.black,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Joined ${_formatDate(userData['joinDate'] ?? DateTime.now())}',
-          style: TextStyle(
-            color: subTextColor,
-            fontSize: 14,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 20),
-        Card(
-          color: Theme.of(context).brightness == Brightness.dark ? const Color.fromARGB(255, 32, 32, 32) : Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildProfileItem(
-                  context,
-                  'Email',
-                  userData['email'] ?? 'No email provided',
-                  Icons.email,
-                  textColor,
-                ),
-                const Divider(color: Color(0xFFFFE6AC)),
-                _buildProfileItem(
-                  context,
-                  AppLocalizations.of(context)!.profileName,
-                  userData['name'] ?? 'No name provided',
-                  Icons.person,
-                  textColor,
-                ),
-                const Divider(color: Color(0xFFFFE6AC)),
-                _buildProfileItem(
-                  context,
-                  AppLocalizations.of(context)!.favTeam,
-                  userData['favoriteTeam'] ?? 'No team selected',
-                  Icons.sports_soccer,
-                  textColor,
-                ),
-                const Divider(color: Color(0xFFFFE6AC)),
-                _buildProfileItem(
-                  context,
-                  AppLocalizations.of(context)!.favLeague,
-                  userData['favoriteLeague'] ?? 'No league selected',
-                  Icons.emoji_events,
-                  textColor,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Future<void> _deleteProfilePicture(BuildContext context) async {
-    setState(() {
-      _profileImage = null;
-    });
-
+  ImageProvider? _getProfileImageProvider() {
     final provider = Provider.of<FirebaseProvider>(context, listen: false);
-    try {
-      await provider.updateProfilePictureUrl(null);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile picture deleted successfully')),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to delete profile picture: ${e.toString()}')),
-      );
+    final userData = provider.userData;
+    
+    // Extra verification of user data
+    if (userData == null) {
+      print('WARNING: userData is null in _getProfileImageProvider');
+      return null;
     }
+    
+    // Get the exact profilePictureUrl as stored in Firebase
+    final profileUrl = userData['profilePictureUrl'];
+    
+    print('VERIFICATION: Getting profile image provider with URL: $profileUrl');
+    
+    // If image is being loaded from local selection (non-web)
+    if (!kIsWeb && _profileImage != null) {
+      print('Using local file image from: ${_profileImage!.path}');
+      return FileImage(_profileImage!);
+    }
+    
+    // If we have a web temporary image
+    if (kIsWeb && _webImagePath != null) {
+      print('Using web temporary image from: $_webImagePath');
+      return NetworkImage(_webImagePath!);
+    }
+    
+    // If we have an existing profile picture URL
+    if (profileUrl != null && profileUrl.isNotEmpty) {
+      // Use the exact URL as stored in Firestore, without modifications
+      print('Loading profile image from Firebase URL: $profileUrl');
+      return NetworkImage(profileUrl);
+    }
+    
+    print('No valid profile image source found, returning null');
+    // Return null to let the CircleAvatar display the default icon in the child parameter
+    return null;
   }
 
-  Future<void> _pickImage(BuildContext context) async {
-    try {
-      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-      if (image != null) {
-        setState(() {
-          _profileImage = File(image.path);
-        });
+  @override
+  void initState() {
+    super.initState();
+    // Refresh user data when the profile page is loaded
+    _refreshUserData();
+  }
 
-        final provider = Provider.of<FirebaseProvider>(context, listen: false);
-        try {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Uploading profile picture...')),
-          );
-          final String? imageUrl = await provider.uploadProfileImage(_profileImage!);
-          if (imageUrl != null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Profile picture updated successfully')),
-            );
+  // Add method to verify Firebase data
+  void _verifyFirebaseData() {
+    // Get the provider
+    final provider = Provider.of<FirebaseProvider>(context, listen: false);
+    final userData = provider.userData;
+    
+    // Debug output of all user data to verify
+    print('------- FIREBASE USER DATA VERIFICATION -------');
+    if (userData != null) {
+      userData.forEach((key, value) {
+        print('$key: $value');
+      });
+      
+      // Specifically check the profile picture URL
+      final profileUrl = userData['profilePictureUrl'];
+      print('Profile Picture URL: $profileUrl');
+      
+      if (profileUrl == null) {
+        print('WARNING: profilePictureUrl is NULL in Firebase data');
+      } else if (profileUrl.isEmpty) {
+        print('WARNING: profilePictureUrl is EMPTY in Firebase data');
+      } else {
+        print('Profile picture URL appears valid, length: ${profileUrl.length}');
+      }
+    } else {
+      print('WARNING: userData is NULL - no user data loaded from Firebase');
+    }
+    print('--------------------------------------------');
+  }
+
+  // Add a method to refresh user data and precache the profile image
+  Future<void> _refreshUserData() async {
+    if (!mounted) return;
+    
+    try {
+      final provider = Provider.of<FirebaseProvider>(context, listen: false);
+      await provider.refreshUserData();
+      
+      // Verify the data once it's loaded
+      if (mounted) {
+        _verifyFirebaseData();
+      }
+      
+      // After user data is loaded, check for the profile image URL
+      if (provider.userData != null) {
+        final profileUrl = provider.userData!['profilePictureUrl'];
+        
+        if (profileUrl != null && profileUrl.isNotEmpty) {
+          print('Profile image URL found in user data: $profileUrl');
+          
+          // Don't use precacheImage on web as it can cause issues
+          if (!kIsWeb) {
+            try {
+              // Only precache on mobile/desktop platforms
+              await precacheImage(
+                NetworkImage(profileUrl),
+                context,
+              ).timeout(const Duration(seconds: 3), onTimeout: () {
+                print('Precaching timed out after 3 seconds');
+                return;
+              });
+              print('Profile image precached successfully');
+            } catch (e) {
+              print('Warning: Error precaching image: $e');
+            }
+          } else {
+            print('On web platform - skipping precacheImage');
           }
-        } catch (e) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to upload profile picture: ${e.toString()}')),
-          );
+        } else {
+          print('No profile picture URL found in user data');
         }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error selecting image: ${e.toString()}')),
-      );
+      print('Error refreshing user data: $e');
     }
   }
 
-  Widget _buildLoginButton(BuildContext context) {
-    return ElevatedButton(
-      onPressed: () => _showLoginDialog(context),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: goldColor,
-        foregroundColor: darkColor,
-        padding: const EdgeInsets.symmetric(
-          horizontal: 50,
-          vertical: 16,
-        ),
-        shape: const StadiumBorder(),
-      ),
-      child: Text(
-        AppLocalizations.of(context)!.loginButton,
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
+  @override
+  void dispose() {
+    // Clean up resources
+    _profileImage = null;
+    _webImagePath = null;
+    super.dispose();
   }
 
-  Widget _buildRegisterButton(BuildContext context) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final borderColor = isDarkMode ? goldColor : Colors.black;
-    final textColor = isDarkMode ? goldColor : Colors.black;
-
-    return OutlinedButton(
-      onPressed: () => _showRegistrationFlow(context),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: textColor,
-        padding: const EdgeInsets.symmetric(
-          horizontal: 50,
-          vertical: 16,
-        ),
-        side: BorderSide(color: borderColor),
-        shape: const StadiumBorder(),
-      ),
-      child: Text(
-        AppLocalizations.of(context)!.registerButton,
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-          color: textColor,
-        ),
-      ),
-    );
+  Future<void> _pickImage(BuildContext context) async {
+    // Store the scaffold messenger and provider before any async operation
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final provider = Provider.of<FirebaseProvider>(context, listen: false);
+    
+    try {
+      // Use image picker to select an image from the device
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 75, // Reduce quality to improve performance
+        maxWidth: 800,    // Limit dimensions to reduce file size
+      );
+      
+      if (image == null) {
+        // User canceled the picker
+        return;
+      }
+      
+      if (!mounted) return; // Check if widget is still mounted
+      
+      setState(() {
+        _isLoadingImage = true;
+        if (!kIsWeb) {
+          _profileImage = File(image.path);
+        } else {
+          // For web, we'll keep the XFile path for reference
+          _webImagePath = image.path;
+        }
+      });
+      
+      if (!mounted) return; // Check again after setState
+      
+      // Show uploading message
+      scaffoldMessenger.showSnackBar(
+        const SnackBar(content: Text('Uploading profile picture...')),
+      );
+      
+      try {
+        String? imageUrl;
+        
+        if (!kIsWeb) {
+          // For mobile/desktop, upload to Firebase Storage
+          imageUrl = await provider.uploadProfileImage(_profileImage!);
+        } else {
+          // For web, use web-specific approach
+          final bytes = await image.readAsBytes();
+          imageUrl = await provider.uploadProfileImageBytes(bytes, 'jpg');
+        }
+        
+        if (imageUrl == null || imageUrl.isEmpty) {
+          throw Exception("Failed to upload image to storage");
+        }
+        
+        // Update Firestore with the image URL
+        await provider.updateProfilePictureUrl(imageUrl);
+        
+        // Refresh user data
+        await provider.refreshUserData();
+        
+        if (!mounted) return; // Check if mounted before showing success
+        
+        scaffoldMessenger.showSnackBar(
+          const SnackBar(content: Text('Profile picture updated successfully')),
+        );
+      } catch (e) {
+        print('Profile picture upload error: $e');
+        
+        if (mounted) { // Only show error if still mounted
+          scaffoldMessenger.showSnackBar(
+            SnackBar(content: Text('Failed to upload profile picture: ${e.toString()}')),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoadingImage = false;
+          });
+        }
+      }
+    } catch (e) {
+      print('Image picker error: $e');
+      
+      // Only try to show errors if we're still mounted
+      if (mounted) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(content: Text('Error selecting image: ${e.toString()}')),
+        );
+      }
+    }
   }
 
   Widget _buildProfileItem(BuildContext context, String label, String value, IconData icon, Color textColor) {
@@ -892,11 +923,277 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  String _formatDate(DateTime date) {
-    final months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    return '${months[date.month - 1]} ${date.year}';
+  String _formatDate(dynamic date) {
+    try {
+      if (date == null) {
+        return 'Recently'; // Fallback text
+      }
+      
+      final months = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ];
+      
+      DateTime dateTime;
+      
+      // Handle different types
+      if (date is DateTime) {
+        dateTime = date;
+      } else if (date is Timestamp) {
+        dateTime = date.toDate();
+      } else if (date is int) {
+        // Milliseconds since epoch
+        dateTime = DateTime.fromMillisecondsSinceEpoch(date);
+      } else {
+        return 'Recently'; // Fallback if format unknown
+      }
+      
+      return '${months[dateTime.month - 1]} ${dateTime.year}';
+    } catch (e) {
+      print('Error formatting date: $e');
+      return 'Recently'; // Fallback on error
+    }
+  }
+
+  void _showImageOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              ListTile(
+                leading: const Icon(Icons.photo_camera),
+                title: const Text('Add Profile Picture'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(context);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete),
+                title: const Text('Remove Profile Picture'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _deleteProfilePicture(context);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _deleteProfilePicture(BuildContext context) async {
+    setState(() {
+      _profileImage = null;
+      _webImagePath = null;
+      _isLoadingImage = true; // Show loading indicator
+    });
+
+    final provider = Provider.of<FirebaseProvider>(context, listen: false);
+    try {
+      // Update the Firestore document with null for profilePictureUrl
+      await provider.updateProfilePictureUrl(null);
+      
+      // Refresh user data
+      await provider.refreshUserData();
+      
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile picture removed')),
+        );
+      }
+    } catch (e) {
+      print('Error removing profile picture: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to remove profile picture: ${e.toString()}')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingImage = false;
+        });
+      }
+    }
+  }
+
+  void _editProfile(BuildContext context) {
+    // Navigate to profile edit screen or show edit dialog
+    // Implementation depends on your app's navigation structure
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Edit profile feature coming soon')),
+    );
+  }
+
+  void _signOut(BuildContext context) async {
+    final provider = Provider.of<FirebaseProvider>(context, listen: false);
+    try {
+      await provider.signOut();
+      if (context.mounted) {
+        // Navigate to login page or show a success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Signed out successfully')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error signing out: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
+  bool _shouldShowDefaultIcon() {
+    final provider = Provider.of<FirebaseProvider>(context, listen: false);
+    final profileUrl = provider.userData?['profilePictureUrl'];
+    
+    // If image is being loaded from local selection (non-web)
+    if (!kIsWeb && _profileImage != null) {
+      return false;
+    }
+    
+    // If we have a web temporary image
+    if (kIsWeb && _webImagePath != null) {
+      return false;
+    }
+    
+    // If we have an existing profile picture URL
+    if (profileUrl != null && profileUrl.isNotEmpty) {
+      return false;
+    }
+    
+    // Default placeholder image - use a material default icon as fallback
+    return true;
+  }
+
+  Widget _buildAvatarChild() {
+    if (_isLoadingImage) {
+      return const CircularProgressIndicator();
+    }
+    
+    // Show default icon if needed
+    if (_shouldShowDefaultIcon()) {
+      return const Icon(Icons.person, size: 50, color: Colors.black54);
+    }
+    
+    // Return an empty widget for when we have an actual image
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildProfileAvatar() {
+    return Container(
+      width: 128,
+      height: 128,
+      decoration: BoxDecoration(
+        color: Colors.grey[300],
+        shape: BoxShape.circle,
+      ),
+      child: ClipOval(
+        child: _isLoadingImage
+            ? const Center(child: CircularProgressIndicator())
+            : _getProfileImageProvider() != null
+                ? _buildNetworkImageWithRetry()
+                : const Icon(Icons.person, size: 50, color: Colors.black54),
+      ),
+    );
+  }
+
+  // Add a method to create a proxied URL for images on the web platform
+  String _getProxiedImageUrl(String originalUrl) {
+    // Base URL for your Firebase Functions
+    // This URL should match your deployed Firebase Functions
+    const String functionsBaseUrl = 'https://us-central1-footify-13da4.cloudfunctions.net';
+    
+    // URL encode the original URL to use as a query parameter
+    final encodedUrl = Uri.encodeComponent(originalUrl);
+    
+    // Return the proxied URL that routes through the Firebase Function
+    return '$functionsBaseUrl/proxyImage?url=$encodedUrl';
+  }
+
+  // Create a new method specifically for handling network image loading with retries
+  Widget _buildNetworkImageWithRetry() {
+    final imageProvider = _getProfileImageProvider()!;
+    final provider = Provider.of<FirebaseProvider>(context, listen: false);
+    final profileUrl = provider.userData?['profilePictureUrl'];
+    
+    print('========== PROFILE IMAGE DEBUG ==========');
+    print('Provider type: ${imageProvider.runtimeType}');
+    print('Original profile URL from user data: $profileUrl');
+    
+    // Verify URL format
+    if (profileUrl != null) {
+      if (profileUrl.startsWith('https://firebasestorage.googleapis.com')) {
+        print('URL appears to be a valid Firebase Storage URL');
+      } else {
+        print('WARNING: URL does not appear to be a Firebase Storage URL');
+      }
+    }
+    print('=========================================');
+    
+    // Handle web platform differently
+    if (kIsWeb) {
+      if (profileUrl != null && profileUrl.isNotEmpty) {
+        // Use the proxied URL for the web
+        final proxiedUrl = _getProxiedImageUrl(profileUrl);
+        print('Using proxied URL for web: $proxiedUrl');
+        
+        return Image(
+          image: NetworkImage(proxiedUrl),
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) {
+              return child;
+            }
+            return Center(
+              child: CircularProgressIndicator(
+                value: loadingProgress.expectedTotalBytes != null
+                    ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                    : null,
+              ),
+            );
+          },
+          errorBuilder: (context, error, stackTrace) {
+            print('Error loading proxied profile image on web: $error');
+            return const Icon(Icons.person, size: 50, color: Colors.black54);
+          },
+        );
+      } else {
+        return const Icon(Icons.person, size: 50, color: Colors.black54);
+      }
+    } else {
+      // For mobile/desktop platforms
+      return Image(
+        image: imageProvider,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) {
+            return AnimatedOpacity(
+              opacity: 1.0,
+              duration: const Duration(milliseconds: 300),
+              child: child,
+            );
+          }
+          return Center(
+            child: CircularProgressIndicator(
+              value: loadingProgress.expectedTotalBytes != null
+                  ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                  : null,
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          print('Error loading profile image on mobile: $error');
+          return const Icon(Icons.person, size: 50, color: Colors.black54);
+        },
+      );
+    }
   }
 }

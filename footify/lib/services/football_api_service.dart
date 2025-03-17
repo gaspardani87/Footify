@@ -205,14 +205,21 @@ class FootballApiService {
         if (data is Map && data.containsKey('teams') && data['teams'] is List) {
           List<dynamic> teamsData = data['teams'];
           return teamsData.map((team) {
+            String crestUrl = team['crest']?.toString() ?? '';
+            // Use proxy for non-direct images
+            if (crestUrl.isNotEmpty && !crestUrl.startsWith('data:')) {
+              crestUrl = '$baseUrl/proxyImage?url=${Uri.encodeComponent(crestUrl)}';
+            }
+            
             return {
               'id': team['id']?.toString() ?? '',
               'name': team['name']?.toString() ?? 'Unknown Team',
-              'crest': team['crest']?.toString() ?? '',
+              'crest': crestUrl,
               'tla': team['tla']?.toString() ?? '',
             };
           }).toList().cast<Map<String, String>>();
         } else {
+          print('Invalid team data format: $data');
           return [];
         }
       } else {
@@ -234,17 +241,23 @@ class FootballApiService {
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (data is Map && data.containsKey('competitions') && data['competitions'] is List) {
-          List<dynamic> leaguesData = data['competitions'];
-          return leaguesData.map((league) {
+        if (data is List) {
+          return data.map((league) {
+            String emblemUrl = league['emblem']?.toString() ?? '';
+            // Use proxy for non-direct images
+            if (emblemUrl.isNotEmpty && !emblemUrl.startsWith('data:')) {
+              emblemUrl = '$baseUrl/proxyImage?url=${Uri.encodeComponent(emblemUrl)}';
+            }
+            
             return {
               'id': league['id']?.toString() ?? '',
               'name': league['name']?.toString() ?? 'Unknown League',
               'code': league['code']?.toString() ?? '',
-              'emblem': league['emblem']?.toString() ?? '',
+              'emblem': emblemUrl,
             };
           }).toList().cast<Map<String, String>>();
         } else {
+          print('Invalid league data format: $data');
           return [];
         }
       } else {

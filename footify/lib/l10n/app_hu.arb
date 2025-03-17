@@ -34,5 +34,97 @@
     "detailedStats": "Döntőbb statisztikák",
     "possession": "Labdairtoklás",
     "shotsOnTarget": "Kapura lövések",
-    "matchDetails": "Mérkőzés részletek"
+    "matchDetails": "Mérkőzés részletek",
+    "emptyFixtureTitle": "Üres a meccsnaptar? Nevezzük ezt stratégiai csendnek. 🧠⚽",
+    "emptyFixtureSubtitle": "A nagyság vár—értesítünk, amikor itt az idő!",
+    
+    "emptyFixtureTitle1": "A stadion ülései üresek… 🏟️",
+    "emptyFixtureSubtitle1": "De ne aggódj—a szurkolók (és a gólok) úton vannak!",
+    
+    "emptyFixtureTitle2": "A bíró még nem fújt sípjába… egyelőre! 🎶",
+    "emptyFixtureSubtitle2": "Használd ki ezt az időt a gólöröm gyakorlására.",
+    
+    "emptyFixtureTitle3": "Még a sztároknak is kell pihenő. 🌟",
+    "emptyFixtureSubtitle3": "Igyál egy frissítőt—szólunk, ha visszatér a varázslat!",
+    
+    "emptyFixtureTitle4": "A taktikai könyv nyitva áll… 📖",
+    "emptyFixtureSubtitle4": "Tanulj! A következő tipped legendás lehet.",
+    
+    "emptyFixtureTitle5": "Nincsenek élő gólok? Gyakorold a győzelmi éneket! 🎤",
+    "emptyFixtureSubtitle5": "(Az 'Olé, Olé, Olé!' ajánlott a maximális hangulatért.)",
+    
+    "emptyFixtureTitle6": "A trófea épp fényesíti magát… 🏆✨",
+    "emptyFixtureSubtitle6": "Még ragyogóbb lesz a következő bajnoknak!",
+    
+    "emptyFixtureTitle7": "Az átigazolási ablak bezárult… 🚪🔒",
+    "emptyFixtureSubtitle7": "De a dráma mindig visszatalál. Maradj velünk!",
+    
+    "emptyFixtureTitle8": "A fű csendben nő… 🌱",
+    "emptyFixtureSubtitle8": "Tökéletes körülmények a jövő mesterhármas hőseinek!",
+    
+    "emptyFixtureTitle9": "Les? Dehogy—csak egy kis szünet! 🚩",
+    "emptyFixtureSubtitle9": "Töltekezz fel és térj vissza a következő szívdobogtató meccsre.",
+    
+    "emptyFixtureTitle10": "A szögletzászlók pihennek… 🍹",
+    "emptyFixtureSubtitle10": "Hamarosan újra táncolnak a szélben!",
+    
+    "emptyFixtureTitle11": "A jegyzőkönyvvezető ceruzája ki van hegyezve! ✏️",
+    "emptyFixtureSubtitle11": "Készen áll a következő epikus visszatérés dokumentálására.",
+    
+    "emptyFixtureTitle12": "A VAR-szoba csendes… egyelőre. 📺",
+    "emptyFixtureSubtitle12": "Vitamentes zóna (átmenetileg). Élvezd a nyugalmat!",
+    
+    "emptyFixtureTitle13": "A félidei narancsokat éppen szeletelgetik… 🍊",
+    "emptyFixtureSubtitle13": "Friss energia érkezik! ⚡",
+    
+    "emptyFixtureTitle14": "A szurkolók nyújtják a hangszálaikat… 📢",
+    "emptyFixtureSubtitle14": "\"GÓÓÓÓÓL!\" gyakorlati foglalkozások folyamatban.",
+    
+    "emptyFixtureTitle15": "A piros lap bujkál… 😈",
+    "emptyFixtureSubtitle15": "Reméljük, a bíró zsebében is marad a következő meccsen!",
+    
+    "emptyFixtureTitle16": "Az aranycipő épp fényesedik… 👟",
+    "emptyFixtureSubtitle16": "A kedvenc csatárod hamarosan megszerezheti!",
+    
+    "emptyFixtureTitle17": "Az edző táblája üres… 🤔",
+    "emptyFixtureSubtitle17": "Zseniális taktikák főnek… érezzük!",
+    
+    "emptyFixtureTitle18": "A tizenegyes pont gyakorolja a drámát… 🎭",
+    "emptyFixtureSubtitle18": "Jöhet a feszültségkeltő zene…",
+    
+    "emptyFixtureTitle19": "A kapufa élvezi a békét… ⚽❌",
+    "emptyFixtureSubtitle19": "(Egyelőre nincsenek szívszorító kapufák.)",
+    
+    "emptyFixtureTitle20": "Az alkalmazásod alapozó edzésen van… 🏋️♂️",
+    "emptyFixtureSubtitle20": "Keményen dolgozunk, hogy elsőosztályú frissítéseket szállítsunk!",
+    
+    "emptyFixtureTitle21": "A pálya csendes… egyelőre! ⚽",
+    "emptyFixtureSubtitle21": "Nézz vissza hamarosan—a gólok már a sarkon túl vannak!",
+    
+    "emptyFixtureTitle22": "Nincs élő meccs? Ideje bemelegíteni! 🏃♂️",
+    "emptyFixtureSubtitle22": "Kapj be egy harapnivalót és maradj velünk—jön az akció.",
+    
+    "emptyFixtureTitle23": "Teljes nyugalom a focifrontokon. 🌤️",
+    "emptyFixtureSubtitle23": "Tökéletes idő a következő győzelmed megjósolására!",
+    
+    "emptyFixtureTitle24": "Félidő a frissítésekhez! ☕",
+    "emptyFixtureSubtitle24": "Pihenj, töltődj fel és térj vissza a következő kezdőrúgásra.",
+    
+    "emptyFixtureTitle25": "Nincs meccs? Nem gond! 🧘",
+    "emptyFixtureSubtitle25": "Használd ki ezt a szünetet a győzelmi táncod megtervezésére.",
+    
+    "emptyFixtureTitle26": "Az eredményjelző szundít… 😴",
+    "emptyFixtureSubtitle26": "Ébreszd fel később élő meccsekkel!",
+    
+    "emptyFixtureTitle27": "Csssss… a focilabdák pihennek. 🌙",
+    "emptyFixtureSubtitle27": "Hamarosan visszatérnek, hangosabban, mint valaha!",
+    
+    "emptyFixtureTitle28": "Még nincsenek meccsek?",
+    "emptyFixtureSubtitle28": "Profi tipp: Tegyél úgy, mintha te lennél a bíró—mindenki hallgatni fog rád. 😉",
+    
+    "emptyFixtureTitle29": "A stadion fényei tompák… 🌟",
+    "emptyFixtureSubtitle29": "De ne aggódj—a következő nagy összecsapás előkészítés alatt!",
+    
+    "emptyFixtureTitle30": "A foci épp levegőt vesz... 🧠",
+    "emptyFixtureSubtitle30": "Mint minden nagy történetben, az akció előtt mindig van egy kis szünet!"
 }

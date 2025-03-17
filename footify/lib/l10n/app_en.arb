@@ -62,5 +62,97 @@
     "noHighlightsAvailable": "No highlights available",
     "abandoned": "Abandoned",
     "extraTime": "Extra Time",
-    "penalties": "Penalties"
+    "penalties": "Penalties",
+    "emptyFixtureTitle": "Empty fixture list? Let's call it strategic silence. 🧠⚽",
+    "emptyFixtureSubtitle": "Greatness awaits—we'll notify you when it's game time!",
+    
+    "emptyFixtureTitle1": "Stadium seats are empty… 🏟️",
+    "emptyFixtureSubtitle1": "But don't worry—the fans (and goals) are on their way!",
+    
+    "emptyFixtureTitle2": "The whistle hasn't blown… yet! 🎶",
+    "emptyFixtureSubtitle2": "Use this time to perfect your goal celebration pose.",
+    
+    "emptyFixtureTitle3": "Even superstars need a timeout. 🌟",
+    "emptyFixtureSubtitle3": "Grab a Gatorade—we'll shout when the magic returns!",
+    
+    "emptyFixtureTitle4": "The playbook is wide open… 📖",
+    "emptyFixtureSubtitle4": "Study up! Your next prediction could be legendary.",
+    
+    "emptyFixtureTitle5": "No live goals? Practice your victory chant! 🎤",
+    "emptyFixtureSubtitle5": "(We recommend 'Olé, Olé, Olé!' for maximum vibes.)",
+    
+    "emptyFixtureTitle6": "The trophy is polishing itself… 🏆✨",
+    "emptyFixtureSubtitle6": "It'll shine even brighter for the next champion!",
+    
+    "emptyFixtureTitle7": "The transfer window is closed… 🚪🔒",
+    "emptyFixtureSubtitle7": "But drama always finds its way back. Stay tuned!",
+    
+    "emptyFixtureTitle8": "The grass is growing… quietly. 🌱",
+    "emptyFixtureSubtitle8": "Perfect conditions for future hat-trick heroes!",
+    
+    "emptyFixtureTitle9": "Offside? Nope—just a breather! 🚩",
+    "emptyFixtureSubtitle9": "Refuel and return for the next heart-stopping match.",
+    
+    "emptyFixtureTitle10": "The corner flags are chilling… 🍹",
+    "emptyFixtureSubtitle10": "They'll be dancing in the wind again soon!",
+    
+    "emptyFixtureTitle11": "The scorekeeper's pencil is sharpened! ✏️",
+    "emptyFixtureSubtitle11": "Ready to document the next epic comeback.",
+    
+    "emptyFixtureTitle12": "The VAR room is quiet… for now. 📺",
+    "emptyFixtureSubtitle12": "Controversy-free zone (temporarily). Enjoy the peace!",
+    
+    "emptyFixtureTitle13": "The halftime oranges are being sliced… 🍊",
+    "emptyFixtureSubtitle13": "Fresh energy incoming! ⚡",
+    
+    "emptyFixtureTitle14": "The fans are stretching their vocal cords… 📢",
+    "emptyFixtureSubtitle14": "\"GOOOOOOAL!\" practice sessions in progress.",
+    
+    "emptyFixtureTitle15": "The red card is hiding… 😈",
+    "emptyFixtureSubtitle15": "Let's hope it stays in the ref's pocket next game!",
+    
+    "emptyFixtureTitle16": "The golden boot is taking a shine… 👟",
+    "emptyFixtureSubtitle16": "Your favorite striker might claim it soon!",
+    
+    "emptyFixtureTitle17": "The manager's whiteboard is blank… 🤔",
+    "emptyFixtureSubtitle17": "Genius tactics are brewing… we can feel it.",
+    
+    "emptyFixtureTitle18": "The penalty spot is practicing its drama… 🎭",
+    "emptyFixtureSubtitle18": "Cue suspenseful music…",
+    
+    "emptyFixtureTitle19": "The crossbar is enjoying the peace… ⚽❌",
+    "emptyFixtureSubtitle19": "(For now, no heartbreaking near-misses.)",
+    
+    "emptyFixtureTitle20": "Your app is in preseason mode… 🏋️♂️",
+    "emptyFixtureSubtitle20": "Training hard to deliver top-tier updates!",
+    
+    "emptyFixtureTitle21": "The pitch is quiet… for now! ⚽",
+    "emptyFixtureSubtitle21": "Check back soon—goals are just around the corner!",
+    
+    "emptyFixtureTitle22": "No matches live? Time to warm up! 🏃♂️",
+    "emptyFixtureSubtitle22": "Grab a snack and stay tuned—action is coming.",
+    
+    "emptyFixtureTitle23": "All calm on the football front. 🌤️",
+    "emptyFixtureSubtitle23": "Perfect time to predict your next win!",
+    
+    "emptyFixtureTitle24": "Halftime for updates! ☕",
+    "emptyFixtureSubtitle24": "Relax, recharge, and return for the next kickoff.",
+    
+    "emptyFixtureTitle25": "No games? No problem! 🧘",
+    "emptyFixtureSubtitle25": "Use this break to plan your victory dance.",
+    
+    "emptyFixtureTitle26": "The scoreboard is taking a nap… 😴",
+    "emptyFixtureSubtitle26": "Wake it up later with live matches!",
+    
+    "emptyFixtureTitle27": "Shhh… the footballs are resting. 🌙",
+    "emptyFixtureSubtitle27": "They'll be back soon, louder than ever!",
+    
+    "emptyFixtureTitle28": "No matches yet?",
+    "emptyFixtureSubtitle28": "Pro Tip: Pretend you're the referee—everyone will listen. 😉",
+    
+    "emptyFixtureTitle29": "The stadium lights are dimmed… 🌟",
+    "emptyFixtureSubtitle29": "But don't worry—the next showdown is being prepped!",
+    
+    "emptyFixtureTitle30": "Football's taking a breather... 🧠",
+    "emptyFixtureSubtitle30": "Like all great stories, there's a pause before the action!"
 }
