@@ -8,6 +8,7 @@ import 'services/football_api_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'language_provider.dart';
+import 'font_size_provider.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Added for email availability check
 import 'package:cloud_firestore/cloud_firestore.dart'; // Added for Timestamp
@@ -54,22 +55,10 @@ class _ProfilePageState extends State<ProfilePage> {
       }
     }
     
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profile'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () => _editProfile(context),
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => _signOut(context),
-          ),
-        ],
-      ),
-      body: userData == null
-          ? const Center(child: CircularProgressIndicator())
+    return CommonLayout(
+      selectedIndex: 3, // Profile is index 3 in the bottom navigation
+      child: userData == null
+          ? _buildLoginView(context)
           : SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -152,6 +141,30 @@ class _ProfilePageState extends State<ProfilePage> {
                         ],
                       ),
                     ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.edit),
+                        label: const Text('Edit Profile'),
+                        onPressed: () => _editProfile(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFFE6AC),
+                          foregroundColor: Colors.black,
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.logout),
+                        label: const Text('Logout'),
+                        onPressed: () => _signOut(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red.shade300,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1195,5 +1208,105 @@ class _ProfilePageState extends State<ProfilePage> {
         },
       );
     }
+  }
+
+  // Method to build the login/register view when user is not logged in
+  Widget _buildLoginView(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final fontSizeProvider = Provider.of<FontSizeProvider>(context);
+    final baseFontSize = fontSizeProvider.fontSize;
+    final backgroundColor = isDarkMode ? const Color(0xFF1D1D1D) : Colors.white;
+    
+    // Calculate button dimensions based on font size
+    final buttonWidth = 180 + (baseFontSize - 16) * 5; // Starts at 180px at default font size (16)
+    final buttonHeight = 44 + (baseFontSize - 16) * 2; // Starts at 44px at default font size (16)
+    
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const SizedBox(height: 20),
+            Text(
+              'Welcome to Footify!',
+              style: TextStyle(
+                fontSize: baseFontSize * 1.7, // Responsive font size
+                fontWeight: FontWeight.bold,
+                color: isDarkMode ? const Color(0xFFFFE6AC) : Colors.black,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Sign in or create an account to save your favorite teams and personalize your experience.',
+              style: TextStyle(
+                fontSize: baseFontSize,
+                color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 40),
+            SizedBox(
+              width: buttonWidth,
+              height: buttonHeight,
+              child: ElevatedButton(
+                onPressed: () => _showLoginDialog(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFFE6AC),
+                  foregroundColor: Colors.black,
+                  elevation: 5,
+                  shadowColor: Colors.black.withOpacity(0.3),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: baseFontSize * 0.75,
+                    vertical: baseFontSize * 0.3,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(buttonHeight / 2), // Fully rounded corners
+                  ),
+                ),
+                child: Text(
+                  'Login',
+                  style: TextStyle(
+                    fontSize: baseFontSize * 1.1, 
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(height: baseFontSize),
+            SizedBox(
+              width: buttonWidth,
+              height: buttonHeight,
+              child: ElevatedButton(
+                onPressed: () => _showRegistrationFlow(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: backgroundColor, // Match app background color
+                  foregroundColor: const Color(0xFFFFE6AC), // Yellowish text
+                  elevation: 0, // No shadow for outline style
+                  padding: EdgeInsets.symmetric(
+                    horizontal: baseFontSize * 0.75,
+                    vertical: baseFontSize * 0.3,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(buttonHeight / 2), // Fully rounded corners
+                    side: const BorderSide(color: Color(0xFFFFE6AC), width: 2),
+                  ),
+                ),
+                child: Text(
+                  'Register',
+                  style: TextStyle(
+                    fontSize: baseFontSize * 1.1,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
