@@ -11,6 +11,7 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'storage_service.dart';
 import 'main.dart' show showNotification;
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -107,6 +108,32 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _toggleNotifications(bool enabled) async {
+    // For web, request permission when enabling notifications
+    if (enabled && kIsWeb) {
+      final messaging = FirebaseMessaging.instance;
+      final settings = await messaging.requestPermission(
+        alert: true,
+        announcement: false,
+        badge: true,
+        carPlay: false,
+        criticalAlert: false,
+        provisional: false,
+        sound: true,
+      );
+      
+      if (settings.authorizationStatus != AuthorizationStatus.authorized &&
+          settings.authorizationStatus != AuthorizationStatus.provisional) {
+        // Permission denied, show a message and don't enable notifications
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Notification permission was denied. Notifications will not work.'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+        return; // Don't enable notifications if permission denied
+      }
+    }
+    
     setState(() {
       notificationsEnabled = enabled;
     });

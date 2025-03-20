@@ -310,25 +310,31 @@ class FCMTokenManager {
 void main() async {
   await initializeApp();
 
-  // Értesítési engedélyek kérése (iOS-en kötelező, Androidon opcionális)
+  // Modify notification permissions request to be non-blocking
   FirebaseMessaging messaging = FirebaseMessaging.instance;
+  
+  // Don't request notification permissions on startup for web
+  if (!kIsWeb) {
+    NotificationSettings settings = await messaging.requestPermission(
+      alert: true,
+      announcement: false,
+      badge: true,
+      carPlay: false,
+      criticalAlert: false,
+      provisional: false,
+      sound: true,
+    );
 
-  NotificationSettings settings = await messaging.requestPermission(
-    alert: true,
-    announcement: false,
-    badge: true,
-    carPlay: false,
-    criticalAlert: false,
-    provisional: false,
-    sound: true,
-  );
-
-  if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-    print('User granted permission');
-  } else if (settings.authorizationStatus == AuthorizationStatus.provisional) {
-    print('User granted provisional permission');
+    if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+      print('User granted permission');
+    } else if (settings.authorizationStatus == AuthorizationStatus.provisional) {
+      print('User granted provisional permission');
+    } else {
+      print('User declined or has not accepted permission');
+    }
   } else {
-    print('User declined or has not accepted permission');
+    // For web, we'll request permissions only when user enables notifications in settings
+    print('Web platform detected: deferring notification permission request');
   }
 
   // Foreground üzenetek kezelése

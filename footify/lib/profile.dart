@@ -15,6 +15,7 @@ import 'package:cloud_firestore/cloud_firestore.dart'; // Added for Timestamp
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:intl/intl.dart';
+import 'dart:math' as math;
 // Import for web support
 // We'll use a different approach for conditional imports
 
@@ -25,7 +26,7 @@ class ProfilePage extends StatefulWidget {
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
-class _ProfilePageState extends State<ProfilePage> {
+class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStateMixin {
   static const Color goldColor = Color(0xFFFFE6AC);
   static const Color darkColor = Color(0xFF2C2C2C);
 
@@ -35,6 +36,42 @@ class _ProfilePageState extends State<ProfilePage> {
 
   // Track the temporary image path for web
   String? _webImagePath;
+
+  // Preload teams for faster dialog display
+  List<Map<String, String>>? _cachedTeams;
+  List<Map<String, String>>? _cachedLeagues;
+
+  // Track if we're in edit mode
+  bool _isEditMode = false;
+  
+  // Controllers for editable fields
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  
+  // Keys for animations
+  final GlobalKey _editProfileButtonKey = GlobalKey();
+  final GlobalKey _logoutButtonKey = GlobalKey();
+  final GlobalKey _deleteButtonKey = GlobalKey();
+  final GlobalKey _cancelButtonKey = GlobalKey();
+
+  // Add this variable to track which field is being edited
+  String? _currentlyEditingField;
+
+  // Add this variable to store temporary name change
+  String? _pendingNameChange;
+
+  // Add controllers for password fields
+  final TextEditingController _currentPasswordController = TextEditingController();
+  final TextEditingController _newPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
+
+  // Add these variables to store temporary selections
+  Map<String, String>? _selectedTeam;
+  Map<String, String>? _selectedLeague;
+  
+  // Add variables to store original values
+  Map<String, String>? _originalTeam;
+  Map<String, String>? _originalLeague;
 
   @override
   Widget build(BuildContext context) {
@@ -60,9 +97,9 @@ class _ProfilePageState extends State<ProfilePage> {
       child: userData == null
           ? _buildLoginView(context)
           : SingleChildScrollView(
-              child: Column(
+            child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
+              children: [
                   const SizedBox(height: 24),
                   GestureDetector(
                     onTap: () => _showImageOptions(context),
@@ -70,102 +107,290 @@ class _ProfilePageState extends State<ProfilePage> {
                       alignment: Alignment.bottomRight,
                       children: [
                         _buildProfileAvatar(),
-                        IconButton(
-                          icon: Icon(Icons.camera_alt, size: 20, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
-                          onPressed: () => _pickImage(context),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    '@${userData['username'] ?? 'username'}',
-                    style: TextStyle(
-                      color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFFFFE6AC) : Colors.black,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
+            IconButton(
+              icon: Icon(Icons.camera_alt, size: 20, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
+              onPressed: () => _pickImage(context),
+                ),
+              ],
+            ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          '@${userData['username'] ?? 'username'}',
+          style: TextStyle(
+            color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFFFFE6AC) : Colors.black,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 4),
+        Text(
                     'Joined $joinDate',
-                    style: TextStyle(
+          style: TextStyle(
                       color: Theme.of(context).brightness == Brightness.dark ? Colors.grey[400] : Colors.black54,
-                      fontSize: 14,
+            fontSize: 14,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 20),
+        Card(
+          color: Theme.of(context).brightness == Brightness.dark ? const Color.fromARGB(255, 32, 32, 32) : Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildProfileItem(
+                  context,
+                  'Email',
+                  userData['email'] ?? 'No email provided',
+                  Icons.email,
+                            Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                ),
+                const Divider(color: Color(0xFFFFE6AC)),
+                _buildProfileItem(
+                  context,
+                  AppLocalizations.of(context)!.profileName,
+                  userData['name'] ?? 'No name provided',
+                  Icons.person,
+                            Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                ),
+                const Divider(color: Color(0xFFFFE6AC)),
+                _buildProfileItem(
+                  context,
+                  AppLocalizations.of(context)!.favTeam,
+                  userData['favoriteTeam'] ?? 'No team selected',
+                  Icons.sports_soccer,
+                            Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                ),
+                const Divider(color: Color(0xFFFFE6AC)),
+                _buildProfileItem(
+                  context,
+                  AppLocalizations.of(context)!.favLeague,
+                  userData['favoriteLeague'] ?? 'No league selected',
+                  Icons.emoji_events,
+                            Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                ),
+              ],
+            ),
                     ),
-                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 30),
+                  // Main action buttons with responsive layout
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        // Calculate button height based on screen width
+                        final buttonHeight = constraints.maxWidth < 350 ? 40.0 : 44.0;
+                        final fontSize = constraints.maxWidth < 350 ? 13.0 : 14.0;
+                        
+                        return Column(
+                          children: [
+                            // Edit Profile/Confirm button
+                            SizedBox(
+                              key: _editProfileButtonKey,
+                              width: double.infinity,
+                              height: buttonHeight,
+                              child: ElevatedButton.icon(
+                                icon: Icon(
+                                  _isEditMode ? Icons.check : Icons.edit, 
+                                  size: 20, 
+                                  color: Colors.black
+                                ),
+                                label: AnimatedCrossFade(
+                                  firstChild: const Text(
+                                    'Edit Profile', 
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    )
+                                  ),
+                                  secondChild: const Text(
+                                    'Confirm', 
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    )
+                                  ),
+                                  crossFadeState: _isEditMode 
+                                      ? CrossFadeState.showSecond 
+                                      : CrossFadeState.showFirst,
+                                  duration: const Duration(milliseconds: 300),
+                                ),
+                                onPressed: () => _toggleEditMode(context),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFFFE6AC),
+                                  foregroundColor: Colors.black,
+                                  elevation: 5,
+                                  shadowColor: Colors.black.withOpacity(0.3),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(buttonHeight / 2),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            
+                            // Animated space for Cancel button
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              height: _isEditMode ? 12 : 0,
+                              curve: Curves.easeInOut,
+                            ),
+                            
+                            // Cancel button that appears in edit mode
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              height: _isEditMode ? buttonHeight : 0,
+                              curve: Curves.easeInOut,
+                              child: AnimatedOpacity(
+                                opacity: _isEditMode ? 1.0 : 0.0,
+                                duration: const Duration(milliseconds: 250),
+                                child: SizedBox(
+                                  key: _cancelButtonKey,
+                                  width: double.infinity,
+                                  height: _isEditMode ? buttonHeight : 0,
+                                  child: ElevatedButton.icon(
+                                    icon: const Icon(
+                                      Icons.close, 
+                                      size: 20, 
+                                      color: Color(0xFFFFE6AC),
+                                    ),
+                                    label: const Text(
+                                      'Cancel', 
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      )
+                                    ),
+                                    onPressed: () => _cancelEditMode(context),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Theme.of(context).brightness == Brightness.dark 
+                                          ? const Color(0xFF1D1D1D) 
+                                          : Colors.white,
+                                      foregroundColor: const Color(0xFFFFE6AC),
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(buttonHeight / 2),
+                                        side: const BorderSide(color: Color(0xFFFFE6AC), width: 2),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            
+                            const SizedBox(height: 12),
+                            
+                            // Row with Logout and Delete Account buttons
+                            Row(
+                              children: [
+                                // Logout Button - Animated slide
+                                AnimatedContainer(
+                                  duration: const Duration(milliseconds: 300),
+                                  width: _isEditMode ? 0 : constraints.maxWidth / 2 - 5,
+                                  height: buttonHeight,
+                                  curve: Curves.easeInOut,
+                                  child: AnimatedOpacity(
+                                    opacity: _isEditMode ? 0.0 : 1.0,
+                                    duration: const Duration(milliseconds: 300),
+                                    child: OverflowBox(
+                                      maxWidth: constraints.maxWidth / 2 - 5,
+                                      maxHeight: buttonHeight,
+                                      child: SizedBox(
+                                        key: _logoutButtonKey,
+                                        height: buttonHeight,
+                                        child: ElevatedButton.icon(
+                                          icon: Icon(
+                                            Icons.logout, 
+                                            size: constraints.maxWidth < 350 ? 16 : 20,
+                                            color: const Color(0xFFFFE6AC),
+                                          ),
+                                          label: Text(
+                                            'Logout', 
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: fontSize,
+                                            )
+                                          ),
+                                          onPressed: _isEditMode ? null : () => _signOut(context),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Theme.of(context).brightness == Brightness.dark 
+                                                ? const Color(0xFF1D1D1D) 
+                                                : Colors.white,
+                                            foregroundColor: const Color(0xFFFFE6AC),
+                                            elevation: 0,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(buttonHeight / 2),
+                                              side: const BorderSide(color: Color(0xFFFFE6AC), width: 2),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                
+                                // Center spacer that grows when buttons slide out
+                                AnimatedContainer(
+                                  duration: const Duration(milliseconds: 300),
+                                  width: _isEditMode ? constraints.maxWidth : 10,
+                                  curve: Curves.easeInOut,
+                                ),
+                                
+                                // Delete Account Button - Animated slide
+                                AnimatedContainer(
+                                  duration: const Duration(milliseconds: 300),
+                                  width: _isEditMode ? 0 : constraints.maxWidth / 2 - 5,
+                                  height: buttonHeight,
+                                  curve: Curves.easeInOut,
+                                  child: AnimatedOpacity(
+                                    opacity: _isEditMode ? 0.0 : 1.0,
+                                    duration: const Duration(milliseconds: 300),
+                                    child: OverflowBox(
+                                      maxWidth: constraints.maxWidth / 2 - 5,
+                                      maxHeight: buttonHeight,
+                                      child: SizedBox(
+                                        key: _deleteButtonKey,
+                                        height: buttonHeight,
+                                        child: ElevatedButton.icon(
+                                          icon: Icon(
+                                            Icons.delete_forever, 
+                                            size: constraints.maxWidth < 350 ? 16 : 20,
+                                            color: Colors.white,
+                                          ),
+                                          label: Text(
+                                            'Delete Account', 
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: fontSize,
+                                            )
+                                          ),
+                                          onPressed: _isEditMode ? null : () => _showDeleteAccountDialog(context),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.red.shade600,
+                                            foregroundColor: Colors.white,
+                                            elevation: 5,
+                                            shadowColor: Colors.black.withOpacity(0.3),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(buttonHeight / 2),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        );
+                      },
+                    ),
                   ),
                   const SizedBox(height: 20),
-                  Card(
-                    color: Theme.of(context).brightness == Brightness.dark ? const Color.fromARGB(255, 32, 32, 32) : Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildProfileItem(
-                            context,
-                            'Email',
-                            userData['email'] ?? 'No email provided',
-                            Icons.email,
-                            Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-                          ),
-                          const Divider(color: Color(0xFFFFE6AC)),
-                          _buildProfileItem(
-                            context,
-                            AppLocalizations.of(context)!.profileName,
-                            userData['name'] ?? 'No name provided',
-                            Icons.person,
-                            Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-                          ),
-                          const Divider(color: Color(0xFFFFE6AC)),
-                          _buildProfileItem(
-                            context,
-                            AppLocalizations.of(context)!.favTeam,
-                            userData['favoriteTeam'] ?? 'No team selected',
-                            Icons.sports_soccer,
-                            Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-                          ),
-                          const Divider(color: Color(0xFFFFE6AC)),
-                          _buildProfileItem(
-                            context,
-                            AppLocalizations.of(context)!.favLeague,
-                            userData['favoriteLeague'] ?? 'No league selected',
-                            Icons.emoji_events,
-                            Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.edit),
-                        label: const Text('Edit Profile'),
-                        onPressed: () => _editProfile(context),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFFFE6AC),
-                          foregroundColor: Colors.black,
-                        ),
-                      ),
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.logout),
-                        label: const Text('Logout'),
-                        onPressed: () => _signOut(context),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red.shade300,
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
                 ],
               ),
             ),
@@ -214,8 +439,8 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
-    // Refresh user data when the profile page is loaded
     _refreshUserData();
+    _preloadTeamsAndLeagues();  // Preload the data
   }
 
   // Add method to verify Firebase data
@@ -253,7 +478,7 @@ class _ProfilePageState extends State<ProfilePage> {
     if (!mounted) return;
     
     try {
-      final provider = Provider.of<FirebaseProvider>(context, listen: false);
+    final provider = Provider.of<FirebaseProvider>(context, listen: false);
       await provider.refreshUserData();
       
       // Verify the data once it's loaded
@@ -280,7 +505,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 return;
               });
               print('Profile image precached successfully');
-            } catch (e) {
+    } catch (e) {
               print('Warning: Error precaching image: $e');
             }
           } else {
@@ -297,9 +522,13 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   void dispose() {
-    // Clean up resources
+    _nameController.dispose();
+    _emailController.dispose();
     _profileImage = null;
     _webImagePath = null;
+    _currentPasswordController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -323,7 +552,7 @@ class _ProfilePageState extends State<ProfilePage> {
       
       if (!mounted) return; // Check if widget is still mounted
       
-      setState(() {
+        setState(() {
         _isLoadingImage = true;
         if (!kIsWeb) {
           _profileImage = File(image.path);
@@ -337,8 +566,8 @@ class _ProfilePageState extends State<ProfilePage> {
       
       // Show uploading message
       scaffoldMessenger.showSnackBar(
-        const SnackBar(content: Text('Uploading profile picture...')),
-      );
+            const SnackBar(content: Text('Uploading profile picture...')),
+          );
       
       try {
         String? imageUrl;
@@ -365,9 +594,9 @@ class _ProfilePageState extends State<ProfilePage> {
         if (!mounted) return; // Check if mounted before showing success
         
         scaffoldMessenger.showSnackBar(
-          const SnackBar(content: Text('Profile picture updated successfully')),
-        );
-      } catch (e) {
+              const SnackBar(content: Text('Profile picture updated successfully')),
+            );
+        } catch (e) {
         print('Profile picture upload error: $e');
         
         if (mounted) { // Only show error if still mounted
@@ -388,42 +617,190 @@ class _ProfilePageState extends State<ProfilePage> {
       // Only try to show errors if we're still mounted
       if (mounted) {
         scaffoldMessenger.showSnackBar(
-          SnackBar(content: Text('Error selecting image: ${e.toString()}')),
-        );
-      }
+        SnackBar(content: Text('Error selecting image: ${e.toString()}')),
+      );
     }
+  }
   }
 
   Widget _buildProfileItem(BuildContext context, String label, String value, IconData icon, Color textColor) {
+    final bool isNameField = label == AppLocalizations.of(context)!.profileName;
+    final bool isTeamField = label == AppLocalizations.of(context)!.favTeam;
+    final bool isLeagueField = label == AppLocalizations.of(context)!.favLeague;
+    final bool isEmailField = label == 'Email';
+    
+    // Calculate if this field is currently being edited
+    final bool isFieldBeingEdited = _isEditMode && _currentlyEditingField == label && isNameField;
+    
+    // Use pending changes if available for each field type
+    String displayValue;
+    if (isNameField && _pendingNameChange != null) {
+      displayValue = _pendingNameChange!;
+    } else if (isTeamField && _selectedTeam != null) {
+      displayValue = _selectedTeam!['name'] ?? value;
+    } else if (isLeagueField && _selectedLeague != null) {
+      displayValue = _selectedLeague!['name'] ?? value;
+    } else {
+      displayValue = value;
+    }
+    
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: goldColor, size: 24),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: textColor,
-                  ),
+          Row(
+            children: [
+              Icon(icon, color: goldColor, size: 24),
+              const SizedBox(width: 15),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: textColor,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    // Show name TextField only when this specific field is being edited
+                    if (isFieldBeingEdited)
+                      TextField(
+                        controller: _nameController,
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: textColor,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        decoration: InputDecoration(
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                          border: UnderlineInputBorder(
+                            borderSide: BorderSide(color: goldColor),
+                          ),
+                          enabledBorder: UnderlineInputBorder(
+                            borderSide: BorderSide(color: goldColor),
+                          ),
+                          focusedBorder: UnderlineInputBorder(
+                            borderSide: BorderSide(color: goldColor, width: 2),
+                          ),
+                          suffixIcon: IconButton(
+                            icon: const Icon(Icons.check, size: 18),
+                            color: goldColor,
+                            onPressed: () {
+                              setState(() {
+                                // Store the pending name change
+                                _pendingNameChange = _nameController.text;
+                                _currentlyEditingField = null; // Close editing
+                              });
+                            },
+                          ),
+                        ),
+                      )
+                    else if (_isEditMode && (isNameField || isTeamField || isLeagueField))
+                      // For name/team/league, show a button to open the selection dialog
+                      InkWell(
+                        onTap: () {
+                          if (isNameField) {
+                            setState(() {
+                              // Initialize the controller with the current display value
+                              _nameController.text = displayValue;
+                              _currentlyEditingField = label;
+                            });
+                          } else if (isTeamField) {
+                            _showTeamSelectionDialogForEdit(context);
+                          } else if (isLeagueField) {
+                            _showLeagueSelectionDialogForEdit(context);
+                          }
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  displayValue,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: textColor,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                              Icon(Icons.edit, color: goldColor, size: 18),
+                            ],
+                          ),
+                        ),
+                      )
+                    else if (_isEditMode && isEmailField)
+                      // Email is typically not editable after registration
+                      Container(
+                        height: 40, // Fixed height to match other fields
+                        alignment: Alignment.centerLeft,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                value,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: textColor.withOpacity(0.7), // Dimmed to indicate not editable
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            Tooltip(
+                              message: 'Email cannot be changed after registration',
+                              child: Icon(Icons.info_outline, color: Colors.grey, size: 18),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      // Regular text in non-edit mode (or any other field)
+                      Container(
+                        height: 40, // Fixed height for consistency
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          displayValue,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: textColor,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: textColor,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
+          
+          // Add Change Password button below the email field when in edit mode
+          if (isEmailField && _isEditMode)
+            Padding(
+              padding: const EdgeInsets.only(top: 4.0, left: 39.0),
+              child: TextButton(
+                onPressed: () => _showChangePasswordDialog(context),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  'Change Password',
+                  style: TextStyle(
+                    color: goldColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -485,6 +862,8 @@ class _ProfilePageState extends State<ProfilePage> {
     final passwordController = TextEditingController();
     final confirmPasswordController = TextEditingController();
     bool isLoading = false;
+    bool _obscurePassword = true;
+    bool _obscureConfirmPassword = true;
 
     return showDialog<Map<String, String>>(
       context: context,
@@ -500,18 +879,41 @@ class _ProfilePageState extends State<ProfilePage> {
                 decoration: const InputDecoration(labelText: 'Email'),
                 keyboardType: TextInputType.emailAddress,
                 enabled: !isLoading,
+                onSubmitted: !isLoading ? (_) => _performRegistration(context, setState, emailController, passwordController, confirmPasswordController, isLoading) : null,
               ),
               TextField(
                 controller: passwordController,
-                decoration: const InputDecoration(labelText: 'Password'),
-                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: 'Password',
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+                    onPressed: () {
+                      setState(() {
+                        _obscurePassword = !_obscurePassword;
+                      });
+                    },
+                  ),
+                ),
+                obscureText: _obscurePassword,
                 enabled: !isLoading,
+                onSubmitted: !isLoading ? (_) => _performRegistration(context, setState, emailController, passwordController, confirmPasswordController, isLoading) : null,
               ),
               TextField(
                 controller: confirmPasswordController,
-                decoration: const InputDecoration(labelText: 'Confirm Password'),
-                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: 'Confirm Password',
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscureConfirmPassword ? Icons.visibility : Icons.visibility_off),
+                    onPressed: () {
+                      setState(() {
+                        _obscureConfirmPassword = !_obscureConfirmPassword;
+                      });
+                    },
+                  ),
+                ),
+                obscureText: _obscureConfirmPassword,
                 enabled: !isLoading,
+                onSubmitted: !isLoading ? (_) => _performRegistration(context, setState, emailController, passwordController, confirmPasswordController, isLoading) : null,
               ),
             ],
           ),
@@ -521,43 +923,51 @@ class _ProfilePageState extends State<ProfilePage> {
               child: const Text('Cancel'),
             ),
             TextButton(
-              onPressed: isLoading
-                  ? null
-                  : () async {
-                      if (passwordController.text != confirmPasswordController.text) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Passwords do not match')),
-                        );
-                        return;
-                      }
-
-                      setState(() => isLoading = true);
-                      try {
-                        final methods = await FirebaseAuth.instance.fetchSignInMethodsForEmail(emailController.text);
-                        if (methods.isNotEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Email already in use')),
-                          );
-                          setState(() => isLoading = false);
-                          return;
-                        }
-                        Navigator.pop(context, {
-                          'email': emailController.text,
-                          'password': passwordController.text,
-                        });
-                      } catch (e) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Error checking email: $e')),
-                        );
-                        setState(() => isLoading = false);
-                      }
-                    },
+              onPressed: isLoading ? null : () => _performRegistration(context, setState, emailController, passwordController, confirmPasswordController, isLoading),
               child: const Text('Next'),
             ),
           ],
         ),
       ),
     );
+  }
+
+  // Helper method to handle the registration step
+  Future<void> _performRegistration(
+    BuildContext context, 
+    StateSetter setState, 
+    TextEditingController emailController, 
+    TextEditingController passwordController,
+    TextEditingController confirmPasswordController, 
+    bool isLoading
+  ) async {
+    if (passwordController.text != confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Passwords do not match')),
+      );
+      return;
+    }
+
+    setState(() => isLoading = true);
+    try {
+      final methods = await FirebaseAuth.instance.fetchSignInMethodsForEmail(emailController.text);
+      if (methods.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Email already in use')),
+        );
+        setState(() => isLoading = false);
+        return;
+      }
+      Navigator.pop(context, {
+        'email': emailController.text,
+        'password': passwordController.text,
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error checking email: $e')),
+      );
+      setState(() => isLoading = false);
+    }
   }
 
   Future<String?> _showNameDialog(BuildContext context) async {
@@ -631,17 +1041,28 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<Map<String, String>?> _showTeamSelectionDialog(BuildContext context) async {
-    List<Map<String, String>>? teams;
+    List<Map<String, String>>? teams = _cachedTeams;
     Map<String, String>? selectedTeam;
-    bool isLoading = true;
+    bool isLoading = teams == null;
 
-    try {
-      teams = await FootballApiService.getTeams();
-      isLoading = false;
-    } catch (e) {
-      print('Error loading teams: $e');
-      isLoading = false;
+    if (teams == null) {
+      try {
+        teams = await FootballApiService.getTeams();
+        isLoading = false;
+      } catch (e) {
+        print('Error loading teams: $e');
+        isLoading = false;
+      }
     }
+
+    // Get screen size to make dialog properly responsive
+    final screenSize = MediaQuery.of(context).size;
+    final isSmallScreen = screenSize.width < 600;
+    
+    // Adjust dialog width based on screen size
+    final dialogWidth = isSmallScreen
+        ? math.min(400.0, screenSize.width * 0.9)  // Mobile: 90% of screen width up to 400px
+        : math.min(450.0, screenSize.width * 0.7); // Desktop: 70% of screen width up to 450px
 
     return showDialog<Map<String, String>>(
       context: context,
@@ -649,9 +1070,10 @@ class _ProfilePageState extends State<ProfilePage> {
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
           title: const Text('Select Your Favorite Team'),
+          contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
           content: SizedBox(
-            width: double.maxFinite,
-            height: 400,
+            width: dialogWidth,
+            height: 400, // Slightly taller than before
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -662,9 +1084,11 @@ class _ProfilePageState extends State<ProfilePage> {
                 else
                   Expanded(
                     child: GridView.builder(
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        childAspectRatio: 1,
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: isSmallScreen ? 3 : 4, // 3 columns on mobile, 4 on desktop
+                        childAspectRatio: 0.75, // Slightly better than 0.7
+                        crossAxisSpacing: 4, // Increased from 3
+                        mainAxisSpacing: 4, // Increased from 3
                       ),
                       itemCount: teams.length,
                       itemBuilder: (context, index) {
@@ -676,19 +1100,27 @@ class _ProfilePageState extends State<ProfilePage> {
                           },
                           child: Card(
                             color: isSelected ? Colors.blue.withOpacity(0.3) : null,
+                            margin: const EdgeInsets.all(2), // Back to 2px margins
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Image.network(
                                   team['crest'] ?? '',
-                                  height: 40,
+                                  height: 28, // Increased from 25
                                   errorBuilder: (context, error, stackTrace) =>
-                                      const Icon(Icons.sports_soccer),
+                                      const Icon(Icons.sports_soccer, size: 28),
                                 ),
-                                Text(
-                                  team['name'] ?? 'Unknown Team',
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(fontSize: 12),
+                                Padding(
+                                  padding: const EdgeInsets.all(2), // Increased from 1
+                                  child: Text(
+                                    team['name'] ?? 'Unknown Team',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: isSmallScreen ? 9.0 : 9.5, // Responsive font size
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                               ],
                             ),
@@ -718,17 +1150,28 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<Map<String, String>?> _showLeagueSelectionDialog(BuildContext context) async {
-    List<Map<String, String>>? leagues;
+    List<Map<String, String>>? leagues = _cachedLeagues;
     Map<String, String>? selectedLeague;
-    bool isLoading = true;
+    bool isLoading = leagues == null;
 
-    try {
-      leagues = await FootballApiService.getLeagues();
-      isLoading = false;
-    } catch (e) {
-      print('Error loading leagues: $e');
-      isLoading = false;
+    if (leagues == null) {
+      try {
+        leagues = await FootballApiService.getLeagues();
+        isLoading = false;
+      } catch (e) {
+        print('Error loading leagues: $e');
+        isLoading = false;
+      }
     }
+
+    // Get screen size to make dialog properly responsive
+    final screenSize = MediaQuery.of(context).size;
+    final isSmallScreen = screenSize.width < 600;
+    
+    // Adjust dialog width based on screen size
+    final dialogWidth = isSmallScreen
+        ? math.min(400.0, screenSize.width * 0.9)  // Mobile: 90% of screen width up to 400px
+        : math.min(450.0, screenSize.width * 0.7); // Desktop: 70% of screen width up to 450px
 
     return showDialog<Map<String, String>>(
       context: context,
@@ -736,9 +1179,10 @@ class _ProfilePageState extends State<ProfilePage> {
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
           title: const Text('Select Your Favorite League'),
+          contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
           content: SizedBox(
-            width: double.maxFinite,
-            height: 400,
+            width: dialogWidth,
+            height: 400, // Slightly taller than before
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -749,9 +1193,11 @@ class _ProfilePageState extends State<ProfilePage> {
                 else
                   Expanded(
                     child: GridView.builder(
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        childAspectRatio: 1,
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: isSmallScreen ? 3 : 4, // 3 columns on mobile, 4 on desktop
+                        childAspectRatio: 0.75, // Slightly better than 0.7
+                        crossAxisSpacing: 4, // Increased from 3
+                        mainAxisSpacing: 4, // Increased from 3
                       ),
                       itemCount: leagues.length,
                       itemBuilder: (context, index) {
@@ -763,19 +1209,27 @@ class _ProfilePageState extends State<ProfilePage> {
                           },
                           child: Card(
                             color: isSelected ? Colors.blue.withOpacity(0.3) : null,
+                            margin: const EdgeInsets.all(2), // Back to 2px margins
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Image.network(
                                   league['emblem'] ?? '',
-                                  height: 40,
+                                  height: 28, // Increased from 25
                                   errorBuilder: (context, error, stackTrace) =>
-                                      const Icon(Icons.emoji_events),
+                                      const Icon(Icons.emoji_events, size: 28),
                                 ),
-                                Text(
-                                  league['name'] ?? 'Unknown League',
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(fontSize: 12),
+                                Padding(
+                                  padding: const EdgeInsets.all(2), // Increased from 1
+                                  child: Text(
+                                    league['name'] ?? 'Unknown League',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: isSmallScreen ? 9.0 : 9.5, // Responsive font size
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                               ],
                             ),
@@ -808,6 +1262,7 @@ class _ProfilePageState extends State<ProfilePage> {
     final emailController = TextEditingController();
     final passwordController = TextEditingController();
     bool isLoading = false;
+    bool _obscurePassword = true;
 
     return showDialog(
       context: context,
@@ -823,13 +1278,25 @@ class _ProfilePageState extends State<ProfilePage> {
                 decoration: const InputDecoration(labelText: 'Email'),
                 keyboardType: TextInputType.emailAddress,
                 enabled: !isLoading,
+                onSubmitted: !isLoading ? (_) => _performLogin(context, setState, emailController, passwordController, isLoading) : null,
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: passwordController,
-                decoration: const InputDecoration(labelText: 'Password'),
-                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: 'Password',
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+                    onPressed: () {
+                      setState(() {
+                        _obscurePassword = !_obscurePassword;
+                      });
+                    },
+                  ),
+                ),
+                obscureText: _obscurePassword,
                 enabled: !isLoading,
+                onSubmitted: !isLoading ? (_) => _performLogin(context, setState, emailController, passwordController, isLoading) : null,
               ),
               if (isLoading) ...[
                 const SizedBox(height: 16),
@@ -843,45 +1310,7 @@ class _ProfilePageState extends State<ProfilePage> {
               child: const Text('Cancel'),
             ),
             TextButton(
-              onPressed: isLoading
-                  ? null
-                  : () async {
-                      if (emailController.text.isEmpty || passwordController.text.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Please fill in all fields')),
-                        );
-                        return;
-                      }
-
-                      setState(() => isLoading = true);
-
-                      try {
-                        final firebaseProvider = Provider.of<FirebaseProvider>(context, listen: false);
-                        final success = await firebaseProvider.signIn(
-                          emailController.text,
-                          passwordController.text,
-                        );
-
-                        if (success && context.mounted) {
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Login successful')),
-                          );
-                        } else if (context.mounted) {
-                          setState(() => isLoading = false);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Login failed')),
-                          );
-                        }
-                      } catch (e) {
-                        setState(() => isLoading = false);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error: ${e.toString()}')),
-                          );
-                        }
-                      }
-                    },
+              onPressed: isLoading ? null : () => _performLogin(context, setState, emailController, passwordController, isLoading),
               child: const Text('Login'),
             ),
           ],
@@ -890,28 +1319,98 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  // Helper method to handle login logic
+  Future<void> _performLogin(BuildContext context, StateSetter setState, 
+      TextEditingController emailController, TextEditingController passwordController, bool isLoading) async {
+    if (emailController.text.isEmpty || passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in all fields')),
+      );
+      return;
+    }
+
+    setState(() => isLoading = true);
+
+    try {
+      final firebaseProvider = Provider.of<FirebaseProvider>(context, listen: false);
+      final success = await firebaseProvider.signIn(
+        emailController.text,
+        passwordController.text,
+      );
+
+      if (success && context.mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Login successful')),
+        );
+      } else if (context.mounted) {
+        setState(() => isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Login failed')),
+        );
+      }
+    } catch (e) {
+      setState(() => isLoading = false);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
   void _showDeleteAccountDialog(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Account'),
-        content: const Text(
-          'Are you sure you want to delete your account? This action cannot be undone.',
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red.shade400, size: 28),
+            const SizedBox(width: 10),
+            const Text('Delete Account'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Are you sure you want to delete your account?',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16, 
+                color: isDarkMode ? Colors.white : Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'This action cannot be undone. All your data will be permanently removed.',
+              style: TextStyle(
+                color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
               await _handleDeleteAccount(context);
             },
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.red,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade400,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
-            child: const Text('Delete'),
+            child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -942,10 +1441,10 @@ class _ProfilePageState extends State<ProfilePage> {
         return 'Recently'; // Fallback text
       }
       
-      final months = [
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'
-      ];
+    final months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
       
       DateTime dateTime;
       
@@ -1307,6 +1806,367 @@ class _ProfilePageState extends State<ProfilePage> {
           ],
         ),
       ),
+    );
+  }
+
+  // Preload teams and leagues data when profile page is initialized
+  Future<void> _preloadTeamsAndLeagues() async {
+    try {
+      _cachedTeams = await FootballApiService.getTeams();
+      _cachedLeagues = await FootballApiService.getLeagues();
+      print('Preloaded ${_cachedTeams?.length ?? 0} teams and ${_cachedLeagues?.length ?? 0} leagues');
+    } catch (e) {
+      print('Error preloading teams/leagues: $e');
+    }
+  }
+
+  // Add this method for team selection in edit mode
+  Future<void> _showTeamSelectionDialogForEdit(BuildContext context) async {
+    final team = await _showTeamSelectionDialog(context);
+    if (team != null && mounted) {
+      setState(() {
+        // We'll store this selection temporarily and apply it on confirm
+        _selectedTeam = team;
+      });
+    }
+  }
+
+  // Add this method for league selection in edit mode
+  Future<void> _showLeagueSelectionDialogForEdit(BuildContext context) async {
+    final league = await _showLeagueSelectionDialog(context);
+    if (league != null && mounted) {
+      setState(() {
+        // We'll store this selection temporarily and apply it on confirm
+        _selectedLeague = league;
+      });
+    }
+  }
+
+  // Add the _toggleEditMode method
+  void _toggleEditMode(BuildContext context) async {
+    final provider = Provider.of<FirebaseProvider>(context, listen: false);
+    final userData = provider.userData;
+    
+    // If we're turning on edit mode, initialize the controllers
+    if (!_isEditMode) {
+      _nameController.text = userData?['name'] ?? '';
+      _emailController.text = userData?['email'] ?? '';
+      
+      // Store original values
+      if (userData != null) {
+        final teamName = userData['favoriteTeam'];
+        final teamId = userData['favoriteTeamId'];
+        if (teamName != null && teamId != null) {
+          _originalTeam = {
+            'name': teamName,
+            'id': teamId,
+          };
+        }
+        
+        final leagueName = userData['favoriteLeague'];
+        if (leagueName != null) {
+          _originalLeague = {
+            'name': leagueName,
+          };
+        }
+      }
+      
+      // Clear temporary selections
+      _selectedTeam = null;
+      _selectedLeague = null;
+      _currentlyEditingField = null;
+      _pendingNameChange = null;
+      
+      setState(() {
+        _isEditMode = true;
+      });
+    } else {
+      // Confirm edits and save changes
+      final Map<String, dynamic> updates = {};
+      
+      // Only add changed fields - use pending name if available
+      if (_pendingNameChange != null && _pendingNameChange != (userData?['name'] ?? '')) {
+        updates['name'] = _pendingNameChange;
+      }
+      
+      // Add team/league changes if they were updated
+      if (_selectedTeam != null) {
+        updates['favoriteTeam'] = _selectedTeam!['name'];
+        updates['favoriteTeamId'] = _selectedTeam!['id'];
+      }
+      
+      if (_selectedLeague != null) {
+        updates['favoriteLeague'] = _selectedLeague!['name'];
+      }
+      
+      // Save changes if there are any
+      if (updates.isNotEmpty) {
+        try {
+          await provider.updateUserProfile(updates);
+          
+          // Refresh user data after update
+          await provider.refreshUserData();
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Profile updated successfully')),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error updating profile: ${e.toString()}')),
+            );
+          }
+        }
+      }
+      
+      setState(() {
+        _isEditMode = false;
+        _currentlyEditingField = null;
+        _pendingNameChange = null; // Clear the pending name change
+        _selectedTeam = null;
+        _selectedLeague = null;
+        _originalTeam = null;
+        _originalLeague = null;
+      });
+    }
+  }
+
+  // Add the _cancelEditMode method
+  void _cancelEditMode(BuildContext context) {
+    setState(() {
+      _isEditMode = false;
+      _currentlyEditingField = null;
+      _pendingNameChange = null;
+      // Revert to original values if selections were made
+      _selectedTeam = null;
+      _selectedLeague = null;
+      _originalTeam = null;
+      _originalLeague = null;
+    });
+  }
+
+  // Method to show change password dialog
+  void _showChangePasswordDialog(BuildContext context) {
+    // Clear previous password entries
+    _currentPasswordController.clear();
+    _newPasswordController.clear();
+    _confirmPasswordController.clear();
+    
+    // Error states
+    bool isCurrentPasswordError = false;
+    bool isNewPasswordError = false;
+    bool isConfirmPasswordError = false;
+    String? errorText;
+    
+    // Password visibility toggles
+    bool _obscureCurrentPassword = true;
+    bool _obscureNewPassword = true;
+    bool _obscureConfirmPassword = true;
+    bool isLoading = false;
+    
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Change Password'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Current Password
+                    TextField(
+                      controller: _currentPasswordController,
+                      decoration: InputDecoration(
+                        labelText: 'Current Password',
+                        errorText: isCurrentPasswordError ? 'Current password is required' : null,
+                        suffixIcon: IconButton(
+                          icon: Icon(_obscureCurrentPassword ? Icons.visibility : Icons.visibility_off),
+                          onPressed: () {
+                            setState(() {
+                              _obscureCurrentPassword = !_obscureCurrentPassword;
+                            });
+                          },
+                        ),
+                        enabled: !isLoading,
+                      ),
+                      obscureText: _obscureCurrentPassword,
+                      onSubmitted: !isLoading ? (_) => null : null,
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // New Password
+                    TextField(
+                      controller: _newPasswordController,
+                      decoration: InputDecoration(
+                        labelText: 'New Password',
+                        errorText: isNewPasswordError ? 'Password must be at least 6 characters' : null,
+                        suffixIcon: IconButton(
+                          icon: Icon(_obscureNewPassword ? Icons.visibility : Icons.visibility_off),
+                          onPressed: () {
+                            setState(() {
+                              _obscureNewPassword = !_obscureNewPassword;
+                            });
+                          },
+                        ),
+                        enabled: !isLoading,
+                      ),
+                      obscureText: _obscureNewPassword,
+                      onSubmitted: !isLoading ? (_) => null : null,
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4.0, left: 4.0),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '*', 
+                            style: TextStyle(
+                              color: Colors.red,
+                              fontSize: 12,
+                            )
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            'Password must be at least 6 characters',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Confirm New Password
+                    TextField(
+                      controller: _confirmPasswordController,
+                      decoration: InputDecoration(
+                        labelText: 'Confirm New Password',
+                        errorText: isConfirmPasswordError ? 'Passwords do not match' : null,
+                        suffixIcon: IconButton(
+                          icon: Icon(_obscureConfirmPassword ? Icons.visibility : Icons.visibility_off),
+                          onPressed: () {
+                            setState(() {
+                              _obscureConfirmPassword = !_obscureConfirmPassword;
+                            });
+                          },
+                        ),
+                        enabled: !isLoading,
+                      ),
+                      obscureText: _obscureConfirmPassword,
+                      onSubmitted: !isLoading ? (_) => null : null,
+                    ),
+                    
+                    // Display error message if any
+                    if (errorText != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 16),
+                        child: Text(
+                          errorText!,
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                      ),
+                      
+                    // Show loading indicator when processing
+                    if (isLoading) ...[
+                      const SizedBox(height: 16),
+                      const CircularProgressIndicator(),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isLoading ? null : () {
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: isLoading ? null : () async {
+                    // Reset error states
+                    setState(() {
+                      isCurrentPasswordError = _currentPasswordController.text.isEmpty;
+                      isNewPasswordError = _newPasswordController.text.length < 6;
+                      isConfirmPasswordError = _newPasswordController.text != _confirmPasswordController.text;
+                      errorText = null;
+                      
+                      // Set loading state if validation passes
+                      if (!isCurrentPasswordError && !isNewPasswordError && !isConfirmPasswordError) {
+                        isLoading = true;
+                      }
+                    });
+                    
+                    // Check for validation errors
+                    if (isCurrentPasswordError || isNewPasswordError || isConfirmPasswordError) {
+                      return;
+                    }
+                    
+                    // Attempt to change password
+                    try {
+                      final user = FirebaseAuth.instance.currentUser;
+                      if (user != null) {
+                        // Get credentials with current password for reauthentication
+                        final credential = EmailAuthProvider.credential(
+                          email: user.email!,
+                          password: _currentPasswordController.text,
+                        );
+                        
+                        // Reauthenticate user
+                        await user.reauthenticateWithCredential(credential);
+                        
+                        // Update password
+                        await user.updatePassword(_newPasswordController.text);
+                        
+                        // Close dialog
+                        Navigator.of(context).pop();
+                        
+                        // Show success message
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Password updated successfully'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      }
+                    } on FirebaseAuthException catch (e) {
+                      setState(() {
+                        isLoading = false;
+                        if (e.code == 'wrong-password') {
+                          isCurrentPasswordError = true;
+                          errorText = 'Current password is incorrect';
+                        } else if (e.code == 'weak-password') {
+                          isNewPasswordError = true;
+                          errorText = 'New password is too weak';
+                        } else {
+                          errorText = 'Error: ${e.message}';
+                        }
+                      });
+                    } catch (e) {
+                      setState(() {
+                        isLoading = false;
+                        errorText = 'An unexpected error occurred: $e';
+                      });
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFFE6AC),
+                    foregroundColor: Colors.black,
+                  ),
+                  child: const Text('Update Password'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }
