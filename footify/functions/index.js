@@ -269,14 +269,65 @@ exports.proxyImage = functions.https.onRequest(async (req, res) => {
   }
 
   try {
-    const response = await axios.get(imageUrl, {
-      responseType: 'arraybuffer',
-    });
-    res.set('Content-Type', response.headers['content-type'] || 'image/png'); // Fallback to PNG if unspecified
-    res.status(200).send(response.data);
+    // Check if it's an SVG image and try to load PNG version first
+    let urlToFetch = imageUrl;
+    console.log(`Attempting to fetch image: ${urlToFetch}`);
+    
+    try {
+      const response = await axios.get(urlToFetch, {
+        responseType: 'arraybuffer',
+        timeout: 10000, // 10 second timeout
+        validateStatus: function (status) {
+          return status < 500; // Accept any status code less than 500 to handle 404 properly
+        }
+      });
+      
+      // Handle 404 separately
+      if (response.status === 404) {
+        console.log(`Image not found at ${urlToFetch}, sending 404`);
+        res.status(404).send('Image not found');
+        return;
+      }
+      
+      // If status is not 200, throw error to trigger fallback
+      if (response.status !== 200) {
+        throw new Error(`Received status ${response.status} for ${urlToFetch}`);
+      }
+      
+      // Get the content type from the response, or determine it from the URL
+      let contentType = response.headers['content-type'];
+      
+      // If content-type is not provided or is octet-stream, try to determine from extension
+      if (!contentType || contentType === 'application/octet-stream') {
+        if (urlToFetch.toLowerCase().endsWith('.png')) {
+          contentType = 'image/png';
+        } else if (urlToFetch.toLowerCase().endsWith('.jpg') || urlToFetch.toLowerCase().endsWith('.jpeg')) {
+          contentType = 'image/jpeg';
+        } else if (urlToFetch.toLowerCase().endsWith('.svg')) {
+          contentType = 'image/svg+xml';
+        } else {
+          // Default to png if we can't determine the type
+          contentType = 'image/png';
+        }
+      }
+      
+      res.set('Content-Type', contentType);
+      res.set('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
+      res.send(response.data);
+      
+    } catch (error) {
+      console.error(`Error proxying image from ${urlToFetch}:`, error.message);
+      
+      // Check if we were trying to fetch SVG and provide helpful response
+      if (imageUrl.toLowerCase().endsWith('.svg')) {
+        res.status(500).send('SVG images are not supported directly. Please provide PNG version.');
+      } else {
+        res.status(500).send('Error loading image: ' + error.message);
+      }
+    }
   } catch (error) {
-    console.error('Error fetching image:', error.message);
-    res.status(500).send(`Failed to fetch image: ${error.message}`);
+    console.error('Unexpected error in proxyImage:', error);
+    res.status(500).send('Internal server error');
   }
 });
 
@@ -798,6 +849,36 @@ exports.fetchTeams = functions.https.onRequest(async (req, res) => {
     console.error('Error fetching teams:', error.message);
     res.status(500).json({
       error: 'Failed to fetch teams',
+      details: error.message || 'Unknown error',
+      status: error.response ? error.response.status : null,
+    });
+  }
+});
+
+// Function to fetch all areas/countries
+exports.fetchAreas = functions.https.onRequest(async (req, res) => {
+  setCorsHeaders(res);
+  
+  if (handleOptions(req, res)) return;
+
+  try {
+    // Fetch all areas from the football-data.org API
+    const response = await axios.get(`${BASE_URL}/areas`, {
+      headers: {
+        'X-Auth-Token': API_KEY,
+      },
+    });
+    
+    if (response.status === 200) {
+      // Return the complete data with all areas
+      res.status(200).json(response.data);
+    } else {
+      throw new Error(`API returned status: ${response.status}`);
+    }
+  } catch (error) {
+    console.error('Error fetching areas/countries:', error.message);
+    res.status(500).json({
+      error: 'Failed to fetch areas/countries',
       details: error.message || 'Unknown error',
       status: error.response ? error.response.status : null,
     });

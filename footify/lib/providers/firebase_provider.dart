@@ -115,6 +115,7 @@ class FirebaseProvider with ChangeNotifier {
     required String favoriteTeam,
     required String favoriteTeamId,  // Make sure this parameter exists
     required String favoriteLeague,
+    String? favoriteNationalTeamId,
   }) async {
     try {
       // Create the user account with email and password
@@ -132,7 +133,8 @@ class FirebaseProvider with ChangeNotifier {
           'username': username,
           'favoriteTeam': favoriteTeam,
           'favoriteTeamId': favoriteTeamId,  // Make sure this field is included
-          'favoriteLeague': favoriteLeague,
+          'favoriteNationalTeam': favoriteLeague, // Az átnevezett mező
+          'favoriteNationalTeamId': favoriteNationalTeamId ?? '', // Új mező az ID-nak
           'joinDate': FieldValue.serverTimestamp(),
           'uid': _user!.uid,
         };

@@ -16,6 +16,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:intl/intl.dart';
 import 'dart:math' as math;
+import 'dart:async';
 // Import for web support
 // We'll use a different approach for conditional imports
 
@@ -38,8 +39,8 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
   String? _webImagePath;
 
   // Preload teams for faster dialog display
-  List<Map<String, String>>? _cachedTeams;
-  List<Map<String, String>>? _cachedLeagues;
+  List<Map<String, dynamic>>? _cachedTeams;
+  List<Map<String, dynamic>>? _cachedLeagues;
 
   // Track if we're in edit mode
   bool _isEditMode = false;
@@ -66,12 +67,12 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
   final TextEditingController _confirmPasswordController = TextEditingController();
 
   // Add these variables to store temporary selections
-  Map<String, String>? _selectedTeam;
-  Map<String, String>? _selectedLeague;
+  Map<String, dynamic>? _selectedTeam;
+  Map<String, dynamic>? _selectedLeague;
   
   // Add variables to store original values
-  Map<String, String>? _originalTeam;
-  Map<String, String>? _originalLeague;
+  Map<String, dynamic>? _originalTeam;
+  Map<String, dynamic>? _originalLeague;
 
   @override
   Widget build(BuildContext context) {
@@ -97,6 +98,8 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
       child: userData == null
           ? _buildLoginView(context)
           : SingleChildScrollView(
+            // Webböngészőben letiltjuk a görgetést, hogy ne legyen lehetséges a profil oldalon
+            physics: kIsWeb ? const NeverScrollableScrollPhysics() : const AlwaysScrollableScrollPhysics(),
             child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
               children: [
@@ -137,7 +140,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
         Card(
           color: Theme.of(context).brightness == Brightness.dark ? const Color.fromARGB(255, 32, 32, 32) : Colors.white,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(12),
           ),
           child: Padding(
             padding: const EdgeInsets.all(20),
@@ -170,16 +173,16 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                 const Divider(color: Color(0xFFFFE6AC)),
                 _buildProfileItem(
                   context,
-                  AppLocalizations.of(context)!.favLeague,
-                  userData['favoriteLeague'] ?? 'No league selected',
-                  Icons.emoji_events,
+                  'Favorite National Team',
+                  userData['favoriteNationalTeam'] ?? userData['favoriteLeague'] ?? 'No national team selected',
+                  Icons.flag,
                             Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                 ),
               ],
             ),
                     ),
                   ),
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 16),
                   // Main action buttons with responsive layout
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -390,7 +393,6 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                       },
                     ),
                   ),
-                  const SizedBox(height: 20),
                 ],
               ),
             ),
@@ -626,7 +628,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
   Widget _buildProfileItem(BuildContext context, String label, String value, IconData icon, Color textColor) {
     final bool isNameField = label == AppLocalizations.of(context)!.profileName;
     final bool isTeamField = label == AppLocalizations.of(context)!.favTeam;
-    final bool isLeagueField = label == AppLocalizations.of(context)!.favLeague;
+    final bool isNationalTeamField = label == 'Favorite National Team';
     final bool isEmailField = label == 'Email';
     
     // Calculate if this field is currently being edited
@@ -638,7 +640,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
       displayValue = _pendingNameChange!;
     } else if (isTeamField && _selectedTeam != null) {
       displayValue = _selectedTeam!['name'] ?? value;
-    } else if (isLeagueField && _selectedLeague != null) {
+    } else if (isNationalTeamField && _selectedLeague != null) {
       displayValue = _selectedLeague!['name'] ?? value;
     } else {
       displayValue = value;
@@ -699,7 +701,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                           ),
                         ),
                       )
-                    else if (_isEditMode && (isNameField || isTeamField || isLeagueField))
+                    else if (_isEditMode && (isNameField || isTeamField || isNationalTeamField))
                       // For name/team/league, show a button to open the selection dialog
                       InkWell(
                         onTap: () {
@@ -711,7 +713,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                             });
                           } else if (isTeamField) {
                             _showTeamSelectionDialogForEdit(context);
-                          } else if (isLeagueField) {
+                          } else if (isNationalTeamField) {
                             _showLeagueSelectionDialogForEdit(context);
                           }
                         },
@@ -783,20 +785,22 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
           // Add Change Password button below the email field when in edit mode
           if (isEmailField && _isEditMode)
             Padding(
-              padding: const EdgeInsets.only(top: 4.0, left: 39.0),
-              child: TextButton(
-                onPressed: () => _showChangePasswordDialog(context),
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              padding: const EdgeInsets.only(top: 12.0, left: 39.0),
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: goldColor, width: 1.5),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(
-                  'Change Password',
-                  style: TextStyle(
-                    color: goldColor,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
+                child: TextButton.icon(
+                  icon: const Icon(Icons.lock_outline, size: 16),
+                  label: const Text('Change Password'),
+                  onPressed: () => _showChangePasswordDialog(context),
+                  style: TextButton.styleFrom(
+                    foregroundColor: goldColor,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                 ),
               ),
@@ -825,9 +829,9 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     final team = await _showTeamSelectionDialog(context);
     if (team == null) return;
 
-    // Step 5: Collect Favorite League
-    final league = await _showLeagueSelectionDialog(context);
-    if (league == null) return;
+    // Step 5: Collect Favorite National Team
+    final nationalTeam = await _showNationalTeamSelectionDialog(context);
+    if (nationalTeam == null) return;
 
     // Complete Registration with all collected data
     if (context.mounted) {
@@ -840,7 +844,8 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
           username: username,
           favoriteTeam: team['name'] ?? '',
           favoriteTeamId: team['id'] ?? '',
-          favoriteLeague: league['name'] ?? '',
+          favoriteLeague: nationalTeam['name'] ?? '',
+          favoriteNationalTeamId: nationalTeam['id'] ?? '',
         );
         if (success && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1040,10 +1045,13 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     );
   }
 
-  Future<Map<String, String>?> _showTeamSelectionDialog(BuildContext context) async {
-    List<Map<String, String>>? teams = _cachedTeams;
-    Map<String, String>? selectedTeam;
+  Future<Map<String, dynamic>?> _showTeamSelectionDialog(BuildContext context) async {
+    List<Map<String, dynamic>>? teams = _cachedTeams;
+    Map<String, dynamic>? selectedTeam;
     bool isLoading = teams == null;
+    // Keresési szöveg és szűrt csapatok listájának hozzáadása
+    String searchQuery = '';
+    List<Map<String, dynamic>> filteredTeams = [];
 
     if (teams == null) {
       try {
@@ -1053,6 +1061,11 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
         print('Error loading teams: $e');
         isLoading = false;
       }
+    }
+    
+    // Inicializáljuk a szűrt listát az összes csapattal
+    if (teams != null) {
+      filteredTeams = List.from(teams);
     }
 
     // Get screen size to make dialog properly responsive
@@ -1064,7 +1077,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
         ? math.min(400.0, screenSize.width * 0.9)  // Mobile: 90% of screen width up to 400px
         : math.min(450.0, screenSize.width * 0.7); // Desktop: 70% of screen width up to 450px
 
-    return showDialog<Map<String, String>>(
+    return showDialog<Map<String, dynamic>>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(
@@ -1077,57 +1090,84 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // Keresősáv hozzáadása
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: TextField(
+                    decoration: InputDecoration(
+                      hintText: 'Search teams...',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
+                    ),
+                    onChanged: (value) {
+                      setState(() {
+                        searchQuery = value.toLowerCase();
+                        // Csapatok szűrése a keresési kifejezés alapján
+                        if (teams != null) {
+                          filteredTeams = teams.where((team) => 
+                            team['name']?.toLowerCase().contains(searchQuery) ?? false
+                          ).toList();
+                        }
+                      });
+                    },
+                  ),
+                ),
                 if (isLoading)
                   const CircularProgressIndicator()
                 else if (teams == null || teams.isEmpty)
                   const Text('Failed to load teams')
                 else
                   Expanded(
-                    child: GridView.builder(
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: isSmallScreen ? 3 : 4, // 3 columns on mobile, 4 on desktop
-                        childAspectRatio: 0.75, // Slightly better than 0.7
-                        crossAxisSpacing: 4, // Increased from 3
-                        mainAxisSpacing: 4, // Increased from 3
-                      ),
-                      itemCount: teams.length,
-                      itemBuilder: (context, index) {
-                        final team = teams![index];
-                        final isSelected = selectedTeam == team;
-                        return InkWell(
-                          onTap: () {
-                            setState(() => selectedTeam = team);
-                          },
-                          child: Card(
-                            color: isSelected ? Colors.blue.withOpacity(0.3) : null,
-                            margin: const EdgeInsets.all(2), // Back to 2px margins
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Image.network(
-                                  team['crest'] ?? '',
-                                  height: 28, // Increased from 25
-                                  errorBuilder: (context, error, stackTrace) =>
-                                      const Icon(Icons.sports_soccer, size: 28),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.all(2), // Increased from 1
-                                  child: Text(
-                                    team['name'] ?? 'Unknown Team',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: isSmallScreen ? 9.0 : 9.5, // Responsive font size
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
+                    child: filteredTeams.isEmpty
+                      ? const Center(child: Text('No matching teams found'))
+                      : GridView.builder(
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: isSmallScreen ? 3 : 4, // 3 columns on mobile, 4 on desktop
+                          childAspectRatio: 0.75, // Slightly better than 0.7
+                          crossAxisSpacing: 4, // Increased from 3
+                          mainAxisSpacing: 4, // Increased from 3
+                        ),
+                        itemCount: filteredTeams.length,
+                        itemBuilder: (context, index) {
+                          final team = filteredTeams[index];
+                          final isSelected = selectedTeam == team;
+                          return InkWell(
+                            onTap: () {
+                              setState(() => selectedTeam = team);
+                            },
+                            child: Card(
+                              color: isSelected ? Colors.blue.withOpacity(0.3) : null,
+                              margin: const EdgeInsets.all(2), // Back to 2px margins
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Image.network(
+                                    team['crest'] ?? '',
+                                    height: 28, // Increased from 25
+                                    errorBuilder: (context, error, stackTrace) =>
+                                        const Icon(Icons.sports_soccer, size: 28),
                                   ),
-                                ),
-                              ],
+                                  Padding(
+                                    padding: const EdgeInsets.all(2), // Increased from 1
+                                    child: Text(
+                                      team['name'] ?? 'Unknown Team',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: isSmallScreen ? 9.0 : 9.5, // Responsive font size
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        );
-                      },
-                    ),
+                          );
+                        },
+                      ),
                   ),
               ],
             ),
@@ -1149,22 +1189,34 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     );
   }
 
-  Future<Map<String, String>?> _showLeagueSelectionDialog(BuildContext context) async {
-    List<Map<String, String>>? leagues = _cachedLeagues;
-    Map<String, String>? selectedLeague;
-    bool isLoading = leagues == null;
-
-    if (leagues == null) {
-      try {
-        leagues = await FootballApiService.getLeagues();
-        isLoading = false;
-      } catch (e) {
-        print('Error loading leagues: $e');
-        isLoading = false;
-      }
-    }
-
-    // Get screen size to make dialog properly responsive
+  Future<Map<String, dynamic>?> _showNationalTeamSelectionDialog(BuildContext context) async {
+    Completer<Map<String, dynamic>?> completer = Completer<Map<String, dynamic>?>();
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return FutureBuilder<List<Map<String, dynamic>>>(
+          future: FootballApiService.getNationalTeams(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            } else if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+              // Hiba esetén, vagy ha üres a lista, használjuk a fallback adatokat
+              print('Error loading national teams: ${snapshot.error}');
+              return _buildNationalTeamDialog(context, FootballApiService.getNationalTeams(useFallback: true), completer);
+            }
+            
+            // A sikeres lekérdezés adataival építjük fel a dialógust
+            return _buildNationalTeamDialog(context, Future.value(snapshot.data!), completer);
+          },
+        );
+      },
+    );
+    
+    return completer.future;
+  }
+  
+  Widget _buildNationalTeamDialog(BuildContext context, Future<List<Map<String, dynamic>>> teamsFuture, Completer<Map<String, dynamic>?> completer) {
     final screenSize = MediaQuery.of(context).size;
     final isSmallScreen = screenSize.width < 600;
     
@@ -1172,89 +1224,132 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     final dialogWidth = isSmallScreen
         ? math.min(400.0, screenSize.width * 0.9)  // Mobile: 90% of screen width up to 400px
         : math.min(450.0, screenSize.width * 0.7); // Desktop: 70% of screen width up to 450px
-
-    return showDialog<Map<String, String>>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Select Your Favorite League'),
-          contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-          content: SizedBox(
-            width: dialogWidth,
-            height: 400, // Slightly taller than before
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (isLoading)
-                  const CircularProgressIndicator()
-                else if (leagues == null || leagues.isEmpty)
-                  const Text('Failed to load leagues')
-                else
-                  Expanded(
-                    child: GridView.builder(
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: isSmallScreen ? 3 : 4, // 3 columns on mobile, 4 on desktop
-                        childAspectRatio: 0.75, // Slightly better than 0.7
-                        crossAxisSpacing: 4, // Increased from 3
-                        mainAxisSpacing: 4, // Increased from 3
-                      ),
-                      itemCount: leagues.length,
-                      itemBuilder: (context, index) {
-                        final league = leagues![index];
-                        final isSelected = selectedLeague == league;
-                        return InkWell(
-                          onTap: () {
-                            setState(() => selectedLeague = league);
-                          },
-                          child: Card(
-                            color: isSelected ? Colors.blue.withOpacity(0.3) : null,
-                            margin: const EdgeInsets.all(2), // Back to 2px margins
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Image.network(
-                                  league['emblem'] ?? '',
-                                  height: 28, // Increased from 25
-                                  errorBuilder: (context, error, stackTrace) =>
-                                      const Icon(Icons.emoji_events, size: 28),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.all(2), // Increased from 1
-                                  child: Text(
-                                    league['name'] ?? 'Unknown League',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: isSmallScreen ? 9.0 : 9.5, // Responsive font size
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-              ],
+    
+    // Keresőszöveg kontrollere
+    TextEditingController searchController = TextEditingController();
+    ValueNotifier<String> searchText = ValueNotifier<String>('');
+    
+    return AlertDialog(
+      title: Column(
+        children: [
+          const Text('Válassz nemzeti csapatot'),
+          const SizedBox(height: 8),
+          TextField(
+            controller: searchController,
+            decoration: InputDecoration(
+              hintText: 'Keresés...',
+              prefixIcon: Icon(Icons.search),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
+            onChanged: (value) {
+              searchText.value = value.toLowerCase();
+            },
           ),
-          actions: [
-            TextButton(
-              onPressed: isLoading ? null : () => Navigator.pop(dialogContext),
-              child: const Text('Back'),
-            ),
-            TextButton(
-              onPressed: isLoading || selectedLeague == null
-                  ? null
-                  : () => Navigator.pop(dialogContext, selectedLeague),
-              child: const Text('Next'),
-            ),
-          ],
+        ],
+      ),
+      contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      content: SizedBox(
+        width: dialogWidth,
+        height: 400,
+        child: FutureBuilder<List<Map<String, dynamic>>>(
+          future: teamsFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            } else if (snapshot.hasError || !snapshot.hasData) {
+              return const Center(
+                child: Text('Hiba történt a csapatok betöltése során'),
+              );
+            }
+            
+            List<Map<String, dynamic>> teams = snapshot.data!;
+            
+            return ValueListenableBuilder<String>(
+              valueListenable: searchText,
+              builder: (context, search, child) {
+                List<Map<String, dynamic>> filteredTeams = teams
+                    .where((team) => 
+                        team['name'].toString().toLowerCase().contains(search))
+                    .toList();
+                
+                // ABC sorrendbe rendezés a nevek alapján
+                filteredTeams.sort((a, b) => 
+                    (a['name'] as String).compareTo(b['name'] as String));
+                
+                return GridView.builder(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: isSmallScreen ? 3 : 4,
+                    childAspectRatio: 0.75,
+                    crossAxisSpacing: 4,
+                    mainAxisSpacing: 4,
+                  ),
+                  itemCount: filteredTeams.length,
+                  itemBuilder: (context, index) {
+                    Map<String, dynamic> team = filteredTeams[index];
+                    return InkWell(
+                      onTap: () {
+                        setState(() {
+                          _selectedLeague = team;
+                        });
+                        Navigator.of(context).pop();
+                        completer.complete(team);
+                      },
+                      child: Card(
+                        margin: const EdgeInsets.all(2),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Image.network(
+                              team['crest'] ?? '',
+                              height: 28,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.flag, size: 28),
+                                    if (team['countryCode'] != null)
+                                      Text(
+                                        team['countryCode'],
+                                        style: const TextStyle(fontSize: 10),
+                                      ),
+                                  ],
+                                );
+                              },
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(2),
+                              child: Text(
+                                team['name'] ?? '',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: isSmallScreen ? 9.0 : 9.5,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            );
+          },
         ),
       ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Navigator.of(context).pop();
+            completer.complete(null);
+          },
+          child: const Text('Mégse'),
+        ),
+      ],
     );
   }
 
@@ -1812,11 +1907,17 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
   // Preload teams and leagues data when profile page is initialized
   Future<void> _preloadTeamsAndLeagues() async {
     try {
+      // Nemzeti csapatok betöltése
+      _cachedLeagues = await FootballApiService.getNationalTeams();
+      if (_cachedLeagues != null && _cachedLeagues!.isNotEmpty) {
+        print('Preloaded ${_cachedTeams?.length ?? 0} teams and ${_cachedLeagues?.length ?? 0} national teams');
+      }
+      
+      // Klubcsapatok betöltése
       _cachedTeams = await FootballApiService.getTeams();
-      _cachedLeagues = await FootballApiService.getLeagues();
-      print('Preloaded ${_cachedTeams?.length ?? 0} teams and ${_cachedLeagues?.length ?? 0} leagues');
+      
     } catch (e) {
-      print('Error preloading teams/leagues: $e');
+      print('Error preloading data: $e');
     }
   }
 
@@ -1833,11 +1934,25 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
 
   // Add this method for league selection in edit mode
   Future<void> _showLeagueSelectionDialogForEdit(BuildContext context) async {
-    final league = await _showLeagueSelectionDialog(context);
-    if (league != null && mounted) {
+    final Completer<Map<String, dynamic>?> completer = Completer<Map<String, dynamic>?>();
+    
+    // Mindig a fallback listát használjuk, hogy ugyanazok a csapatok jelenjenek meg, mint a regisztrációnál
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return _buildNationalTeamDialog(
+          context, 
+          FootballApiService.getNationalTeams(useFallback: true), 
+          completer
+        );
+      },
+    );
+    
+    final nationalTeam = await completer.future;
+    if (nationalTeam != null && mounted) {
       setState(() {
         // We'll store this selection temporarily and apply it on confirm
-        _selectedLeague = league;
+        _selectedLeague = nationalTeam;
       });
     }
   }
@@ -1863,10 +1978,11 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
           };
         }
         
-        final leagueName = userData['favoriteLeague'];
-        if (leagueName != null) {
+        // Most már favoriteNationalTeam-ként van tárolva az adatbázisban
+        final nationalTeamName = userData['favoriteNationalTeam'] ?? userData['favoriteLeague']; // Visszafele kompatibilitás
+        if (nationalTeamName != null) {
           _originalLeague = {
-            'name': leagueName,
+            'name': nationalTeamName,
           };
         }
       }
@@ -1896,7 +2012,9 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
       }
       
       if (_selectedLeague != null) {
-        updates['favoriteLeague'] = _selectedLeague!['name'];
+        // Már favoriteNationalTeam-ként mentjük az adatbázisba
+        updates['favoriteNationalTeam'] = _selectedLeague!['name'];
+        updates['favoriteNationalTeamId'] = _selectedLeague!['id'];
       }
       
       // Save changes if there are any
@@ -1924,7 +2042,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
       setState(() {
         _isEditMode = false;
         _currentlyEditingField = null;
-        _pendingNameChange = null; // Clear the pending name change
+        _pendingNameChange = null;
         _selectedTeam = null;
         _selectedLeague = null;
         _originalTeam = null;

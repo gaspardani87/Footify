@@ -78,7 +78,7 @@ class CommonLayout extends StatelessWidget {
             child: Container(),
           ),
           Container(
-            width: 1200,
+            width: 1000,
             child: child,
           ),
           Expanded(
