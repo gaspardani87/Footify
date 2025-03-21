@@ -88,7 +88,7 @@ class _CalendarPageState extends State<CalendarPage> {
         final Map<DateTime, List<dynamic>> matchDays = {};
         
         for (var match in matches) {
-          final matchDate = DateTime.parse(match['utcDate']).add(const Duration(hours: 1));
+          final matchDate = DateTime.parse(match['utcDate']).toLocal();
           final dateKey = DateTime(matchDate.year, matchDate.month, matchDate.day);
           
           if (!matchDays.containsKey(dateKey)) {
@@ -139,9 +139,7 @@ class _CalendarPageState extends State<CalendarPage> {
           final match = selectedMatches[index];
           final homeTeam = match['homeTeam']['name'];
           final awayTeam = match['awayTeam']['name'];
-          final matchTime = DateTime.parse(match['utcDate'])
-              .add(const Duration(hours: 1))
-              .toLocal();
+          final matchTime = DateTime.parse(match['utcDate']).toLocal();
           final formattedTime = 
               '${matchTime.hour.toString().padLeft(2, '0')}:${matchTime.minute.toString().padLeft(2, '0')}';
               
