@@ -28,7 +28,7 @@ class _CalendarPageState extends State<CalendarPage> {
     super.initState();
     // Load matches after the widget is fully built
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadMatchDays();
+    _loadMatchDays();
     });
   }
 
@@ -56,7 +56,7 @@ class _CalendarPageState extends State<CalendarPage> {
       });
       return;
     }
-    
+
     // Store the team name for display in the legend
     setState(() {
       _favoriteTeamName = favoriteTeamName ?? 'your favorite team';
@@ -126,9 +126,9 @@ class _CalendarPageState extends State<CalendarPage> {
       }
       
       // Process matches to group by date
-      final Map<DateTime, List<dynamic>> matchDays = {};
-      
-      for (var match in matches) {
+        final Map<DateTime, List<dynamic>> matchDays = {};
+        
+        for (var match in matches) {
         // Check for required match data
         if (match['utcDate'] == null) {
           debugPrint('Match missing utcDate field, skipping');
@@ -390,34 +390,39 @@ class _CalendarPageState extends State<CalendarPage> {
                   onEnter: (_) => _updateHoveredDay(day),
                   onExit: (_) => _updateHoveredDay(null),
                   child: Container(
-                    margin: const EdgeInsets.all(4.0),
-                    padding: const EdgeInsets.only(bottom: 6.0),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: backgroundColor,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Stack(
-                      alignment: Alignment.center,
+                    height: 48, // Fixed height for all cells
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          '${day.day}',
-                          style: TextStyle(
-                            color: isSelected ? Colors.black : null,
+                        Container(
+                          width: 36,
+                          height: 36,
+                          margin: const EdgeInsets.all(4.0),
+                          decoration: BoxDecoration(
+                            color: backgroundColor,
+                            shape: BoxShape.circle,
                           ),
-                        ),
-                        if (hasEvents)
-                          Positioned(
-                            top: 22,
-                            child: Container(
-                              width: 6,
-                              height: 6,
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                              ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            '${day.day}',
+                            style: TextStyle(
+                              color: isSelected ? Colors.black : null,
                             ),
                           ),
+                        ),
+                        SizedBox(
+                          height: 8, // Fixed space for dot or empty space
+                          child: hasEvents 
+                            ? Container(
+                                width: 6,
+                                height: 6,
+                                decoration: const BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                ),
+                              )
+                            : null, // Empty space if no events
+                        ),
                       ],
                     ),
                   ),
@@ -433,17 +438,28 @@ class _CalendarPageState extends State<CalendarPage> {
                   onEnter: (_) => _updateHoveredDay(day),
                   onExit: (_) => _updateHoveredDay(null),
                   child: Container(
-                    margin: const EdgeInsets.all(4.0),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: isHovered ? (isDarkMode ? Colors.grey[800] : Colors.grey[300]) : null,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Text(
-                      '${day.day}',
-                      style: TextStyle(
-                        color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
-                      ),
+                    height: 48, // Fixed height for all cells
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          margin: const EdgeInsets.all(4.0),
+                          width: 36,
+                          height: 36,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: isHovered ? (isDarkMode ? Colors.grey[800] : Colors.grey[300]) : null,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            '${day.day}',
+                            style: TextStyle(
+                              color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8), // Fixed space to match other cells
+                      ],
                     ),
                   ),
                 );
@@ -472,34 +488,39 @@ class _CalendarPageState extends State<CalendarPage> {
                   onEnter: (_) => _updateHoveredDay(day),
                   onExit: (_) => _updateHoveredDay(null),
                   child: Container(
-                    margin: const EdgeInsets.all(4.0),
-                    padding: const EdgeInsets.only(bottom: 6.0),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: backgroundColor,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Stack(
-                      alignment: Alignment.center,
+                    height: 48, // Fixed height for all cells
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          '${day.day}',
-                          style: TextStyle(
-                            color: isSelected ? Colors.black : null,
+                        Container(
+                          width: 36,
+                          height: 36,
+                          margin: const EdgeInsets.all(4.0),
+                          decoration: BoxDecoration(
+                            color: backgroundColor,
+                            shape: BoxShape.circle,
                           ),
-                        ),
-                        if (hasEvents)
-                          Positioned(
-                            top: 22,
-                            child: Container(
-                              width: 6,
-                              height: 6,
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                              ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            '${day.day}',
+                            style: TextStyle(
+                              color: isSelected ? Colors.black : null,
                             ),
                           ),
+                        ),
+                        SizedBox(
+                          height: 8, // Fixed space for dot or empty space
+                          child: hasEvents 
+                            ? Container(
+                                width: 6,
+                                height: 6,
+                                decoration: const BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                ),
+                              )
+                            : null, // Empty space if no events
+                        ),
                       ],
                     ),
                   ),
@@ -523,34 +544,39 @@ class _CalendarPageState extends State<CalendarPage> {
                   onEnter: (_) => _updateHoveredDay(day),
                   onExit: (_) => _updateHoveredDay(null),
                   child: Container(
-                    margin: const EdgeInsets.all(4.0),
-                    padding: const EdgeInsets.only(bottom: 6.0),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: backgroundColor,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Stack(
-                      alignment: Alignment.center,
+                    height: 48, // Fixed height for all cells
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          '${day.day}',
-                          style: const TextStyle(
-                            color: Colors.black,
+                        Container(
+                          width: 36,
+                          height: 36,
+                          margin: const EdgeInsets.all(4.0),
+                          decoration: BoxDecoration(
+                            color: backgroundColor,
+                            shape: BoxShape.circle,
                           ),
-                        ),
-                        if (hasEvents)
-                          Positioned(
-                            top: 22,
-                            child: Container(
-                              width: 6,
-                              height: 6,
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                              ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            '${day.day}',
+                            style: const TextStyle(
+                              color: Colors.black,
                             ),
                           ),
+                        ),
+                        SizedBox(
+                          height: 8, // Fixed space for dot or empty space
+                          child: hasEvents 
+                            ? Container(
+                                width: 6,
+                                height: 6,
+                                decoration: const BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                ),
+                              )
+                            : null, // Empty space if no events
+                        ),
                       ],
                     ),
                   ),
