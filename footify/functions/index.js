@@ -884,3 +884,95 @@ exports.fetchAreas = functions.https.onRequest(async (req, res) => {
     });
   }
 });
+
+// Function to fetch matches for a team and return data optimized for calendar display
+exports.fetchCalendarTeamMatches = functions.https.onRequest(async (req, res) => {
+  setCorsHeaders(res);
+  
+  // Handle CORS preflight requests
+  if (handleOptions(req, res)) return;
+
+  const teamId = req.query.id;
+  if (!teamId) {
+    res.status(400).json({ 
+      error: 'Missing team ID parameter',
+      success: false
+    });
+    return;
+  }
+
+  try {
+    console.log(`Fetching calendar matches for team ${teamId}`);
+    
+    // We'll try to request matches in two parts to maximize coverage
+    // First, get current and future matches
+    const futureResponse = await axios.get(`${BASE_URL}/teams/${teamId}/matches`, {
+      headers: {
+        'X-Auth-Token': API_KEY,
+      },
+      params: {
+        dateFrom: getDateString(0),     // Today
+        dateTo: getDateString(180)      // 6 months in the future (covers future season)
+      }
+    });
+    
+    // Next, get historical matches from the past year
+    const pastResponse = await axios.get(`${BASE_URL}/teams/${teamId}/matches`, {
+      headers: {
+        'X-Auth-Token': API_KEY,
+      },
+      params: {
+        dateFrom: getDateString(-365),  // 1 year ago
+        dateTo: getDateString(-1)       // Yesterday
+      }
+    });
+    
+    // Combine the matches
+    let matches = [];
+    
+    if (futureResponse.status === 200) {
+      const futureMatches = futureResponse.data.matches || [];
+      matches = matches.concat(futureMatches);
+    }
+    
+    if (pastResponse.status === 200) {
+      const pastMatches = pastResponse.data.matches || [];
+      matches = matches.concat(pastMatches);
+    }
+    
+    // Sort matches by date (newest to oldest)
+    matches.sort((a, b) => {
+      const dateA = new Date(a.utcDate);
+      const dateB = new Date(b.utcDate);
+      return dateA - dateB;  // Ascending order (oldest to newest)
+    });
+    
+    console.log(`Successfully retrieved ${matches.length} matches for team ${teamId}`);
+    
+    // Return in a format that's easy to use in the calendar
+    res.status(200).json({
+      success: true,
+      teamId: teamId,
+      matches: matches,
+      count: matches.length
+    });
+  } catch (error) {
+    console.error(`Error fetching calendar matches for team ${teamId}:`, error);
+    
+    // Detailed error response to help with debugging
+    res.status(500).json({
+      error: 'Failed to fetch team matches for calendar',
+      details: error.message || 'Unknown error',
+      status: error.response ? error.response.status : null,
+      success: false
+    });
+  }
+});
+
+// Helper function to get a date string in YYYY-MM-DD format
+// offset is the number of days from today (negative for past, positive for future)
+function getDateString(offset = 0) {
+  const date = new Date();
+  date.setDate(date.getDate() + offset);
+  return date.toISOString().split('T')[0];
+}

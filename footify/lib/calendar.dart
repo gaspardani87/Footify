@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'common_layout.dart';
 import 'package:provider/provider.dart';
 import 'providers/firebase_provider.dart';
+import 'services/team_matches_service.dart';
 
 class CalendarPage extends StatefulWidget {
   const CalendarPage({super.key});
@@ -20,6 +20,8 @@ class _CalendarPageState extends State<CalendarPage> {
   Map<DateTime, List<dynamic>> _matchDays = {};
   bool _isLoading = true;
   String _favoriteTeamName = '';
+  int _matchCount = 0;
+  DateTime? _hoveredDay;
 
   @override
   void initState() {
@@ -33,6 +35,7 @@ class _CalendarPageState extends State<CalendarPage> {
   Future<void> _loadMatchDays() async {
     setState(() {
       _isLoading = true;
+      _matchDays = {}; // Clear any existing matches
     });
     
     // Get the Firebase provider
@@ -59,35 +62,80 @@ class _CalendarPageState extends State<CalendarPage> {
       _favoriteTeamName = favoriteTeamName ?? 'your favorite team';
     });
 
-    // Use Firebase Functions to get team matches
+    // Use our TeamMatchesService to get team matches
     try {
-      // First, make sure the FootballApiService is initialized
       if(!ModalRoute.of(context)!.isCurrent) return;
       
-      // API configuration
-      const proxyUrl = 'https://thingproxy.freeboard.io/fetch/';
-      final apiUrl = 'https://api.football-data.org/v4/teams/$favoriteTeamId/matches';
+      debugPrint('Requesting matches for team ID: $favoriteTeamId');
+      debugPrint('Using endpoint: ${TeamMatchesService.getEndpointUrl(favoriteTeamId)}');
       
-      debugPrint('Requesting matches from: $apiUrl');
-
-      final response = await http.get(
-        Uri.parse('$proxyUrl$apiUrl'),
-        headers: {
-          'X-Auth-Token': '4c553fac5d704101906782d1ecbe1b12',
-          'x-cors-api-key': 'temp_b7020b5f16680aae2a61be69685f4115'
-        },
-      );
-
-      debugPrint('Response status code: ${response.statusCode}');
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        debugPrint('Received data: ${data.toString().substring(0, min(100, data.toString().length))}...');
+      final data = await TeamMatchesService.getTeamMatches(favoriteTeamId);
+      
+      // Check for error response
+      if (data.containsKey('error') && data['error'] != null) {
+        debugPrint('Error from TeamMatchesService: ${data['error']}');
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+          // Show error to user
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to load matches: ${data['error']}'),
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
+        return;
+      }
+      
+      // Check if matches key exists and is not null
+      final matches = data['matches'];
+      if (matches == null) {
+        debugPrint('Error: No matches key in API response');
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+      
+      debugPrint('Found ${matches.length} matches');
+      
+      // Log first and last match dates for debugging
+      if (matches.isNotEmpty) {
+        try {
+          final firstMatch = matches.first;
+          final lastMatch = matches.last;
+          final firstDate = DateTime.parse(firstMatch['utcDate']).toLocal();
+          final lastDate = DateTime.parse(lastMatch['utcDate']).toLocal();
+          debugPrint('Date range: ${firstDate.toString()} to ${lastDate.toString()}');
+          
+          // Count past matches
+          final now = DateTime.now();
+          final pastMatches = matches.where((match) => 
+            DateTime.parse(match['utcDate']).toLocal().isBefore(now)).toList();
+          debugPrint('Past matches: ${pastMatches.length}');
+          
+          // Count future matches
+          final futureMatches = matches.where((match) => 
+            DateTime.parse(match['utcDate']).toLocal().isAfter(now)).toList();
+          debugPrint('Future matches: ${futureMatches.length}');
+        } catch (e) {
+          debugPrint('Error analyzing match dates: $e');
+        }
+      }
+      
+      // Process matches to group by date
+      final Map<DateTime, List<dynamic>> matchDays = {};
+      
+      for (var match in matches) {
+        // Check for required match data
+        if (match['utcDate'] == null) {
+          debugPrint('Match missing utcDate field, skipping');
+          continue;
+        }
         
-        final matches = data['matches'] as List;
-        
-        final Map<DateTime, List<dynamic>> matchDays = {};
-        
-        for (var match in matches) {
+        try {
           final matchDate = DateTime.parse(match['utcDate']).toLocal();
           final dateKey = DateTime(matchDate.year, matchDate.month, matchDate.day);
           
@@ -95,21 +143,20 @@ class _CalendarPageState extends State<CalendarPage> {
             matchDays[dateKey] = [];
           }
           matchDays[dateKey]!.add(match);
+        } catch (e) {
+          debugPrint('Error processing match: $e');
+          // Continue with next match
         }
+      }
 
-        if (mounted) {
-          setState(() {
-            _matchDays = matchDays;
-            _isLoading = false;
-          });
-        }
-      } else {
-        debugPrint('Failed to load matches: ${response.statusCode}');
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-        }
+      debugPrint('Processed ${matchDays.keys.length} unique match days');
+
+      if (mounted) {
+        setState(() {
+          _matchDays = matchDays;
+          _matchCount = matches.length;
+          _isLoading = false;
+        });
       }
     } catch (e) {
       debugPrint('Error loading matches: $e');
@@ -117,6 +164,13 @@ class _CalendarPageState extends State<CalendarPage> {
         setState(() {
           _isLoading = false;
         });
+        // Show error to user
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading matches: $e'),
+            duration: const Duration(seconds: 5),
+          ),
+        );
       }
     }
   }
@@ -142,6 +196,8 @@ class _CalendarPageState extends State<CalendarPage> {
           final matchTime = DateTime.parse(match['utcDate']).toLocal();
           final formattedTime = 
               '${matchTime.hour.toString().padLeft(2, '0')}:${matchTime.minute.toString().padLeft(2, '0')}';
+          final formattedDate = 
+              '${matchTime.year}-${matchTime.month.toString().padLeft(2, '0')}-${matchTime.day.toString().padLeft(2, '0')}';
               
           // Check if match is in the past
           final isPastMatch = matchTime.isBefore(DateTime.now());
@@ -160,6 +216,12 @@ class _CalendarPageState extends State<CalendarPage> {
             }
           }
 
+          // Get competition name if available
+          String competition = '';
+          if (match['competition'] != null && match['competition']['name'] != null) {
+            competition = match['competition']['name'];
+          }
+
           return Card(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: ListTile(
@@ -167,7 +229,9 @@ class _CalendarPageState extends State<CalendarPage> {
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(isPastMatch ? 'Played at: $formattedTime' : 'Time: $formattedTime'),
+                  if (competition.isNotEmpty)
+                    Text('Competition: $competition'),
+                  Text(isPastMatch ? 'Played: $formattedDate at $formattedTime' : 'Time: $formattedDate at $formattedTime'),
                   if (match['status'] != null)
                     Text('Status: ${match['status']}'),
                 ],
@@ -183,25 +247,40 @@ class _CalendarPageState extends State<CalendarPage> {
   Widget _buildLegend(bool isDarkMode) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Column(
         children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '- $_favoriteTeamName match',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Text(
-            '- $_favoriteTeamName match',
-            style: TextStyle(
-              fontSize: 14,
-              color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
+          if (_matchCount > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 4.0),
+              child: Text(
+                'Loaded $_matchCount matches',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                ),
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -214,12 +293,25 @@ class _CalendarPageState extends State<CalendarPage> {
       _selectedDay = DateTime.now();
     });
   }
+  
+  // Safe method to update hovered day without affecting focused day
+  void _updateHoveredDay(DateTime? day) {
+    if (mounted) {
+      setState(() {
+        _hoveredDay = day;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final provider = Provider.of<FirebaseProvider>(context);
     final isLoggedIn = provider.userData != null;
+
+    // Calculate the range of possible dates
+    final firstDay = DateTime.now().subtract(const Duration(days: 365 * 2)); // 2 years ago
+    final lastDay = DateTime.now().add(const Duration(days: 365)); // 1 year in the future
 
     return CommonLayout(
       selectedIndex: 1,
@@ -243,8 +335,8 @@ class _CalendarPageState extends State<CalendarPage> {
             ),
           ),
           TableCalendar(
-            firstDay: DateTime.utc(2024, 1, 1),
-            lastDay: DateTime.utc(2025, 12, 31),
+            firstDay: firstDay,
+            lastDay: lastDay,
             focusedDay: _focusedDay,
             calendarFormat: _calendarFormat,
             startingDayOfWeek: StartingDayOfWeek.monday,
@@ -258,6 +350,12 @@ class _CalendarPageState extends State<CalendarPage> {
                 _focusedDay = focusedDay;
               });
             },
+            onPageChanged: (focusedDay) {
+              // When page changes, update the focused day without resetting the selected day
+              setState(() {
+                _focusedDay = focusedDay;
+              });
+            },
             onFormatChanged: (format) {
               setState(() {
                 _calendarFormat = format;
@@ -267,37 +365,214 @@ class _CalendarPageState extends State<CalendarPage> {
               return _matchDays[DateTime(day.year, day.month, day.day)] ?? [];
             },
             calendarBuilders: CalendarBuilders(
-              markerBuilder: (context, date, events) {
-                if (events.isNotEmpty) {
-                  return Positioned(
-                    bottom: 1,
-                    child: Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
+              // Custom day builder with hover effect
+              defaultBuilder: (context, day, focusedDay) {
+                final isToday = isSameDay(day, DateTime.now());
+                final isSelected = _selectedDay != null && isSameDay(day, _selectedDay!);
+                final isHovered = _hoveredDay != null && isSameDay(day, _hoveredDay!);
+                
+                // Show events/markers
+                final events = _matchDays[DateTime(day.year, day.month, day.day)] ?? [];
+                final hasEvents = events.isNotEmpty;
+                
+                // Background color based on state
+                Color? backgroundColor;
+                if (isSelected) {
+                  backgroundColor = const Color(0xFFFFE6AC);
+                } else if (isHovered) {
+                  backgroundColor = isDarkMode ? Colors.grey[800] : Colors.grey[300]; // Hover effect
+                } else if (isToday) {
+                  backgroundColor = isDarkMode ? Colors.grey[700] : Colors.grey[200];
+                }
+                
+                return MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  onEnter: (_) => _updateHoveredDay(day),
+                  onExit: (_) => _updateHoveredDay(null),
+                  child: Container(
+                    margin: const EdgeInsets.all(4.0),
+                    padding: const EdgeInsets.only(bottom: 6.0),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: backgroundColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Text(
+                          '${day.day}',
+                          style: TextStyle(
+                            color: isSelected ? Colors.black : null,
+                          ),
+                        ),
+                        if (hasEvents)
+                          Positioned(
+                            top: 22,
+                            child: Container(
+                              width: 6,
+                              height: 6,
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+              
+              // Apply the same hover effect to outside days
+              outsideBuilder: (context, day, focusedDay) {
+                final isHovered = _hoveredDay != null && isSameDay(day, _hoveredDay!);
+                
+                return MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  onEnter: (_) => _updateHoveredDay(day),
+                  onExit: (_) => _updateHoveredDay(null),
+                  child: Container(
+                    margin: const EdgeInsets.all(4.0),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: isHovered ? (isDarkMode ? Colors.grey[800] : Colors.grey[300]) : null,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      '${day.day}',
+                      style: TextStyle(
+                        color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
                       ),
                     ),
-                  );
-                }
-                return null;
+                  ),
+                );
               },
+              
+              // Apply hover effect to today's date
+              todayBuilder: (context, day, focusedDay) {
+                final isSelected = _selectedDay != null && isSameDay(day, _selectedDay!);
+                final isHovered = _hoveredDay != null && isSameDay(day, _hoveredDay!);
+                
+                // Show events/markers
+                final events = _matchDays[DateTime(day.year, day.month, day.day)] ?? [];
+                final hasEvents = events.isNotEmpty;
+                
+                Color backgroundColor;
+                if (isSelected) {
+                  backgroundColor = const Color(0xFFFFE6AC);
+                } else if (isHovered) {
+                  backgroundColor = isDarkMode ? Colors.grey[800]! : Colors.grey[300]!;
+                } else {
+                  backgroundColor = isDarkMode ? Colors.grey[700]! : Colors.grey[200]!;
+                }
+                
+                return MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  onEnter: (_) => _updateHoveredDay(day),
+                  onExit: (_) => _updateHoveredDay(null),
+                  child: Container(
+                    margin: const EdgeInsets.all(4.0),
+                    padding: const EdgeInsets.only(bottom: 6.0),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: backgroundColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Text(
+                          '${day.day}',
+                          style: TextStyle(
+                            color: isSelected ? Colors.black : null,
+                          ),
+                        ),
+                        if (hasEvents)
+                          Positioned(
+                            top: 22,
+                            child: Container(
+                              width: 6,
+                              height: 6,
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+              
+              // Apply hover effect to selected dates
+              selectedBuilder: (context, day, focusedDay) {
+                final isHovered = _hoveredDay != null && isSameDay(day, _hoveredDay!);
+                
+                // Show events/markers
+                final events = _matchDays[DateTime(day.year, day.month, day.day)] ?? [];
+                final hasEvents = events.isNotEmpty;
+                
+                Color backgroundColor = isHovered 
+                  ? const Color(0xFFFFCD6B) // Slightly different shade when selected AND hovered
+                  : const Color(0xFFFFE6AC);
+                
+                return MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  onEnter: (_) => _updateHoveredDay(day),
+                  onExit: (_) => _updateHoveredDay(null),
+                  child: Container(
+                    margin: const EdgeInsets.all(4.0),
+                    padding: const EdgeInsets.only(bottom: 6.0),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: backgroundColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Text(
+                          '${day.day}',
+                          style: const TextStyle(
+                            color: Colors.black,
+                          ),
+                        ),
+                        if (hasEvents)
+                          Positioned(
+                            top: 22,
+                            child: Container(
+                              width: 6,
+                              height: 6,
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+              
+              // We don't need marker builder since we're incorporating markers into our day builders
+              markerBuilder: null,
             ),
             calendarStyle: CalendarStyle(
-              markersAlignment: Alignment.bottomCenter,
-              markerDecoration: const BoxDecoration(
-                color: Colors.white,  // White dot for favorite team matches
-                shape: BoxShape.circle,
-              ),
-              markersMaxCount: 1,  // Show only one marker per day
-              markerSize: 8.0,     // Make the marker slightly bigger
-              todayDecoration: BoxDecoration(
-                color: isDarkMode ? Colors.grey[700] : Colors.grey[300],
+              // Completely disable the default marker system to prevent duplicate dots
+              markersAutoAligned: false,
+              markersOffset: const PositionedOffset(),
+              markersMaxCount: 0,
+              markerSize: 0,
+              markersAnchor: 0.0,
+              
+              // We're not using these decorations anymore since we have custom builders
+              todayDecoration: const BoxDecoration(
                 shape: BoxShape.circle,
               ),
               selectedDecoration: const BoxDecoration(
-                color: Color(0xFFFFE6AC),
                 shape: BoxShape.circle,
               ),
               selectedTextStyle: const TextStyle(
@@ -305,7 +580,7 @@ class _CalendarPageState extends State<CalendarPage> {
               ),
             ),
             headerStyle: HeaderStyle(
-              formatButtonVisible: false, // Remove the format button
+              formatButtonVisible: true, // Allow user to switch between month/week/2-week views
               titleCentered: true,
               formatButtonShowsNext: false,
               titleTextStyle: TextStyle(
@@ -342,7 +617,7 @@ class _CalendarPageState extends State<CalendarPage> {
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Text(
-                'No upcoming matches found for $_favoriteTeamName',
+                'No matches found for $_favoriteTeamName',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
