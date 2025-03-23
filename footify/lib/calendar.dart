@@ -5,6 +5,7 @@ import 'common_layout.dart';
 import 'package:provider/provider.dart';
 import 'providers/firebase_provider.dart';
 import 'services/team_matches_service.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class CalendarPage extends StatefulWidget {
   const CalendarPage({super.key});
@@ -59,7 +60,7 @@ class _CalendarPageState extends State<CalendarPage> {
 
     // Store the team name for display in the legend
     setState(() {
-      _favoriteTeamName = favoriteTeamName ?? 'your favorite team';
+      _favoriteTeamName = favoriteTeamName ?? AppLocalizations.of(context)!.yourFavoriteTeam;
     });
 
     // Use our TeamMatchesService to get team matches
@@ -81,7 +82,7 @@ class _CalendarPageState extends State<CalendarPage> {
           // Show error to user
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failed to load matches: ${data['error']}'),
+              content: Text('${AppLocalizations.of(context)!.failedToLoadMatches}'.replaceAll('{error}', '${data['error']}')),
               duration: const Duration(seconds: 5),
             ),
           );
@@ -326,7 +327,7 @@ class _CalendarPageState extends State<CalendarPage> {
                 TextButton.icon(
                   onPressed: _goToToday,
                   icon: const Icon(Icons.calendar_today, size: 18),
-                  label: const Text('Today'),
+                  label: Text(AppLocalizations.of(context)!.today),
                   style: TextButton.styleFrom(
                     foregroundColor: const Color(0xFFFFE6AC),
                   ),
@@ -643,7 +644,7 @@ class _CalendarPageState extends State<CalendarPage> {
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Text(
-                'No matches found for $_favoriteTeamName',
+                AppLocalizations.of(context)!.noMatchesFound,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: isDarkMode ? Colors.grey[300] : Colors.grey[700],

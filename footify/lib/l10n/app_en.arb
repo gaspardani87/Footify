@@ -154,5 +154,122 @@
     "emptyFixtureSubtitle29": "But don't worry—the next showdown is being prepped!",
     
     "emptyFixtureTitle30": "Football's taking a breather... 🧠",
-    "emptyFixtureSubtitle30": "Like all great stories, there's a pause before the action!"
+    "emptyFixtureSubtitle30": "Like all great stories, there's a pause before the action!",
+
+    "loginRegister": "Login/Register",
+    "championsLeague": "Champions League",
+    "europaLeague": "Europa League",
+    "relegation": "Relegation",
+    "automaticPromotion": "Automatic Promotion",
+    "playoffPromotion": "Play-off Promotion",
+    "promotion": "Promotion",
+    "playoff": "Play-off",
+    "unknownTeam": "Unknown Team",
+    "unknownLeague": "Unknown League",
+    "errorFetchingLeagues": "Error fetching leagues: {error}",
+    "@errorFetchingLeagues": {
+      "placeholders": {
+        "error": {
+          "type": "String"
+        }
+      }
+    },
+    "failedToLoadLeagues": "Failed to load leagues",
+    "matchesColumnHeader": "M",
+    "goalsForColumnHeader": "G+",
+    "goalsAgainstColumnHeader": "G-",
+    
+    "premierLeagueQualification": "Top 4: Champions League\n5-6: Europa League\n18-20: Relegation",
+    "laLigaQualification": "Top 4: Champions League\n5-6: Europa League\n18-20: Relegation",
+    "bundesligaQualification": "Top 4: Champions League\n5-6: Europa League\n16-18: Relegation",
+    "serieAQualification": "Top 4: Champions League\n5-6: Europa League\n18-20: Relegation",
+    "ligue1Qualification": "Top 2: Champions League\n3-4: Europa League\n18-20: Relegation",
+    "championshipQualification": "Top 2: Automatic Promotion\n3-6: Play-off Promotion\n22-24: Relegation",
+    "leagueOneQualification": "Top 2: Automatic Promotion\n3-6: Play-off Promotion\n21-24: Relegation",
+    
+    "positionColumnHeader": "#",
+    "teamColumnHeader": "Team",
+    "goalDifferenceColumnHeader": "GD",
+    "pointsColumnHeader": "Pts",
+    "previousRound": "Previous round",
+    "topScorers": "Top scorers",
+    "leagueLegend": "Legend",
+
+    "lightMode": "Light",
+    "darkMode": "Dark",
+    "enableNotifications": "Enable Notifications",
+    "settingsSaved": "Settings are saved in your browser and will persist until you clear your browser data.",
+    "small": "Small",
+    "large": "Large",
+    "reset": "Reset",
+    
+    "editProfile": "Edit Profile",
+    "deleteAccountConfirm": "Are you sure you want to delete your account?",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    
+    "january": "January",
+    "february": "February",
+    "march": "March",
+    "april": "April",
+    "may": "May",
+    "june": "June",
+    "july": "July",
+    "august": "August",
+    "september": "September",
+    "october": "October",
+    "november": "November",
+    "december": "December",
+    
+    "joinedIn": "Joined {month}",
+    "@joinedIn": {
+      "placeholders": {
+        "month": {
+          "type": "String"
+        }
+      }
+    },
+    
+    "today": "Today",
+    "teamMatches": "{team} matches",
+    "@teamMatches": {
+      "placeholders": {
+        "team": {
+          "type": "String"
+        }
+      }
+    },
+    "loadedMatches": "Loaded {count} matches",
+    "@loadedMatches": {
+      "placeholders": {
+        "count": {
+          "type": "int"
+        }
+      }
+    },
+    "noMatchesFound": "No matches found",
+    "testNotification": "Test Notification",
+    "notificationSent": "System notification sent. Check your phone's notification area!",
+    
+    "email": "Email",
+    "noEmailProvided": "No email provided",
+    "noNameProvided": "No name provided",
+    "noTeamSelected": "No team selected",
+    "favoriteNationalTeam": "Favorite National Team",
+    "noNationalTeamSelected": "No national team selected",
+    "confirm": "Confirm",
+    
+    "failedToLoadMatches": "Failed to load matches: {error}",
+    "@failedToLoadMatches": {
+      "placeholders": {
+        "error": {
+          "type": "String"
+        }
+      }
+    },
+    "yourFavoriteTeam": "your favorite team",
+    
+    "notificationDenied": "Notification permission was denied. Notifications will not work.",
+    "search": "Search",
+    "backToToday": "Back to Today"
 }

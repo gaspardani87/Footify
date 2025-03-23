@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 // Match model for last matches
 class Match {
@@ -244,44 +245,32 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTicker
   }
 
   Color getPositionColor(int position, int leagueId) {
-    // Premier League
-    if (leagueId == 2021) {
-      if (position <= 4) return Colors.blue; // Champions League
-      if (position <= 6) return Colors.orange; // Europa League
+    // Premier League, La Liga, Serie A (UCL, UEL, Relegation)
+    if (leagueId == 39 || leagueId == 140 || leagueId == 135) {
+      if (position <= 4) return Colors.blue; // UCL
+      if (position <= 6) return Colors.orange; // UEL
       if (position >= 18) return Colors.red; // Relegation
     }
-    // La Liga
-    else if (leagueId == 2014) {
-      if (position <= 4) return Colors.blue; // Champions League
-      if (position <= 6) return Colors.orange; // Europa League
-      if (position >= 18) return Colors.red; // Relegation
-    }
-    // Bundesliga
-    else if (leagueId == 2002) {
-      if (position <= 4) return Colors.blue; // Champions League
-      if (position <= 6) return Colors.orange; // Europa League
+    // Bundesliga (UCL, UEL, Relegation)
+    else if (leagueId == 78) {
+      if (position <= 4) return Colors.blue; // UCL
+      if (position <= 6) return Colors.orange; // UEL
       if (position >= 16) return Colors.red; // Relegation
     }
-    // Serie A
-    else if (leagueId == 2019) {
-      if (position <= 4) return Colors.blue; // Champions League
-      if (position <= 6) return Colors.orange; // Europa League
-      if (position >= 18) return Colors.red; // Relegation
-    }
-    // Ligue 1
-    else if (leagueId == 2015) {
-      if (position <= 2) return Colors.blue; // Champions League
-      if (position <= 4) return Colors.orange; // Europa League
+    // Ligue 1 (UCL, UEL, Relegation)
+    else if (leagueId == 61) {
+      if (position <= 2) return Colors.blue; // UCL
+      if (position <= 4) return Colors.orange; // UEL
       if (position >= 18) return Colors.red; // Relegation
     }
     // Championship (Promotion)
-    else if (leagueId == 2016) {
+    else if (leagueId == 41) {
       if (position <= 2) return Colors.green; // Automatic promotion
       if (position <= 6) return Colors.orange; // Play-off promotion
       if (position >= 22) return Colors.red; // Relegation
     }
     // League One (Promotion)
-    else if (leagueId == 2017) {
+    else if (leagueId == 40) {
       if (position <= 2) return Colors.green; // Automatic promotion
       if (position <= 6) return Colors.orange; // Play-off promotion
       if (position >= 21) return Colors.red; // Relegation
@@ -289,50 +278,51 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTicker
     return Colors.transparent;
   }
 
-  String getLeagueQualificationText(int leagueId) {
+  String getQualificationTextForLeague(BuildContext context, int leagueId) {
     switch (leagueId) {
-      case 2021: // Premier League
-        return 'Top 4: Champions League\n5-6: Europa League\n18-20: Relegation';
-      case 2014: // La Liga
-        return 'Top 4: Champions League\n5-6: Europa League\n18-20: Relegation';
-      case 2002: // Bundesliga
-        return 'Top 4: Champions League\n5-6: Europa League\n16-18: Relegation';
-      case 2019: // Serie A
-        return 'Top 4: Champions League\n5-6: Europa League\n18-20: Relegation';
-      case 2015: // Ligue 1
-        return 'Top 2: Champions League\n3-4: Europa League\n18-20: Relegation';
-      case 2016: // Championship
-        return 'Top 2: Automatic Promotion\n3-6: Play-off Promotion\n22-24: Relegation';
-      case 2017: // League One
-        return 'Top 2: Automatic Promotion\n3-6: Play-off Promotion\n21-24: Relegation';
+      case 39: // Premier League
+        return AppLocalizations.of(context)!.premierLeagueQualification;
+      case 140: // La Liga
+        return AppLocalizations.of(context)!.laLigaQualification;
+      case 78: // Bundesliga
+        return AppLocalizations.of(context)!.bundesligaQualification;
+      case 135: // Serie A
+        return AppLocalizations.of(context)!.serieAQualification;
+      case 61: // Ligue 1
+        return AppLocalizations.of(context)!.ligue1Qualification;
+      case 41: // Championship
+        return AppLocalizations.of(context)!.championshipQualification;
+      case 40: // League One
+        return AppLocalizations.of(context)!.leagueOneQualification;
       default:
         return '';
     }
   }
 
   List<Map<String, dynamic>> getRelevantColors(int leagueId) {
+    final localizations = AppLocalizations.of(context)!;
     switch (leagueId) {
-      case 2021: // Premier League
-      case 2014: // La Liga
-      case 2019: // Serie A
-      case 2002: // Bundesliga
+      case 39: // Premier League
+      case 140: // La Liga
+      case 135: // Serie A
+      case 78: // Bundesliga
         return [
-          {'color': Colors.blue, 'name': 'Bajnokok Ligája'},
-          {'color': Colors.orange, 'name': 'Európa Liga'},
-          {'color': Colors.red, 'name': 'Kiesés'},
+          {'color': Colors.blue, 'name': localizations.championsLeague},
+          {'color': Colors.orange, 'name': localizations.europaLeague},
+          {'color': Colors.red, 'name': localizations.relegation},
         ];
-      case 2015: // Ligue 1
+      case 61: // Ligue 1
         return [
-          {'color': Colors.blue, 'name': 'Bajnokok Ligája'},
-          {'color': Colors.orange, 'name': 'Európa Liga'},
-          {'color': Colors.red, 'name': 'Kiesés'},
+          {'color': Colors.blue, 'name': localizations.championsLeague},
+          {'color': Colors.orange, 'name': localizations.europaLeague},
+          {'color': Colors.red, 'name': localizations.relegation},
         ];
-      case 2016: // Championship
-      case 2017: // League One
+      case 41: // Championship
+      case 40: // League One
         return [
-          {'color': Colors.green, 'name': 'Feljutás'},
-          {'color': Colors.orange, 'name': 'Rájátszás'},
-          {'color': Colors.red, 'name': 'Kiesés'},
+          {'color': Colors.green, 'name': localizations.automaticPromotion},
+          {'color': Colors.orange, 'name': localizations.playoffPromotion},
+          {'color': Colors.red, 'name': localizations.relegation},
         ];
       default:
         return [];
@@ -568,7 +558,7 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTicker
                   height: 48,
                   child: Center(
                     child: Text(
-                      '#',
+                      AppLocalizations.of(context)!.positionColumnHeader,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: isDarkMode ? Colors.white : Colors.black87,
@@ -582,7 +572,7 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTicker
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     child: Text(
-                      'Csapat',
+                      AppLocalizations.of(context)!.teamColumnHeader,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: isDarkMode ? Colors.white : Colors.black87,
@@ -597,7 +587,7 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTicker
                   height: 48,
                   child: Center(
                     child: Text(
-                      'M',
+                      AppLocalizations.of(context)!.matchesColumnHeader,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: isDarkMode ? Colors.white : Colors.black87,
@@ -615,7 +605,7 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTicker
                     height: 48,
                     child: Center(
                       child: Text(
-                        'G+',
+                        AppLocalizations.of(context)!.goalsForColumnHeader,
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: isDarkMode ? Colors.white : Colors.black87,
@@ -629,7 +619,7 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTicker
                     height: 48,
                     child: Center(
                       child: Text(
-                        'G-',
+                        AppLocalizations.of(context)!.goalsAgainstColumnHeader,
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: isDarkMode ? Colors.white : Colors.black87,
@@ -646,7 +636,7 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTicker
                   height: 48,
                   child: Center(
                     child: Text(
-                      'GK',
+                      AppLocalizations.of(context)!.goalDifferenceColumnHeader,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: isDarkMode ? Colors.white : Colors.black87,
@@ -663,7 +653,7 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTicker
                   height: 48,
                   child: Center(
                     child: Text(
-                      'P',
+                      AppLocalizations.of(context)!.pointsColumnHeader,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: isDarkMode ? Colors.white : Colors.black87,
@@ -877,7 +867,7 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTicker
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Előző forduló',
+                AppLocalizations.of(context)!.previousRound,
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -1023,7 +1013,7 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTicker
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Góllövőlista',
+                AppLocalizations.of(context)!.topScorers,
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -1141,40 +1131,53 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTicker
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: relevantColors.map((colorInfo) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 16,
-                  height: 16,
-                  decoration: BoxDecoration(
-                    color: colorInfo['color'],
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: colorInfo['color'].withOpacity(0.3),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  colorInfo['name'],
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: isDarkMode ? Colors.white : Colors.black87,
-                  ),
-                ),
-              ],
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8.0),
+            child: Text(
+              AppLocalizations.of(context)!.leagueLegend,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
             ),
-          );
-        }).toList(),
+          ),
+          ...relevantColors.map((colorInfo) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 16,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: colorInfo['color'],
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: colorInfo['color'].withOpacity(0.3),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    colorInfo['name'],
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: isDarkMode ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ],
       ),
     );
   }

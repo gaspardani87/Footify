@@ -125,9 +125,9 @@ class _SettingsPageState extends State<SettingsPage> {
           settings.authorizationStatus != AuthorizationStatus.provisional) {
         // Permission denied, show a message and don't enable notifications
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Notification permission was denied. Notifications will not work.'),
-            duration: Duration(seconds: 3),
+          SnackBar(
+            content: Text(AppLocalizations.of(context)!.notificationDenied),
+            duration: const Duration(seconds: 3),
           ),
         );
         return; // Don't enable notifications if permission denied
@@ -205,7 +205,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     children: [
                       ElevatedButton.icon(
                         icon: Icon(Icons.wb_sunny, color: !isDarkMode ? Colors.black : Colors.black),
-                        label: const Text('Light'),
+                        label: Text(AppLocalizations.of(context)!.lightMode),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: !isDarkMode ? const Color(0xFFFFE6AC) : Colors.grey[300],
                           foregroundColor: Colors.black,
@@ -214,7 +214,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       ),
                       ElevatedButton.icon(
                         icon: Icon(Icons.nights_stay, color: isDarkMode ? Colors.black : null),
-                        label: const Text('Dark'),
+                        label: Text(AppLocalizations.of(context)!.darkMode),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: isDarkMode ? const Color(0xFFFFE6AC) : Colors.grey[900],
                           foregroundColor: isDarkMode ? Colors.black : Colors.white,
@@ -315,7 +315,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   const SizedBox(height: 16),
                   SwitchListTile(
                     title: Text(
-                      'Enable Notifications',
+                      AppLocalizations.of(context)!.enableNotifications,
                       style: TextStyle(
                         color: isDarkMode ? Colors.white : Colors.black,
                       ),
@@ -330,7 +330,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       padding: const EdgeInsets.only(top: 8.0),
                       child: ElevatedButton.icon(
                         icon: const Icon(Icons.notifications),
-                        label: const Text('Értesítés tesztelése'),
+                        label: Text(AppLocalizations.of(context)!.testNotification),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFFFE6AC),
                           foregroundColor: Colors.black,
@@ -343,9 +343,9 @@ class _SettingsPageState extends State<SettingsPage> {
                           );
                           
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Rendszerszintű értesítés elküldve. Nézd meg a telefon értesítési területét!'),
-                              duration: Duration(seconds: 3),
+                            SnackBar(
+                              content: Text(AppLocalizations.of(context)!.notificationSent),
+                              duration: const Duration(seconds: 3),
                             ),
                           );
                         },
@@ -414,12 +414,12 @@ class _SettingsPageState extends State<SettingsPage> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('Small', style: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[600])),
+                            Text(AppLocalizations.of(context)!.small, style: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[600])),
                             TextButton(
-                              child: Text('Reset', style: TextStyle(color: const Color(0xFFFFE6AC))),
+                              child: Text(AppLocalizations.of(context)!.reset, style: TextStyle(color: const Color(0xFFFFE6AC))),
                               onPressed: () => _setFontSize(16.0),
                             ),
-                            Text('Large', style: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[600])),
+                            Text(AppLocalizations.of(context)!.large, style: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[600])),
                           ],
                         ),
                       ],

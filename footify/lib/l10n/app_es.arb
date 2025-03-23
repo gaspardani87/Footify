@@ -35,6 +35,34 @@
     "possession": "Posesión",
     "shotsOnTarget": "Tiros a puerta",
     "matchDetails": "Detalles del partido",
+    "passAccuracy": "Precisión de pases",
+    "advancedStats": "Estadísticas avanzadas",
+    "expectedGoals": "Goles esperados",
+    "aerialDuelsWon": "Duelos aéreos ganados",
+    "corners": "Córners",
+    "offsides": "Fueras de juego",
+    "live": "EN VIVO",
+    "halftime": "DESCANSO",
+    "finished": "FINALIZADO",
+    "postponed": "APLAZADO",
+    "scheduled": "PROGRAMADO",
+    "number": "Número",
+    "position": "Posición",
+    "recentMatches": "Partidos recientes",
+    "lastFiveMatches": "Últimos 5 partidos",
+    "noDataAvailable": "No hay datos disponibles",
+    "nationality": "Nacionalidad",
+    "age": "Edad",
+    "years": "años",
+    "height": "Altura",
+    "matchStats": "Estadísticas del partido",
+    "heatmap": "Mapa de calor",
+    "noHeatmapAvailable": "Mapa de calor no disponible",
+    "highlights": "Highlights",
+    "noHighlightsAvailable": "No hay highlights disponibles",
+    "abandoned": "Abandonado",
+    "extraTime": "Prórroga",
+    "penalties": "Penaltis",
     "emptyFixtureTitle": "¿Lista de partidos vacía? Llamémoslo silencio estratégico. 🧠⚽",
     "emptyFixtureSubtitle": "La grandeza espera—¡te avisaremos cuando sea hora de jugar!",
     
@@ -117,7 +145,7 @@
     "emptyFixtureSubtitle26": "¡Despiértalo más tarde con partidos en vivo!",
     
     "emptyFixtureTitle27": "Shhh... los balones están descansando. 🌙",
-    "emptyFixtureSubtitle27": "¡Volverán pronto, más ruidosos que nunca!",
+    "emptyFixtureSubtitle27": "¡Volverán pronto, más rumorosos que nunca!",
     
     "emptyFixtureTitle28": "¿Aún no hay partidos?",
     "emptyFixtureSubtitle28": "Consejo profesional: Finge ser el árbitro—todos te escucharán. 😉",
@@ -126,5 +154,122 @@
     "emptyFixtureSubtitle29": "¡Pero no te preocupes—el próximo enfrentamiento está en preparación!",
     
     "emptyFixtureTitle30": "El fútbol está tomando aire... 🧠",
-    "emptyFixtureSubtitle30": "¡Como todas las grandes historias, hay una pausa antes de la acción!"
+    "emptyFixtureSubtitle30": "¡Como todas las grandes historias, hay una pausa antes de la acción!",
+
+    "loginRegister": "Iniciar sesión/Registrarse",
+    "championsLeague": "Liga de Campeones",
+    "europaLeague": "Liga Europa",
+    "relegation": "Descenso",
+    "automaticPromotion": "Ascenso directo",
+    "playoffPromotion": "Promoción de ascenso",
+    "promotion": "Ascenso",
+    "playoff": "Playoff",
+    "unknownTeam": "Equipo desconocido",
+    "unknownLeague": "Liga desconocida",
+    "errorFetchingLeagues": "Error al cargar las ligas: {error}",
+    "@errorFetchingLeagues": {
+      "placeholders": {
+        "error": {
+          "type": "String"
+        }
+      }
+    },
+    "failedToLoadLeagues": "No se pudieron cargar las ligas",
+    "matchesColumnHeader": "PJ",
+    "goalsForColumnHeader": "GF",
+    "goalsAgainstColumnHeader": "GC",
+    
+    "premierLeagueQualification": "Puestos 1-4: Liga de Campeones\nPuestos 5-6: Liga Europa\nPuestos 18-20: Descenso",
+    "laLigaQualification": "Puestos 1-4: Liga de Campeones\nPuestos 5-6: Liga Europa\nPuestos 18-20: Descenso",
+    "bundesligaQualification": "Puestos 1-4: Liga de Campeones\nPuestos 5-6: Liga Europa\nPuestos 16-18: Descenso",
+    "serieAQualification": "Puestos 1-4: Liga de Campeones\nPuestos 5-6: Liga Europa\nPuestos 18-20: Descenso",
+    "ligue1Qualification": "Puestos 1-2: Liga de Campeones\nPuestos 3-4: Liga Europa\nPuestos 18-20: Descenso",
+    "championshipQualification": "Puestos 1-2: Ascenso directo\nPuestos 3-6: Promoción de ascenso\nPuestos 22-24: Descenso",
+    "leagueOneQualification": "Puestos 1-2: Ascenso directo\nPuestos 3-6: Promoción de ascenso\nPuestos 21-24: Descenso",
+    
+    "positionColumnHeader": "#",
+    "teamColumnHeader": "Equipo",
+    "goalDifferenceColumnHeader": "DG",
+    "pointsColumnHeader": "Pts",
+    "previousRound": "Jornada anterior",
+    "topScorers": "Máximos goleadores",
+    "leagueLegend": "Leyenda",
+
+    "lightMode": "Claro",
+    "darkMode": "Oscuro",
+    "enableNotifications": "Habilitar notificaciones",
+    "settingsSaved": "La configuración se guarda en tu navegador y persistirá hasta que borres los datos del navegador.",
+    "small": "Pequeño",
+    "large": "Grande",
+    "reset": "Restablecer",
+    
+    "editProfile": "Editar perfil",
+    "deleteAccountConfirm": "¿Estás seguro de que quieres eliminar tu cuenta?",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    
+    "january": "Enero",
+    "february": "Febrero",
+    "march": "Marzo",
+    "april": "Abril",
+    "may": "Mayo",
+    "june": "Junio",
+    "july": "Julio",
+    "august": "Agosto",
+    "september": "Septiembre",
+    "october": "Octubre",
+    "november": "Noviembre",
+    "december": "Diciembre",
+    
+    "joinedIn": "Se unió en {month}",
+    "@joinedIn": {
+      "placeholders": {
+        "month": {
+          "type": "String"
+        }
+      }
+    },
+    
+    "today": "Hoy",
+    "teamMatches": "Partidos de {team}",
+    "@teamMatches": {
+      "placeholders": {
+        "team": {
+          "type": "String"
+        }
+      }
+    },
+    "loadedMatches": "{count} partidos cargados",
+    "@loadedMatches": {
+      "placeholders": {
+        "count": {
+          "type": "int"
+        }
+      }
+    },
+    "noMatchesFound": "No se encontraron partidos",
+    "testNotification": "Probar notificación",
+    "notificationSent": "Notificación del sistema enviada. ¡Revisa el área de notificaciones de tu teléfono!",
+    
+    "email": "Correo electrónico",
+    "noEmailProvided": "No se proporcionó correo electrónico",
+    "noNameProvided": "No se proporcionó nombre",
+    "noTeamSelected": "Ningún equipo seleccionado",
+    "favoriteNationalTeam": "Selección Nacional Favorita",
+    "noNationalTeamSelected": "Ninguna selección nacional seleccionada",
+    "confirm": "Confirmar",
+    
+    "failedToLoadMatches": "Error al cargar partidos: {error}",
+    "@failedToLoadMatches": {
+      "placeholders": {
+        "error": {
+          "type": "String"
+        }
+      }
+    },
+    "yourFavoriteTeam": "tu equipo favorito",
+    
+    "notificationDenied": "Se denegó el permiso de notificación. Las notificaciones no funcionarán.",
+    "search": "Buscar",
+    "backToToday": "Volver a Hoy"
 }

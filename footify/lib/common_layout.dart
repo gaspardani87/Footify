@@ -182,7 +182,7 @@ class CommonLayout extends StatelessWidget {
                       padding: EdgeInsets.symmetric(horizontal: 8),
                     ),
                     child: Text(
-                      'Login/Register',
+                      AppLocalizations.of(context)!.loginRegister,
                       style: TextStyle(
                         color: isDarkMode ? Colors.white : Colors.black,
                         fontWeight: FontWeight.bold,

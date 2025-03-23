@@ -35,6 +35,34 @@
     "possession": "Ballbesitz",
     "shotsOnTarget": "Torschüsse",
     "matchDetails": "Spiel Details",
+    "passAccuracy": "Passgenauigkeit",
+    "advancedStats": "Erweiterte Statistiken",
+    "expectedGoals": "Erwartete Tore",
+    "aerialDuelsWon": "Gewonnene Kopfballduelle",
+    "corners": "Ecken",
+    "offsides": "Abseits",
+    "live": "LIVE",
+    "halftime": "HALBZEIT",
+    "finished": "BEENDET",
+    "postponed": "VERSCHOBEN",
+    "scheduled": "GEPLANT",
+    "number": "Nummer",
+    "position": "Position",
+    "recentMatches": "Letzte Spiele",
+    "lastFiveMatches": "Letzte 5 Spiele",
+    "noDataAvailable": "Keine Daten verfügbar",
+    "nationality": "Nationalität",
+    "age": "Alter",
+    "years": "Jahre",
+    "height": "Größe",
+    "matchStats": "Spielstatistiken",
+    "heatmap": "Heatmap",
+    "noHeatmapAvailable": "Heatmap nicht verfügbar",
+    "highlights": "Höhepunkte",
+    "noHighlightsAvailable": "Keine Höhepunkte verfügbar",
+    "abandoned": "Abgebrochen",
+    "extraTime": "Verlängerung",
+    "penalties": "Elfmeterschießen",
     "emptyFixtureTitle": "Leere Spielliste? Nennen wir es strategische Stille. 🧠⚽",
     "emptyFixtureSubtitle": "Großartigkeit wartet—wir benachrichtigen dich, wenn es Spielzeit ist!",
     
@@ -126,5 +154,122 @@
     "emptyFixtureSubtitle29": "Aber keine Sorge—der nächste Showdown wird vorbereitet!",
     
     "emptyFixtureTitle30": "Fußball holt gerade Luft... 🧠",
-    "emptyFixtureSubtitle30": "Wie in allen großen Geschichten gibt es eine Pause vor der Action!"
+    "emptyFixtureSubtitle30": "Wie in allen großen Geschichten gibt es eine Pause vor der Action!",
+
+    "loginRegister": "Anmelden/Registrieren",
+    "championsLeague": "Champions League",
+    "europaLeague": "Europa League",
+    "relegation": "Abstieg",
+    "automaticPromotion": "Direkter Aufstieg",
+    "playoffPromotion": "Aufstiegs-Playoff",
+    "promotion": "Aufstieg",
+    "playoff": "Playoff",
+    "unknownTeam": "Unbekanntes Team",
+    "unknownLeague": "Unbekannte Liga",
+    "errorFetchingLeagues": "Fehler beim Abrufen der Ligen: {error}",
+    "@errorFetchingLeagues": {
+      "placeholders": {
+        "error": {
+          "type": "String"
+        }
+      }
+    },
+    "failedToLoadLeagues": "Ligen konnten nicht geladen werden",
+    "matchesColumnHeader": "S",
+    "goalsForColumnHeader": "T+",
+    "goalsAgainstColumnHeader": "T-",
+    
+    "premierLeagueQualification": "Platz 1-4: Champions League\nPlatz 5-6: Europa League\nPlatz 18-20: Abstieg",
+    "laLigaQualification": "Platz 1-4: Champions League\nPlatz 5-6: Europa League\nPlatz 18-20: Abstieg",
+    "bundesligaQualification": "Platz 1-4: Champions League\nPlatz 5-6: Europa League\nPlatz 16-18: Abstieg",
+    "serieAQualification": "Platz 1-4: Champions League\nPlatz 5-6: Europa League\nPlatz 18-20: Abstieg",
+    "ligue1Qualification": "Platz 1-2: Champions League\nPlatz 3-4: Europa League\nPlatz 18-20: Abstieg",
+    "championshipQualification": "Platz 1-2: Direkter Aufstieg\nPlatz 3-6: Aufstiegs-Playoff\nPlatz 22-24: Abstieg",
+    "leagueOneQualification": "Platz 1-2: Direkter Aufstieg\nPlatz 3-6: Aufstiegs-Playoff\nPlatz 21-24: Abstieg",
+    
+    "positionColumnHeader": "#",
+    "teamColumnHeader": "Mannschaft",
+    "goalDifferenceColumnHeader": "TD",
+    "pointsColumnHeader": "Pkt",
+    "previousRound": "Vorheriger Spieltag",
+    "topScorers": "Torschützen",
+    "leagueLegend": "Legende",
+
+    "lightMode": "Hell",
+    "darkMode": "Dunkel",
+    "enableNotifications": "Benachrichtigungen aktivieren",
+    "settingsSaved": "Einstellungen werden in Ihrem Browser gespeichert und bleiben erhalten, bis Sie Ihre Browser-Daten löschen.",
+    "small": "Klein",
+    "large": "Groß",
+    "reset": "Zurücksetzen",
+    
+    "editProfile": "Profil bearbeiten",
+    "deleteAccountConfirm": "Sind Sie sicher, dass Sie Ihr Konto löschen möchten?",
+    "cancel": "Abbrechen",
+    "delete": "Löschen",
+    
+    "january": "Januar",
+    "february": "Februar",
+    "march": "März",
+    "april": "April",
+    "may": "Mai",
+    "june": "Juni",
+    "july": "Juli",
+    "august": "August",
+    "september": "September",
+    "october": "Oktober",
+    "november": "November",
+    "december": "Dezember",
+    
+    "joinedIn": "Beigetreten {month}",
+    "@joinedIn": {
+      "placeholders": {
+        "month": {
+          "type": "String"
+        }
+      }
+    },
+    
+    "today": "Heute",
+    "teamMatches": "{team} Spiele",
+    "@teamMatches": {
+      "placeholders": {
+        "team": {
+          "type": "String"
+        }
+      }
+    },
+    "loadedMatches": "{count} Spiele geladen",
+    "@loadedMatches": {
+      "placeholders": {
+        "count": {
+          "type": "int"
+        }
+      }
+    },
+    "noMatchesFound": "Keine Spiele gefunden",
+    "testNotification": "Benachrichtigung testen",
+    "notificationSent": "Systembenachrichtigung gesendet. Schauen Sie im Benachrichtigungsbereich Ihres Telefons nach!",
+    
+    "email": "E-Mail",
+    "noEmailProvided": "Keine E-Mail angegeben",
+    "noNameProvided": "Kein Name angegeben",
+    "noTeamSelected": "Kein Team ausgewählt",
+    "favoriteNationalTeam": "Lieblings-Nationalmannschaft",
+    "noNationalTeamSelected": "Keine Nationalmannschaft ausgewählt",
+    "confirm": "Bestätigen",
+    
+    "failedToLoadMatches": "Spiele konnten nicht geladen werden: {error}",
+    "@failedToLoadMatches": {
+      "placeholders": {
+        "error": {
+          "type": "String"
+        }
+      }
+    },
+    "yourFavoriteTeam": "dein Lieblingsteam",
+    
+    "notificationDenied": "Benachrichtigungsberechtigung wurde verweigert. Benachrichtigungen funktionieren nicht.",
+    "search": "Suchen",
+    "backToToday": "Zurück zu Heute"
 }

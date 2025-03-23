@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'common_layout.dart';
 import 'league_details.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 // Liga adatmodell
 class League {
@@ -36,7 +37,7 @@ class League {
 
     return League(
       id: json['id'],
-      name: json['name'] ?? 'Ismeretlen bajnokság',
+      name: json['name'] ?? 'Unknown league',
       logo: logoUrl,
     );
   }
@@ -124,9 +125,11 @@ class _LeaguePageState extends State<LeaguePage> {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   } else if (snapshot.hasError) {
-                    return Center(child: Text('Hiba: ${snapshot.error}'));
+                    return Center(child: Text(
+                      '${AppLocalizations.of(context)!.errorFetchingLeagues}'.replaceAll('{error}', '${snapshot.error}')
+                    ));
                   } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return const Center(child: Text('Nincs elérhető bajnokság'));
+                    return Center(child: Text(AppLocalizations.of(context)!.failedToLoadLeagues));
                   }
 
                   // Get original leagues list

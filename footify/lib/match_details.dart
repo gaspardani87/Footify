@@ -9,7 +9,6 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
-// This is the local variable with the correct methods
 class FootballApiService {
   static String baseUrl = 'https://us-central1-footify-13da4.cloudfunctions.net';
   static bool _initialized = true;

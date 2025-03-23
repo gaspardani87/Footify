@@ -35,6 +35,34 @@
     "possession": "Possesso",
     "shotsOnTarget": "Tiri in porta",
     "matchDetails": "Dettagli partita",
+    "passAccuracy": "Precisione dei passaggi",
+    "advancedStats": "Statistiche avanzate",
+    "expectedGoals": "Expected Goals",
+    "aerialDuelsWon": "Duelli aerei vinti",
+    "corners": "Calci d'angolo",
+    "offsides": "Fuorigioco",
+    "live": "LIVE",
+    "halftime": "INTERVALLO",
+    "finished": "FINITA",
+    "postponed": "RINVIATA",
+    "scheduled": "PROGRAMMATA",
+    "number": "Numero",
+    "position": "Posizione",
+    "recentMatches": "Partite recenti",
+    "lastFiveMatches": "Ultime 5 partite",
+    "noDataAvailable": "Nessun dato disponibile",
+    "nationality": "Nazionalità",
+    "age": "Età",
+    "years": "anni",
+    "height": "Altezza",
+    "matchStats": "Statistiche partita",
+    "heatmap": "Heatmap",
+    "noHeatmapAvailable": "Heatmap non disponibile",
+    "highlights": "Highlights",
+    "noHighlightsAvailable": "Nessun highlight disponibile",
+    "abandoned": "Abbandonata",
+    "extraTime": "Tempi supplementari",
+    "penalties": "Rigori",
     "emptyFixtureTitle": "Lista delle partite vuota? Chiamiamolo silenzio strategico. 🧠⚽",
     "emptyFixtureSubtitle": "La grandezza ti attende—ti avviseremo quando è ora di giocare!",
     
@@ -126,5 +154,122 @@
     "emptyFixtureSubtitle29": "Ma non preoccuparti—il prossimo scontro è in preparazione!",
     
     "emptyFixtureTitle30": "Il calcio sta prendendo fiato... 🧠",
-    "emptyFixtureSubtitle30": "Come in tutte le grandi storie, c'è una pausa prima dell'azione!"
+    "emptyFixtureSubtitle30": "Come in tutte le grandi storie, c'è una pausa prima dell'azione!",
+
+    "loginRegister": "Accedi/Registrati",
+    "championsLeague": "Champions League",
+    "europaLeague": "Europa League",
+    "relegation": "Retrocessione",
+    "automaticPromotion": "Promozione diretta",
+    "playoffPromotion": "Promozione playoff",
+    "promotion": "Promozione",
+    "playoff": "Playoff",
+    "unknownTeam": "Squadra sconosciuta",
+    "unknownLeague": "Lega sconosciuta",
+    "errorFetchingLeagues": "Errore nel caricamento delle leghe: {error}",
+    "@errorFetchingLeagues": {
+      "placeholders": {
+        "error": {
+          "type": "String"
+        }
+      }
+    },
+    "failedToLoadLeagues": "Impossibile caricare le leghe",
+    "matchesColumnHeader": "P",
+    "goalsForColumnHeader": "GF",
+    "goalsAgainstColumnHeader": "GS",
+    
+    "premierLeagueQualification": "Posizioni 1-4: Champions League\nPosizioni 5-6: Europa League\nPosizioni 18-20: Retrocessione",
+    "laLigaQualification": "Posizioni 1-4: Champions League\nPosizioni 5-6: Europa League\nPosizioni 18-20: Retrocessione",
+    "bundesligaQualification": "Posizioni 1-4: Champions League\nPosizioni 5-6: Europa League\nPosizioni 16-18: Retrocessione",
+    "serieAQualification": "Posizioni 1-4: Champions League\nPosizioni 5-6: Europa League\nPosizioni 18-20: Retrocessione",
+    "ligue1Qualification": "Posizioni 1-2: Champions League\nPosizioni 3-4: Europa League\nPosizioni 18-20: Retrocessione",
+    "championshipQualification": "Posizioni 1-2: Promozione diretta\nPosizioni 3-6: Promozione playoff\nPosizioni 22-24: Retrocessione",
+    "leagueOneQualification": "Posizioni 1-2: Promozione diretta\nPosizioni 3-6: Promozione playoff\nPosizioni 21-24: Retrocessione",
+    
+    "positionColumnHeader": "#",
+    "teamColumnHeader": "Squadra",
+    "goalDifferenceColumnHeader": "DR",
+    "pointsColumnHeader": "Pti",
+    "previousRound": "Turno precedente",
+    "topScorers": "Capocannonieri",
+    "leagueLegend": "Legenda",
+
+    "lightMode": "Chiaro",
+    "darkMode": "Scuro",
+    "enableNotifications": "Attiva notifiche",
+    "settingsSaved": "Le impostazioni sono salvate nel tuo browser e rimarranno fino a quando non cancellerai i dati del browser.",
+    "small": "Piccolo",
+    "large": "Grande",
+    "reset": "Ripristina",
+    
+    "editProfile": "Modifica profilo",
+    "deleteAccountConfirm": "Sei sicuro di voler eliminare il tuo account?",
+    "cancel": "Annulla",
+    "delete": "Elimina",
+    
+    "january": "Gennaio",
+    "february": "Febbraio",
+    "march": "Marzo",
+    "april": "Aprile",
+    "may": "Maggio",
+    "june": "Giugno",
+    "july": "Luglio",
+    "august": "Agosto",
+    "september": "Settembre",
+    "october": "Ottobre",
+    "november": "Novembre",
+    "december": "Dicembre",
+    
+    "joinedIn": "Iscritto a {month}",
+    "@joinedIn": {
+      "placeholders": {
+        "month": {
+          "type": "String"
+        }
+      }
+    },
+    
+    "today": "Oggi",
+    "teamMatches": "Partite di {team}",
+    "@teamMatches": {
+      "placeholders": {
+        "team": {
+          "type": "String"
+        }
+      }
+    },
+    "loadedMatches": "Caricate {count} partite",
+    "@loadedMatches": {
+      "placeholders": {
+        "count": {
+          "type": "int"
+        }
+      }
+    },
+    "noMatchesFound": "Nessuna partita trovata",
+    "testNotification": "Testa notifica",
+    "notificationSent": "Notifica di sistema inviata. Controlla l'area notifiche del tuo telefono!",
+    
+    "email": "Email",
+    "noEmailProvided": "Nessuna email fornita",
+    "noNameProvided": "Nessun nome fornito",
+    "noTeamSelected": "Nessuna squadra selezionata",
+    "favoriteNationalTeam": "Nazionale Preferita",
+    "noNationalTeamSelected": "Nessuna nazionale selezionata",
+    "confirm": "Conferma",
+    
+    "failedToLoadMatches": "Impossibile caricare le partite: {error}",
+    "@failedToLoadMatches": {
+      "placeholders": {
+        "error": {
+          "type": "String"
+        }
+      }
+    },
+    "yourFavoriteTeam": "la tua squadra preferita",
+    
+    "notificationDenied": "Autorizzazione alle notifiche negata. Le notifiche non funzioneranno.",
+    "search": "Cerca",
+    "backToToday": "Torna a Oggi"
 }

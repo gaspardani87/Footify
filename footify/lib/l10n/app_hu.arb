@@ -35,6 +35,34 @@
     "possession": "Labdairtoklás",
     "shotsOnTarget": "Kapura lövések",
     "matchDetails": "Mérkőzés részletek",
+    "passAccuracy": "Passz pontosság",
+    "advancedStats": "Részletes statisztikák",
+    "expectedGoals": "Várható gólok",
+    "aerialDuelsWon": "Megnyert fejelések",
+    "corners": "Szögletek",
+    "offsides": "Lesek",
+    "live": "ÉLŐ",
+    "halftime": "FÉLIDŐ",
+    "finished": "BEFEJEZETT",
+    "postponed": "ELHALASZTVA",
+    "scheduled": "TERVEZETT",
+    "number": "Szám",
+    "position": "Pozíció",
+    "recentMatches": "Legutóbbi mérkőzések",
+    "lastFiveMatches": "Utolsó 5 mérkőzés",
+    "noDataAvailable": "Nincs elérhető adat",
+    "nationality": "Nemzetiség",
+    "age": "Kor",
+    "years": "év",
+    "height": "Magasság",
+    "matchStats": "Mérkőzés statisztikák",
+    "heatmap": "Hőtérkép",
+    "noHeatmapAvailable": "Hőtérkép nem elérhető",
+    "highlights": "Összefoglaló",
+    "noHighlightsAvailable": "Összefoglaló nem elérhető",
+    "abandoned": "Félbeszakadt",
+    "extraTime": "Hosszabbítás",
+    "penalties": "Büntetők",
     "emptyFixtureTitle": "Üres a meccsnaptar? Nevezzük ezt stratégiai csendnek. 🧠⚽",
     "emptyFixtureSubtitle": "A nagyság vár—értesítünk, amikor itt az idő!",
     
@@ -126,5 +154,122 @@
     "emptyFixtureSubtitle29": "De ne aggódj—a következő nagy összecsapás előkészítés alatt!",
     
     "emptyFixtureTitle30": "A foci épp levegőt vesz... 🧠",
-    "emptyFixtureSubtitle30": "Mint minden nagy történetben, az akció előtt mindig van egy kis szünet!"
+    "emptyFixtureSubtitle30": "Mint minden nagy történetben, az akció előtt mindig van egy kis szünet!",
+
+    "loginRegister": "Bejelentkezés/Regisztráció",
+    "championsLeague": "Bajnokok Ligája",
+    "europaLeague": "Európa Liga",
+    "relegation": "Kiesés",
+    "automaticPromotion": "Automatikus feljutás",
+    "playoffPromotion": "Rájátszásos feljutás",
+    "promotion": "Feljutás",
+    "playoff": "Rájátszás",
+    "unknownTeam": "Ismeretlen Csapat",
+    "unknownLeague": "Ismeretlen Bajnokság",
+    "errorFetchingLeagues": "Hiba a bajnokságok betöltésekor: {error}",
+    "@errorFetchingLeagues": {
+      "placeholders": {
+        "error": {
+          "type": "String"
+        }
+      }
+    },
+    "failedToLoadLeagues": "Nem sikerült betölteni a bajnokságokat",
+    "matchesColumnHeader": "M",
+    "goalsForColumnHeader": "G+",
+    "goalsAgainstColumnHeader": "G-",
+
+    "premierLeagueQualification": "1-4: Bajnokok Ligája\n5-6: Európa Liga\n18-20: Kiesés",
+    "laLigaQualification": "1-4: Bajnokok Ligája\n5-6: Európa Liga\n18-20: Kiesés",
+    "bundesligaQualification": "1-4: Bajnokok Ligája\n5-6: Európa Liga\n16-18: Kiesés",
+    "serieAQualification": "1-4: Bajnokok Ligája\n5-6: Európa Liga\n18-20: Kiesés",
+    "ligue1Qualification": "1-2: Bajnokok Ligája\n3-4: Európa Liga\n18-20: Kiesés",
+    "championshipQualification": "1-2: Automatikus feljutás\n3-6: Rájátszásos feljutás\n22-24: Kiesés",
+    "leagueOneQualification": "1-2: Automatikus feljutás\n3-6: Rájátszásos feljutás\n21-24: Kiesés",
+    
+    "positionColumnHeader": "#",
+    "teamColumnHeader": "Csapat",
+    "goalDifferenceColumnHeader": "GK",
+    "pointsColumnHeader": "P",
+    "previousRound": "Előző forduló",
+    "topScorers": "Góllövőlista",
+    "leagueLegend": "Jelmagyarázat",
+
+    "lightMode": "Világos",
+    "darkMode": "Sötét",
+    "enableNotifications": "Értesítések engedélyezése",
+    "settingsSaved": "A beállításokat a böngésző tárolja, és addig maradnak meg, amíg nem törli a böngésző adatait.",
+    "small": "Kicsi",
+    "large": "Nagy",
+    "reset": "Alaphelyzet",
+    
+    "editProfile": "Profil szerkesztése",
+    "deleteAccountConfirm": "Biztosan törölni szeretnéd a fiókodat?",
+    "cancel": "Mégsem",
+    "delete": "Törlés",
+    
+    "january": "Január",
+    "february": "Február",
+    "march": "Március",
+    "april": "Április",
+    "may": "Május",
+    "june": "Június",
+    "july": "Július",
+    "august": "Augusztus",
+    "september": "Szeptember",
+    "october": "Október",
+    "november": "November",
+    "december": "December",
+    
+    "joinedIn": "Csatlakozott: {month}",
+    "@joinedIn": {
+      "placeholders": {
+        "month": {
+          "type": "String"
+        }
+      }
+    },
+    
+    "today": "Ma",
+    "teamMatches": "{team} mérkőzései",
+    "@teamMatches": {
+      "placeholders": {
+        "team": {
+          "type": "String"
+        }
+      }
+    },
+    "loadedMatches": "{count} mérkőzés betöltve",
+    "@loadedMatches": {
+      "placeholders": {
+        "count": {
+          "type": "int"
+        }
+      }
+    },
+    "noMatchesFound": "Nem találhatók mérkőzések",
+    "testNotification": "Értesítés tesztelése",
+    "notificationSent": "Rendszerértesítés elküldve. Nézd meg a telefonod értesítési területét!",
+    
+    "email": "Email",
+    "noEmailProvided": "Nincs megadva email",
+    "noNameProvided": "Nincs megadva név",
+    "noTeamSelected": "Nincs kiválasztva csapat",
+    "favoriteNationalTeam": "Kedvenc Nemzeti Válogatott",
+    "noNationalTeamSelected": "Nincs kiválasztva nemzeti válogatott",
+    "confirm": "Megerősítés",
+    
+    "failedToLoadMatches": "Nem sikerült betölteni a mérkőzéseket: {error}",
+    "@failedToLoadMatches": {
+      "placeholders": {
+        "error": {
+          "type": "String"
+        }
+      }
+    },
+    "yourFavoriteTeam": "kedvenc csapatod",
+    
+    "notificationDenied": "Az értesítési engedélyt elutasították. Az értesítések nem fognak működni.",
+    "search": "Keresés",
+    "backToToday": "Vissza a mai naphoz"
 }

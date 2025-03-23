@@ -129,9 +129,9 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
         ),
         const SizedBox(height: 4),
         Text(
-                    'Joined $joinDate',
+          '${AppLocalizations.of(context)!.joinedIn}'.replaceAll('{month}', joinDate),
           style: TextStyle(
-                      color: Theme.of(context).brightness == Brightness.dark ? Colors.grey[400] : Colors.black54,
+            color: Theme.of(context).brightness == Brightness.dark ? Colors.grey[400] : Colors.black54,
             fontSize: 14,
           ),
           textAlign: TextAlign.center,
@@ -149,8 +149,8 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
               children: [
                 _buildProfileItem(
                   context,
-                  'Email',
-                  userData['email'] ?? 'No email provided',
+                  AppLocalizations.of(context)!.email,
+                  userData['email'] ?? AppLocalizations.of(context)!.noEmailProvided,
                   Icons.email,
                             Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                 ),
@@ -173,8 +173,8 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                 const Divider(color: Color(0xFFFFE6AC)),
                 _buildProfileItem(
                   context,
-                  'Favorite National Team',
-                  userData['favoriteNationalTeam'] ?? userData['favoriteLeague'] ?? 'No national team selected',
+                  AppLocalizations.of(context)!.favoriteNationalTeam,
+                  userData['favoriteNationalTeam'] ?? userData['favoriteLeague'] ?? AppLocalizations.of(context)!.noNationalTeamSelected,
                   Icons.flag,
                             Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                 ),
@@ -206,15 +206,15 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                                   color: Colors.black
                                 ),
                                 label: AnimatedCrossFade(
-                                  firstChild: const Text(
-                                    'Edit Profile', 
-                                    style: TextStyle(
+                                  firstChild: Text(
+                                    AppLocalizations.of(context)!.editProfile, 
+                                    style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                     )
                                   ),
-                                  secondChild: const Text(
-                                    'Confirm', 
-                                    style: TextStyle(
+                                  secondChild: Text(
+                                    AppLocalizations.of(context)!.confirm, 
+                                    style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                     )
                                   ),
@@ -261,9 +261,9 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                                       size: 20, 
                                       color: Color(0xFFFFE6AC),
                                     ),
-                                    label: const Text(
-                                      'Cancel', 
-                                      style: TextStyle(
+                                    label: Text(
+                                      AppLocalizations.of(context)!.cancel, 
+                                      style: const TextStyle(
                                         fontWeight: FontWeight.bold,
                                       )
                                     ),
@@ -311,7 +311,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                                             color: const Color(0xFFFFE6AC),
                                           ),
                                           label: Text(
-                                            'Logout', 
+                                            AppLocalizations.of(context)!.logOut, 
                                             style: TextStyle(
                                               fontWeight: FontWeight.bold,
                                               fontSize: fontSize,
@@ -364,7 +364,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                                             color: Colors.white,
                                           ),
                                           label: Text(
-                                            'Delete Account', 
+                                            AppLocalizations.of(context)!.delete, 
                                             overflow: TextOverflow.ellipsis,
                                             style: TextStyle(
                                               fontWeight: FontWeight.bold,
@@ -628,8 +628,8 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
   Widget _buildProfileItem(BuildContext context, String label, String value, IconData icon, Color textColor) {
     final bool isNameField = label == AppLocalizations.of(context)!.profileName;
     final bool isTeamField = label == AppLocalizations.of(context)!.favTeam;
-    final bool isNationalTeamField = label == 'Favorite National Team';
-    final bool isEmailField = label == 'Email';
+    final bool isNationalTeamField = label == AppLocalizations.of(context)!.favoriteNationalTeam;
+    final bool isEmailField = label == AppLocalizations.of(context)!.email;
     
     // Calculate if this field is currently being edited
     final bool isFieldBeingEdited = _isEditMode && _currentlyEditingField == label && isNameField;
@@ -1472,7 +1472,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Are you sure you want to delete your account?',
+              AppLocalizations.of(context)!.deleteAccountConfirm,
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 16, 
@@ -1491,21 +1491,14 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: Text(AppLocalizations.of(context)!.cancel, style: const TextStyle(fontWeight: FontWeight.bold)),
           ),
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
               await _handleDeleteAccount(context);
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red.shade400,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: Text(AppLocalizations.of(context)!.delete, style: const TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
