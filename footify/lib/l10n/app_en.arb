@@ -231,6 +231,9 @@
     },
     
     "today": "Today",
+    "tomorrow": "Tomorrow",
+    "yesterday": "Yesterday",
+    "versus": "vs",
     "teamMatches": "{team} matches",
     "@teamMatches": {
       "placeholders": {
@@ -271,5 +274,19 @@
     
     "notificationDenied": "Notification permission was denied. Notifications will not work.",
     "search": "Search",
-    "backToToday": "Back to Today"
+    "backToToday": "Back to Today",
+    
+    "dashboard": "Dashboard",
+    "favoriteTeam": "Favorite Team",
+    "favoriteNation": "Favorite Nation",
+    "noNationSelected": "No nation selected",
+    "matchday": "Matchday",
+    "nextMatch": "Next Match",
+    "upcomingMatches": "Upcoming Matches",
+    "noMatchesScheduled": "No matches scheduled for this day",
+    "loginToViewDashboard": "Log in to view your personalized dashboard",
+    "login": "Login",
+    "winsShort": "W",
+    "drawsShort": "D",
+    "lossesShort": "L"
 }

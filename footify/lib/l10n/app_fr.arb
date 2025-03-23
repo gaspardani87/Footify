@@ -1,0 +1,22 @@
+{
+    "@@locale": "fr",
+    "winsShort": "V",
+    "drawsShort": "N",
+    "lossesShort": "D",
+    "dashboard": "Tableau de bord",
+    "favoriteTeam": "Équipe Favorite",
+    "favoriteNation": "Nation Favorite",
+    "matchday": "Journée",
+    "nextMatch": "Prochain Match",
+    "upcomingMatches": "Matchs à Venir",
+    "noMatchesScheduled": "Aucun match programmé pour ce jour",
+    "loginToViewDashboard": "Connectez-vous pour voir votre tableau de bord personnalisé",
+    "login": "Connexion",
+    "backToToday": "Retour à aujourd'hui",
+    "today": "Aujourd'hui",
+    "tomorrow": "Demain",
+    "yesterday": "Hier",
+    "versus": "vs",
+    "noTeamSelected": "Aucune équipe sélectionnée",
+    "noNationSelected": "Aucune nation sélectionnée"
+} 

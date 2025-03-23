@@ -231,6 +231,9 @@
     },
     
     "today": "Ma",
+    "tomorrow": "Holnap",
+    "yesterday": "Tegnap",
+    "versus": "vs",
     "teamMatches": "{team} mérkőzései",
     "@teamMatches": {
       "placeholders": {
@@ -271,5 +274,18 @@
     
     "notificationDenied": "Az értesítési engedélyt elutasították. Az értesítések nem fognak működni.",
     "search": "Keresés",
-    "backToToday": "Vissza a mai naphoz"
+    "backToToday": "Vissza a mai naphoz",
+    "winsShort": "Gy",
+    "drawsShort": "D",
+    "lossesShort": "V",
+    "dashboard": "Vezérlőpult",
+    "favoriteTeam": "Kedvenc Csapat",
+    "favoriteNation": "Kedvenc Nemzet",
+    "matchday": "Forduló",
+    "nextMatch": "Következő Meccs",
+    "upcomingMatches": "Közelgő Mérkőzések",
+    "noMatchesScheduled": "Erre a napra nincs mérkőzés",
+    "loginToViewDashboard": "Jelentkezz be a személyre szabott vezérlőpult megtekintéséhez",
+    "login": "Bejelentkezés",
+    "backToToday": "Mai napra"
 }

@@ -33,6 +33,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math';
 import 'services/football_api_service.dart' as football_api;
+import 'dashboard.dart';
 
 // A simple in-memory image cache
 class ImageCache {
@@ -735,29 +736,64 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final colorScheme = Theme.of(context).colorScheme;
 
-    return CommonLayout(
-      selectedIndex: _selectedIndex,
-      child: FutureBuilder<Map<String, dynamic>>(
-        future: _futureData,
-        builder: (context, snapshot) {
-          // Handle error case
-          if (snapshot.hasError || _hasError) {
-            return _buildErrorWidget(isDarkMode, colorScheme);
-          }
-          
-          // Show data immediately
-          if (snapshot.hasData && snapshot.data!['matches'] != null) {
-            return _buildMatchesList(snapshot.data!, isDarkMode, colorScheme);
-          }
-          
-          // Fallback for empty data (should rarely happen)
-          return Center(
-            child: Text(
-              'No matches available', 
-              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)
-            )
-          );
-        },
+    return Scaffold(
+      body: Stack(
+        children: [
+          CommonLayout(
+            selectedIndex: _selectedIndex,
+            child: FutureBuilder<Map<String, dynamic>>(
+              future: _futureData,
+              builder: (context, snapshot) {
+                // Handle error case
+                if (snapshot.hasError || _hasError) {
+                  return _buildErrorWidget(isDarkMode, colorScheme);
+                }
+                
+                // Show data immediately
+                if (snapshot.hasData && snapshot.data!['matches'] != null) {
+                  return _buildMatchesList(snapshot.data!, isDarkMode, colorScheme);
+                }
+                
+                // Fallback for empty data (should rarely happen)
+                return Center(
+                  child: Text(
+                    'No matches available', 
+                    style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)
+                  )
+                );
+              },
+            ),
+          ),
+          // Temporary button for testing the dashboard
+          Positioned(
+            bottom: 90,  // Position it just above the bottom navigation
+            right: 20,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const DashboardPage()),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFFE6AC),
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30.0),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.dashboard),
+                  const SizedBox(width: 8),
+                  Text(AppLocalizations.of(context)?.dashboard ?? 'Dashboard'),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -951,7 +987,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
         'emptyFixtureTitle30': "Football's taking a breather... 🧠",
       };
       
-      final String title = defaultMessages[titleKey] ?? "Empty fixture list? Let's call it strategic silence. 🧠⚽";
+      final String title = AppLocalizations.of(context)!.emptyFixtureTitle ??  "Empty fixture list? Let's call it strategic silence. 🧠⚽";
       
       // Get the default subtitle
       final Map<String, String> defaultSubtitles = {
@@ -987,7 +1023,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
         'emptyFixtureSubtitle30': "Like all great stories, there's a pause before the action!",
       };
       
-      final String subtitle = defaultSubtitles[subtitleKey] ?? "Greatness awaits—we'll notify you when it's game time!";
+      final String subtitle =  AppLocalizations.of(context)!.emptyFixtureSubtitle ?? "Greatness awaits—we'll notify you when it's game time!";
       
       return Center(
         child: Padding(

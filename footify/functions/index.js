@@ -976,3 +976,535 @@ function getDateString(offset = 0) {
   date.setDate(date.getDate() + offset);
   return date.toISOString().split('T')[0];
 }
+
+// Function to get team's league
+exports.getTeamLeague = functions.https.onRequest(async (req, res) => {
+  setCorsHeaders(res);
+  
+  if (handleOptions(req, res)) return;
+
+  const teamId = req.query.id;
+  if (!teamId) {
+    res.status(400).json({ error: 'Missing team ID parameter' });
+    return;
+  }
+
+  try {
+    console.log(`Fetching league information for team ${teamId}`);
+    
+    // First get the team info to check which competitions they are in
+    const teamResponse = await axios.get(`${BASE_URL}/teams/${teamId}`, {
+      headers: {
+        'X-Auth-Token': API_KEY,
+      },
+    });
+    
+    if (teamResponse.status !== 200) {
+      throw new Error(`Team API returned status: ${teamResponse.status}`);
+    }
+    
+    const team = teamResponse.data;
+    const runningCompetitions = team.runningCompetitions || [];
+    
+    // Filter for league competitions only (not cups)
+    const leagueCompetitions = runningCompetitions.filter(comp => 
+      comp.type === 'LEAGUE'
+    );
+    
+    // If we found at least one league
+    if (leagueCompetitions.length > 0) {
+      // Sort by tier/importance, with top leagues first
+      const priorityLeagues = ["PL", "BL1", "SA", "PD", "FL1"]; // Premier League, Bundesliga, Serie A, La Liga, Ligue 1
+      
+      // Sort leagues by priority
+      leagueCompetitions.sort((a, b) => {
+        const aPriority = priorityLeagues.indexOf(a.code);
+        const bPriority = priorityLeagues.indexOf(b.code);
+        
+        // If both leagues are in priority list, compare their priorities
+        if (aPriority !== -1 && bPriority !== -1) {
+          return aPriority - bPriority;
+        }
+        
+        // If only a is in priority list, a comes first
+        if (aPriority !== -1) {
+          return -1;
+        }
+        
+        // If only b is in priority list, b comes first
+        if (bPriority !== -1) {
+          return 1;
+        }
+        
+        // If neither is in priority list, sort alphabetically
+        return a.name.localeCompare(b.name);
+      });
+      
+      // Take the highest priority league
+      const primaryLeague = leagueCompetitions[0];
+      
+      // Get the league standings for this league
+      const standingsResponse = await axios.get(`${BASE_URL}/competitions/${primaryLeague.id}/standings`, {
+        headers: {
+          'X-Auth-Token': API_KEY,
+        },
+      });
+      
+      if (standingsResponse.status !== 200) {
+        throw new Error(`Standings API returned status: ${standingsResponse.status}`);
+      }
+      
+      // Return both the league info and the standings
+      res.status(200).json({
+        success: true,
+        team: {
+          id: team.id,
+          name: team.name,
+          crest: team.crest || team.emblem
+        },
+        league: primaryLeague,
+        standings: standingsResponse.data
+      });
+    } else {
+      // No league competitions found
+      res.status(200).json({
+        success: true,
+        team: {
+          id: team.id,
+          name: team.name,
+          crest: team.crest || team.emblem
+        },
+        league: null,
+        message: 'No league competitions found for this team'
+      });
+    }
+  } catch (error) {
+    console.error(`Error fetching league for team ${teamId}:`, error.message);
+    res.status(500).json({
+      error: 'Failed to fetch team league',
+      details: error.message || 'Unknown error',
+      status: error.response ? error.response.status : null,
+    });
+  }
+});
+
+// Function to get national team's competitions
+exports.getNationalTeamLeague = functions.https.onRequest(async (req, res) => {
+  setCorsHeaders(res);
+  
+  if (handleOptions(req, res)) return;
+
+  const teamId = req.query.id;
+  if (!teamId) {
+    res.status(400).json({ error: 'Missing team ID parameter' });
+    return;
+  }
+
+  try {
+    console.log(`Fetching competition information for national team ${teamId}`);
+    
+    // First get the team info
+    const teamResponse = await axios.get(`${BASE_URL}/teams/${teamId}`, {
+      headers: {
+        'X-Auth-Token': API_KEY,
+      },
+    });
+    
+    if (teamResponse.status !== 200) {
+      throw new Error(`Team API returned status: ${teamResponse.status}`);
+    }
+    
+    const team = teamResponse.data;
+    const runningCompetitions = team.runningCompetitions || [];
+    
+    // For national teams, we're interested in international tournaments
+    // like World Cup, Euro, Copa America, etc.
+    const internationalCompetitions = runningCompetitions.filter(comp => 
+      comp.type === 'CUP' || comp.name.includes('World') || 
+      comp.name.includes('Euro') || comp.name.includes('Cup') ||
+      comp.name.includes('Championship')
+    );
+    
+    if (internationalCompetitions.length > 0) {
+      // Sort by current (ongoing competitions take priority)
+      internationalCompetitions.sort((a, b) => {
+        // Check if a competition is currently active
+        const aHasCurrentSeason = a.currentSeason && 
+          new Date(a.currentSeason.startDate) <= new Date() && 
+          new Date(a.currentSeason.endDate) >= new Date();
+          
+        const bHasCurrentSeason = b.currentSeason && 
+          new Date(b.currentSeason.startDate) <= new Date() && 
+          new Date(b.currentSeason.endDate) >= new Date();
+        
+        // Current competitions first
+        if (aHasCurrentSeason && !bHasCurrentSeason) return -1;
+        if (!aHasCurrentSeason && bHasCurrentSeason) return 1;
+        
+        // Otherwise sort by start date (most recent first)
+        if (a.currentSeason && b.currentSeason) {
+          return new Date(b.currentSeason.startDate) - new Date(a.currentSeason.startDate);
+        }
+        
+        return 0;
+      });
+      
+      // Take the top competition
+      const primaryCompetition = internationalCompetitions[0];
+      
+      // Try to get standings if available
+      try {
+        const standingsResponse = await axios.get(`${BASE_URL}/competitions/${primaryCompetition.id}/standings`, {
+          headers: {
+            'X-Auth-Token': API_KEY,
+          },
+        });
+        
+        if (standingsResponse.status === 200) {
+          // Return both the competition info and the standings
+          res.status(200).json({
+            success: true,
+            team: {
+              id: team.id,
+              name: team.name,
+              crest: team.crest || team.emblem
+            },
+            competition: primaryCompetition,
+            standings: standingsResponse.data
+          });
+          return;
+        }
+      } catch (standingsError) {
+        console.log(`No standings available for competition ${primaryCompetition.id}, continuing without standings`);
+      }
+      
+      // If we reach here, no standings were available
+      res.status(200).json({
+        success: true,
+        team: {
+          id: team.id,
+          name: team.name,
+          crest: team.crest || team.emblem
+        },
+        competition: primaryCompetition,
+        standings: null,
+        message: 'No standings available for this competition'
+      });
+    } else {
+      // No international competitions found
+      res.status(200).json({
+        success: true,
+        team: {
+          id: team.id,
+          name: team.name,
+          crest: team.crest || team.emblem
+        },
+        competition: null,
+        message: 'No active competitions found for this national team'
+      });
+    }
+  } catch (error) {
+    console.error(`Error fetching competitions for national team ${teamId}:`, error.message);
+    res.status(500).json({
+      error: 'Failed to fetch national team competitions',
+      details: error.message || 'Unknown error',
+      status: error.response ? error.response.status : null,
+    });
+  }
+});
+
+// Function to fetch matches for a specific date
+exports.getMatchesByDate = functions.https.onRequest(async (req, res) => {
+  setCorsHeaders(res);
+  
+  if (handleOptions(req, res)) return;
+
+  const date = req.query.date;
+  if (!date) {
+    res.status(400).json({ error: 'Missing date parameter (format: YYYY-MM-DD)' });
+    return;
+  }
+
+  try {
+    console.log(`Fetching matches for date: ${date}`);
+    
+    // Date validation - ensure it's in YYYY-MM-DD format
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(date)) {
+      res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD' });
+      return;
+    }
+    
+    // Get matches for the specified date
+    const response = await axios.get(`${BASE_URL}/matches`, {
+      headers: {
+        'X-Auth-Token': API_KEY,
+      },
+      params: {
+        dateFrom: date,
+        dateTo: date,
+      }
+    });
+    
+    if (response.status === 200) {
+      const matches = response.data.matches || [];
+      
+      // Group matches by competition for better organization
+      const matchesByCompetition = {};
+      
+      matches.forEach(match => {
+        const competition = match.competition;
+        const competitionId = competition.id;
+        
+        if (!matchesByCompetition[competitionId]) {
+          matchesByCompetition[competitionId] = {
+            competition: {
+              id: competition.id,
+              name: competition.name,
+              code: competition.code,
+              type: competition.type,
+              emblem: competition.emblem
+            },
+            matches: []
+          };
+        }
+        
+        matchesByCompetition[competitionId].matches.push(match);
+      });
+      
+      // Convert to array and sort by competition name
+      const matchesArray = Object.values(matchesByCompetition)
+        .sort((a, b) => a.competition.name.localeCompare(b.competition.name));
+      
+      res.status(200).json({
+        success: true,
+        date: date,
+        matchCount: matches.length,
+        competitions: matchesArray,
+        matches: matches  // Also include flat list for backward compatibility
+      });
+    } else {
+      throw new Error(`API returned status: ${response.status}`);
+    }
+  } catch (error) {
+    console.error(`Error fetching matches for date ${date}:`, error.message);
+    res.status(500).json({
+      error: 'Failed to fetch matches by date',
+      details: error.message || 'Unknown error',
+      status: error.response ? error.response.status : null,
+    });
+  }
+});
+
+// Function to get next match for a team
+exports.getNextMatch = functions.https.onRequest(async (req, res) => {
+  setCorsHeaders(res);
+  
+  if (handleOptions(req, res)) return;
+
+  const teamId = req.query.id;
+  if (!teamId) {
+    res.status(400).json({ error: 'Missing team ID parameter' });
+    return;
+  }
+
+  try {
+    console.log(`Fetching next match for team ${teamId}`);
+    
+    // Get future matches for this team
+    const today = new Date();
+    const dateFrom = today.toISOString().split('T')[0]; // Today in YYYY-MM-DD
+    
+    // Get date 6 months from now
+    const dateTo = new Date(today);
+    dateTo.setMonth(today.getMonth() + 6);
+    const dateToString = dateTo.toISOString().split('T')[0];
+    
+    const response = await axios.get(`${BASE_URL}/teams/${teamId}/matches`, {
+      headers: {
+        'X-Auth-Token': API_KEY,
+      },
+      params: {
+        dateFrom: dateFrom,
+        dateTo: dateToString,
+        status: 'SCHEDULED',
+        limit: 1  // We only need the next match
+      }
+    });
+    
+    if (response.status === 200) {
+      const matches = response.data.matches || [];
+      
+      if (matches.length > 0) {
+        // Return the first upcoming match
+        res.status(200).json({
+          success: true,
+          teamId: teamId,
+          match: matches[0]
+        });
+      } else {
+        // No upcoming matches found
+        res.status(200).json({
+          success: true,
+          teamId: teamId,
+          match: null,
+          message: 'No upcoming matches found for this team'
+        });
+      }
+    } else {
+      throw new Error(`API returned status: ${response.status}`);
+    }
+  } catch (error) {
+    console.error(`Error fetching next match for team ${teamId}:`, error.message);
+    res.status(500).json({
+      error: 'Failed to fetch next match',
+      details: error.message || 'Unknown error',
+      status: error.response ? error.response.status : null,
+    });
+  }
+});
+
+// Function to get next match for a national team
+exports.getNationalTeamNextMatch = functions.https.onRequest(async (req, res) => {
+  setCorsHeaders(res);
+  
+  if (handleOptions(req, res)) return;
+
+  const teamId = req.query.id;
+  if (!teamId) {
+    res.status(400).json({ error: 'Missing team ID parameter' });
+    return;
+  }
+
+  try {
+    console.log(`Fetching next match for national team ${teamId}`);
+    
+    // Get future matches for this national team
+    const today = new Date();
+    const dateFrom = today.toISOString().split('T')[0]; // Today in YYYY-MM-DD
+    
+    // Get date 1 year from now (national teams play less often)
+    const dateTo = new Date(today);
+    dateTo.setFullYear(today.getFullYear() + 1);
+    const dateToString = dateTo.toISOString().split('T')[0];
+    
+    const response = await axios.get(`${BASE_URL}/teams/${teamId}/matches`, {
+      headers: {
+        'X-Auth-Token': API_KEY,
+      },
+      params: {
+        dateFrom: dateFrom,
+        dateTo: dateToString,
+        status: 'SCHEDULED',
+        limit: 1  // We only need the next match
+      }
+    });
+    
+    if (response.status === 200) {
+      const matches = response.data.matches || [];
+      
+      if (matches.length > 0) {
+        // Return the first upcoming match
+        res.status(200).json({
+          success: true,
+          teamId: teamId,
+          match: matches[0]
+        });
+      } else {
+        // No upcoming matches found
+        res.status(200).json({
+          success: true,
+          teamId: teamId,
+          match: null,
+          message: 'No upcoming matches found for this national team'
+        });
+      }
+    } else {
+      throw new Error(`API returned status: ${response.status}`);
+    }
+  } catch (error) {
+    console.error(`Error fetching next match for national team ${teamId}:`, error.message);
+    res.status(500).json({
+      error: 'Failed to fetch next match for national team',
+      details: error.message || 'Unknown error',
+      status: error.response ? error.response.status : null,
+    });
+  }
+});
+
+// Function to get upcoming matches (not limited by date)
+exports.getUpcomingMatches = functions.https.onRequest(async (req, res) => {
+  setCorsHeaders(res);
+  
+  if (handleOptions(req, res)) return;
+
+  try {
+    console.log('Fetching upcoming matches');
+    
+    // Get today's date and format it as YYYY-MM-DD
+    const today = new Date();
+    const dateFrom = today.toISOString().split('T')[0];
+    
+    // Get date 7 days from now
+    const dateTo = new Date(today);
+    dateTo.setDate(today.getDate() + 7);
+    const dateToString = dateTo.toISOString().split('T')[0];
+    
+    // Get matches for the next 7 days
+    const response = await axios.get(`${BASE_URL}/matches`, {
+      headers: {
+        'X-Auth-Token': API_KEY,
+      },
+      params: {
+        dateFrom: dateFrom,
+        dateTo: dateToString,
+        status: 'SCHEDULED'
+      }
+    });
+    
+    if (response.status === 200) {
+      const matches = response.data.matches || [];
+      
+      // Group matches by date
+      const matchesByDate = {};
+      
+      matches.forEach(match => {
+        // Extract date from match.utcDate (format: YYYY-MM-DD)
+        const matchDate = match.utcDate.split('T')[0];
+        
+        if (!matchesByDate[matchDate]) {
+          matchesByDate[matchDate] = [];
+        }
+        
+        matchesByDate[matchDate].push(match);
+      });
+      
+      // Convert to array of objects with date and matches
+      const matchesArray = Object.entries(matchesByDate).map(([date, dateMatches]) => ({
+        date,
+        matches: dateMatches
+      }));
+      
+      // Sort by date (ascending)
+      matchesArray.sort((a, b) => new Date(a.date) - new Date(b.date));
+      
+      res.status(200).json({
+        success: true,
+        dateFrom: dateFrom,
+        dateTo: dateToString,
+        matchCount: matches.length,
+        matchesByDate: matchesArray,
+        matches: matches  // Also include flat list for backward compatibility
+      });
+    } else {
+      throw new Error(`API returned status: ${response.status}`);
+    }
+  } catch (error) {
+    console.error('Error fetching upcoming matches:', error.message);
+    res.status(500).json({
+      error: 'Failed to fetch upcoming matches',
+      details: error.message || 'Unknown error',
+      status: error.response ? error.response.status : null,
+    });
+  }
+});

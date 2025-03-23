@@ -271,5 +271,23 @@
     
     "notificationDenied": "Se denegó el permiso de notificación. Las notificaciones no funcionarán.",
     "search": "Buscar",
-    "backToToday": "Volver a Hoy"
+    "backToToday": "Volver a Hoy",
+    "winsShort": "G",
+    "drawsShort": "E",
+    "lossesShort": "P",
+    "dashboard": "Panel",
+    "favoriteTeam": "Equipo Favorito",
+    "favoriteNation": "Nación Favorita",
+    "matchday": "Jornada",
+    "nextMatch": "Próximo Partido",
+    "upcomingMatches": "Próximos Partidos",
+    "noMatchesScheduled": "No hay partidos programados para este día",
+    "loginToViewDashboard": "Inicia sesión para ver tu panel personalizado",
+    "login": "Iniciar sesión",
+    "backToToday": "Volver a hoy",
+    "today": "Hoy",
+    "tomorrow": "Mañana",
+    "yesterday": "Ayer",
+    "versus": "vs",
+    "noNationSelected": "Ninguna nación seleccionada"
 }

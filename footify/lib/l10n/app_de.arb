@@ -271,5 +271,21 @@
     
     "notificationDenied": "Benachrichtigungsberechtigung wurde verweigert. Benachrichtigungen funktionieren nicht.",
     "search": "Suchen",
-    "backToToday": "Zurück zu Heute"
+    "backToToday": "Zurück zu Heute",
+    "winsShort": "S",
+    "drawsShort": "U",
+    "lossesShort": "N",
+    "dashboard": "Dashboard",
+    "favoriteTeam": "Lieblingsteam",
+    "favoriteNation": "Lieblingsnation",
+    "matchday": "Spieltag",
+    "nextMatch": "Nächstes Spiel",
+    "upcomingMatches": "Kommende Spiele",
+    "noMatchesScheduled": "Für diesen Tag sind keine Spiele geplant",
+    "loginToViewDashboard": "Melden Sie sich an, um Ihr personalisiertes Dashboard anzuzeigen",
+    "login": "Anmelden",
+    "tomorrow": "Morgen",
+    "yesterday": "Gestern",
+    "versus": "vs",
+    "noNationSelected": "Keine Nation ausgewählt"
 }
