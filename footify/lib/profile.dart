@@ -1146,9 +1146,9 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                                 children: [
                                   Image.network(
                                     team['crest'] ?? '',
-                                    height: 28, // Increased from 25
+                                    height: 36, // Növelve 28-ról 36-ra
                                     errorBuilder: (context, error, stackTrace) =>
-                                        const Icon(Icons.sports_soccer, size: 28),
+                                        const Icon(Icons.sports_soccer, size: 36), // Növelve 28-ról 36-ra
                                   ),
                                   Padding(
                                     padding: const EdgeInsets.all(2), // Increased from 1
@@ -1303,12 +1303,12 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                           children: [
                             Image.network(
                               team['crest'] ?? '',
-                              height: 28,
+                              height: 36, // Növelve 28-ról 36-ra
                               errorBuilder: (context, error, stackTrace) {
                                 return Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(Icons.flag, size: 28),
+                                    const Icon(Icons.flag, size: 36), // Növelve 28-ról 36-ra
                                     if (team['countryCode'] != null)
                                       Text(
                                         team['countryCode'],
@@ -1870,7 +1870,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                 onPressed: () => _showRegistrationFlow(context),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: backgroundColor, // Match app background color
-                  foregroundColor: const Color(0xFFFFE6AC), // Yellowish text
+                  foregroundColor: (Colors.black), // Yellowish text
                   elevation: 0, // No shadow for outline style
                   padding: EdgeInsets.symmetric(
                     horizontal: baseFontSize * 0.75,

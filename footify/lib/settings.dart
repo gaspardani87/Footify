@@ -10,8 +10,6 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'storage_service.dart';
-import 'main.dart' show showNotification;
-import 'package:firebase_messaging/firebase_messaging.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -21,7 +19,6 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  bool notificationsEnabled = false;
   String selectedLanguage = 'English';
   bool isLoading = true;
   
@@ -47,14 +44,6 @@ class _SettingsPageState extends State<SettingsPage> {
       
       // Get color blind mode
       final isColorBlind = await StorageService.getBool('footify_color_blind') ?? false;
-      
-      // Get notifications setting
-      final notificationsEnabled = await StorageService.getBool('footify_notifications') ?? false;
-      
-      // Update state
-      setState(() {
-        this.notificationsEnabled = notificationsEnabled;
-      });
       
       // Apply settings via providers
       if (!mounted) return;
@@ -105,44 +94,6 @@ class _SettingsPageState extends State<SettingsPage> {
     });
     final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
     await languageProvider.setLocale(language);
-  }
-
-  Future<void> _toggleNotifications(bool enabled) async {
-    // For web, request permission when enabling notifications
-    if (enabled && kIsWeb) {
-      final messaging = FirebaseMessaging.instance;
-      final settings = await messaging.requestPermission(
-        alert: true,
-        announcement: false,
-        badge: true,
-        carPlay: false,
-        criticalAlert: false,
-        provisional: false,
-        sound: true,
-      );
-      
-      if (settings.authorizationStatus != AuthorizationStatus.authorized &&
-          settings.authorizationStatus != AuthorizationStatus.provisional) {
-        // Permission denied, show a message and don't enable notifications
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppLocalizations.of(context)!.notificationDenied),
-            duration: const Duration(seconds: 3),
-          ),
-        );
-        return; // Don't enable notifications if permission denied
-      }
-    }
-    
-    setState(() {
-      notificationsEnabled = enabled;
-    });
-    
-    try {
-      await StorageService.setBool('footify_notifications', enabled);
-    } catch (e) {
-      print('Error saving notifications setting: $e');
-    }
   }
 
   Future<void> _openURL(String url) async {
@@ -284,73 +235,6 @@ class _SettingsPageState extends State<SettingsPage> {
                       ),
                     ),
                   ),
-                ],
-              ),
-            ),
-          ),
-
-          // Notifications Card
-          Card(
-            margin: const EdgeInsets.only(bottom: 16),
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    AppLocalizations.of(context)?.notifications ?? 'Notifications',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: isDarkMode ? Colors.white : Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    AppLocalizations.of(context)?.notificationsText ?? 'Receive notifications for matches',
-                    style: TextStyle(
-                      color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  SwitchListTile(
-                    title: Text(
-                      AppLocalizations.of(context)!.enableNotifications,
-                      style: TextStyle(
-                        color: isDarkMode ? Colors.white : Colors.black,
-                      ),
-                    ),
-                    value: notificationsEnabled,
-                    activeColor: const Color(0xFFFFE6AC),
-                    activeTrackColor: isDarkMode ? Colors.grey[700] : Colors.grey[400],
-                    onChanged: _toggleNotifications,
-                  ),
-                  if (notificationsEnabled) 
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.notifications),
-                        label: Text(AppLocalizations.of(context)!.testNotification),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFFFE6AC),
-                          foregroundColor: Colors.black,
-                        ),
-                        onPressed: () {
-                          showNotification(
-                            'Footify értesítés teszt', 
-                            'Ez egy rendszerszintű értesítés a Footify alkalmazásból. Láthatnod kell ezt az értesítési területen is!',
-                            payload: 'test_notification',
-                          );
-                          
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(AppLocalizations.of(context)!.notificationSent),
-                              duration: const Duration(seconds: 3),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
                 ],
               ),
             ),

@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'team_details.dart';
 import 'profile.dart';
+import 'services/football_api_service.dart' as football_api;
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -27,6 +28,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   int _currentDateIndex = 2; // Default to middle date (today)
   late AnimationController _animationController;
   late Animation<Offset> _slideAnimation;
+  Map<String, dynamic>? _nationalTeamStandings;
 
   @override
   void initState() {
@@ -107,6 +109,23 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
       if (!teamLeagueData.containsKey('error') && teamLeagueData['standings'] != null) {
         setState(() {
           _leagueStandings = teamLeagueData['standings'];
+          
+          // Mérkőzésnap hozzáadása közvetlenül a standings objektumhoz a league adatokból
+          if (teamLeagueData['league'] != null && 
+              teamLeagueData['league']['currentSeason'] != null && 
+              teamLeagueData['league']['currentSeason']['currentMatchday'] != null) {
+            
+            // Ha a standings objektum még nem létezik vagy null, akkor üres Map-et hozunk létre
+            if (_leagueStandings == null) {
+              _leagueStandings = {};
+            }
+            
+            // Adjuk hozzá a mérkőzésnap információt a standings objektumhoz
+            _leagueStandings!['season'] = {
+              'currentMatchday': teamLeagueData['league']['currentSeason']['currentMatchday']
+            };
+          }
+          
           debugPrint('League standings updated with ${_leagueStandings != null ? 'data' : 'null'}');
         });
         
@@ -135,23 +154,65 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     if (favoriteNationalTeamId != null && favoriteNationalTeamId.isNotEmpty) {
       // Get the national team's competition information
       final nationalTeamLeagueData = await DashboardService.getNationalTeamLeague(favoriteNationalTeamId);
-      debugPrint('National team competition data: ${nationalTeamLeagueData.containsKey('error') ? 'Error' : 'Success'}');
+      debugPrint('National team competition data received: ${nationalTeamLeagueData.containsKey('error') ? 'Error' : 'Success'}');
       
       // If no team league standings but national team standings available, use those instead
       if (_leagueStandings == null && !nationalTeamLeagueData.containsKey('error') && 
           nationalTeamLeagueData['standings'] != null) {
         setState(() {
           _leagueStandings = nationalTeamLeagueData['standings'];
-          debugPrint('Using national team standings instead');
+          
+          // Mérkőzésnap hozzáadása közvetlenül a standings objektumhoz a competition adatokból
+          if (nationalTeamLeagueData['competition'] != null && 
+              nationalTeamLeagueData['competition']['currentSeason'] != null && 
+              nationalTeamLeagueData['competition']['currentSeason']['currentMatchday'] != null) {
+            
+            // Ha a standings objektum még nem létezik vagy null, akkor üres Map-et hozunk létre
+            if (_leagueStandings == null) {
+              _leagueStandings = {};
+            }
+            
+            // Adjuk hozzá a mérkőzésnap információt a standings objektumhoz
+            _leagueStandings!['season'] = {
+              'currentMatchday': nationalTeamLeagueData['competition']['currentSeason']['currentMatchday']
+            };
+          }
+          
+          debugPrint('Using national team standings instead: ${_leagueStandings != null ? 'Data available' : 'Null data'}');
         });
+      }
+      
+      // Módosított rész: Mindig frissítjük a logót, ha elérhető, függetlenül attól, hogy már létezik-e
+      // Save national team logo if available
+      if (nationalTeamLeagueData.containsKey('team') && 
+          nationalTeamLeagueData['team'] != null && 
+          nationalTeamLeagueData['team']['crest'] != null) {
+        // Mindig frissítjük a logót, ha elérhető
+        updatedUserData['favoriteNationalTeamLogo'] = nationalTeamLeagueData['team']['crest'];
+        provider.updateUserSettings(updatedUserData);
+        debugPrint('Updated favorite national team logo in user settings: ${nationalTeamLeagueData['team']['crest']}');
+      } else {
+        // Ha nincs a válaszban, hozzunk létre egy hardcoded map-et a legnépszerűbb nemzeti csapatok zászlóival
+        final Map<String, String> nationalTeamFlags = {
+          '759': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/ba/Flag_of_Germany.svg/800px-Flag_of_Germany.svg.png', // Németország
+          '760': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/Flag_of_Spain.svg/800px-Flag_of_Spain.svg.png', // Spanyolország
+          '770': 'https://upload.wikimedia.org/wikipedia/en/thumb/b/be/Flag_of_England.svg/1200px-Flag_of_England.svg.png', // Anglia
+          '764': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Flag_of_Brazil.svg/800px-Flag_of_Brazil.svg.png', // Brazília
+          '762': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Flag_of_Argentina.svg/800px-Flag_of_Argentina.svg.png', // Argentína
+          '773': 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Flag_of_France.svg/800px-Flag_of_France.svg.png', // Franciaország
+          '784': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/Flag_of_Italy.svg/800px-Flag_of_Italy.svg.png', // Olaszország
+          '785': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/20/Flag_of_the_Netherlands.svg/800px-Flag_of_the_Netherlands.svg.png', // Hollandia
+          '765': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5c/Flag_of_Portugal.svg/800px-Flag_of_Portugal.svg.png', // Portugália
+          '805': 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/65/Flag_of_Belgium.svg/800px-Flag_of_Belgium.svg.png', // Belgium
+          '799': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Flag_of_Croatia.svg/800px-Flag_of_Croatia.svg.png', // Horvátország
+          '825': 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Flag_of_Hungary.svg/800px-Flag_of_Hungary.svg.png', // Magyarország
+        };
         
-        // Save national team logo if available and not already saved
-        if (nationalTeamLeagueData['team'] != null && 
-            nationalTeamLeagueData['team']['crest'] != null &&
-            (!userData.containsKey('favoriteNationalTeamLogo') || userData['favoriteNationalTeamLogo'] == null)) {
-          updatedUserData['favoriteNationalTeamLogo'] = nationalTeamLeagueData['team']['crest'];
+        // Ha van zászló a kiválasztott nemzeti csapathoz, mentjük
+        if (nationalTeamFlags.containsKey(favoriteNationalTeamId)) {
+          updatedUserData['favoriteNationalTeamLogo'] = nationalTeamFlags[favoriteNationalTeamId];
           provider.updateUserSettings(updatedUserData);
-          debugPrint('Updated favorite national team logo in user settings');
+          debugPrint('Set hardcoded flag for national team: ${nationalTeamFlags[favoriteNationalTeamId]}');
         }
       }
       
@@ -436,10 +497,10 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     final String? teamLogo = userData['favoriteTeamLogo'];
     
     return Container(
-      height: 100,
+      height: 120,
       decoration: BoxDecoration(
         color: const Color(0xFF292929),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: InkWell(
         onTap: favoriteTeamId.isNotEmpty 
@@ -449,6 +510,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
           padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 AppLocalizations.of(context)?.favoriteTeam ?? 'Favorite Team',
@@ -459,46 +521,121 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                 ),
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  teamLogo != null && teamLogo.isNotEmpty
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: Image.network(
-                          _getProxiedImageUrl(teamLogo),
-                          width: 40,
-                          height: 40,
-                          fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) => const Icon(
-                            Icons.sports_soccer,
-                            color: Colors.white,
-                            size: 24,
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 60),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    teamLogo != null && teamLogo.isNotEmpty
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: Image.network(
+                            _getProxiedImageUrl(teamLogo),
+                            width: 40,
+                            height: 40,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) => const Icon(
+                              Icons.sports_soccer,
+                              color: Colors.white,
+                              size: 24,
+                            ),
                           ),
+                        )
+                      : const Icon(
+                          Icons.sports_soccer,
+                          color: Colors.white,
+                          size: 24,
                         ),
-                      )
-                    : const Icon(
-                        Icons.sports_soccer,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      favoriteTeam.isNotEmpty ? favoriteTeam : AppLocalizations.of(context)?.noTeamSelected ?? 'No team selected',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      overflow: TextOverflow.ellipsis,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: favoriteTeam.isNotEmpty
+                        ? _buildTeamNameWithWordWrap(favoriteTeam)
+                        : Text(
+                            AppLocalizations.of(context)?.noTeamSelected ?? 'No team selected',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  // A csapatnév szóköznél való töréshez egy új segédfüggvény
+  Widget _buildTeamNameWithWordWrap(String teamName) {
+    // Megkeressük az első szóközt a sorban, hogy ott törjük a szöveget
+    final words = teamName.split(' ');
+    
+    // Ha csak egy szó van, vagy túl rövid a név, akkor egyszerűen visszaadjuk
+    if (words.length <= 1 || teamName.length < 15) {
+      return Text(
+        teamName,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+        ),
+        maxLines: 2,
+      );
+    }
+    
+    // Próbáljuk megtalálni a legjobb helyet a törésre
+    // Körülbelül a név felénél lévő szóközt keresünk
+    int totalLength = teamName.length;
+    int middleIndex = totalLength ~/ 2;
+    
+    // Keressük meg azt a szóközt, amely a legközelebb van a középponthoz
+    int bestBreakIndex = 0;
+    int minDistance = totalLength;
+    
+    int currentPosition = 0;
+    for (int i = 0; i < words.length - 1; i++) {
+      currentPosition += words[i].length + 1; // +1 a szóköz miatt
+      int distance = (currentPosition - middleIndex).abs();
+      
+      if (distance < minDistance) {
+        minDistance = distance;
+        bestBreakIndex = i;
+      }
+    }
+    
+    // Az első sor a 0-tól a bestBreakIndex-ig terjedő szavak
+    String firstLine = words.sublist(0, bestBreakIndex + 1).join(' ');
+    // A második sor a maradék
+    String secondLine = words.sublist(bestBreakIndex + 1).join(' ');
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          firstLine,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+          ),
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 2),
+        Text(
+          secondLine,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+          ),
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
     );
   }
 
@@ -508,10 +645,10 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     final String? nationLogo = userData['favoriteNationalTeamLogo'];
     
     return Container(
-      height: 100,
+      height: 120,
       decoration: BoxDecoration(
         color: const Color(0xFF292929),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: InkWell(
         onTap: favoriteNationId.isNotEmpty 
@@ -521,6 +658,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
           padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 AppLocalizations.of(context)?.favoriteNation ?? 'Favorite Nation',
@@ -531,41 +669,53 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                 ),
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  nationLogo != null && nationLogo.isNotEmpty
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: Image.network(
-                          _getProxiedImageUrl(nationLogo),
-                          width: 40,
-                          height: 40,
-                          fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) => const Icon(
-                            Icons.flag,
-                            color: Colors.white,
-                            size: 24,
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 60),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    nationLogo != null && nationLogo.isNotEmpty
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Image.network(
+                              _getProxiedImageUrl(nationLogo),
+                              width: 40,
+                              height: 40,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => const Icon(
+                                Icons.flag,
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                            ),
                           ),
+                        )
+                      : const Icon(
+                          Icons.flag,
+                          color: Colors.white,
+                          size: 24,
                         ),
-                      )
-                    : const Icon(
-                        Icons.flag,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      favoriteNation.isNotEmpty ? favoriteNation : AppLocalizations.of(context)?.noNationSelected ?? 'No nation selected',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      overflow: TextOverflow.ellipsis,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: favoriteNation.isNotEmpty
+                        ? _buildTeamNameWithWordWrap(favoriteNation)
+                        : Text(
+                            AppLocalizations.of(context)?.noNationSelected ?? 'No nation selected',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -582,11 +732,28 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     final standings = _leagueStandings?['standings']?[0]?['table'] ?? [];
     final competition = _leagueStandings?['competition'] ?? {};
     final String leagueName = competition['name'] ?? 'League';
-    final int matchday = competition['currentSeason']?['currentMatchday'] ?? 0;
+    
+    // Javított mérkőzésnap kinyerés - több lehetséges helyen keressük az adatot
+    int matchday = 0;
+    
+    // 1. Először közvetlenül a leagueStandings season adatából próbáljuk kinyerni
+    if (_leagueStandings?['season']?['currentMatchday'] != null) {
+      matchday = _leagueStandings!['season']['currentMatchday'];
+    } 
+    // 2. Azután a competition currentSeason adatából
+    else if (competition['currentSeason']?['currentMatchday'] != null) {
+      matchday = competition['currentSeason']['currentMatchday'];
+    }
+    // 3. Vagy közvetlenül a standings adatban is lehet (API függő)
+    else if (_leagueStandings?['matchday'] != null) {
+      matchday = _leagueStandings!['matchday'];
+    }
+    
     final String? leagueLogo = competition['emblem'];
     
-    // Debug print to check standings data structure
+    // Debug információk kiírása a konzolra
     print('League Standings: ${standings.length} teams available');
+    print('Matchday: $matchday, Data source: ${_leagueStandings.toString().substring(0, 100 < (_leagueStandings?.toString().length ?? 0) ? 100 : (_leagueStandings?.toString().length ?? 1))}...');
     
     // Find favorite team position
     int favoriteTeamIndex = -1;
@@ -628,7 +795,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF1D1D1D),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         children: [
@@ -783,7 +950,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                   border: isFavorite 
                       ? Border.all(color: const Color(0xFFFFE6AC), width: 1)
                       : null,
-                  borderRadius: isFavorite ? BorderRadius.circular(4) : null,
+                  borderRadius: isFavorite ? BorderRadius.circular(12) : null,
                 ),
                 child: Row(
                   children: [
@@ -922,7 +1089,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF1D1D1D),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         children: [
@@ -1110,7 +1277,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   
   Widget _buildDateSelector() {
     return Container(
-      height: 60,
+      height: 70, // Magasságot növeltem, hogy elférjen két sor
       child: Row(
         children: [
           IconButton(
@@ -1123,6 +1290,9 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 itemCount: _dateRange.length,
+                controller: ScrollController(
+                  initialScrollOffset: _findTodayScrollOffset(),
+                ),
                 itemBuilder: (context, index) {
                   final date = _dateRange[index];
                   final isSelected = index == _currentDateIndex;
@@ -1130,36 +1300,62 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                   final isTomorrow = _isTomorrow(date);
                   final isYesterday = _isYesterday(date);
                   
-                  String dateLabel;
-                  if (isToday) {
-                    dateLabel = AppLocalizations.of(context)?.today ?? 'Today';
-                  } else if (isTomorrow) {
-                    dateLabel = AppLocalizations.of(context)?.tomorrow ?? 'Tomorrow';
-                  } else if (isYesterday) {
-                    dateLabel = AppLocalizations.of(context)?.yesterday ?? 'Yesterday';
-                  } else {
-                    dateLabel = DateFormat('MMM d').format(date);
-                  }
+                  final double buttonWidth = isYesterday || isTomorrow ? 90.0 : 70.0;
                   
                   return InkWell(
                     onTap: () => _selectDate(date, index),
                     child: Container(
-                      width: 70,
+                      width: buttonWidth,
                       margin: const EdgeInsets.symmetric(horizontal: 4.0),
                       decoration: BoxDecoration(
                         color: isSelected ? const Color(0xFFFFE6AC) : Colors.grey[800],
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(16),
                       ),
                       child: Center(
-                        child: Text(
-                          dateLabel,
-                          style: TextStyle(
-                            color: isSelected ? Colors.black : isToday ? const Color(0xFFFFE6AC) : Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
+                        child: isToday || isTomorrow || isYesterday
+                            ? Text(
+                                isToday 
+                                    ? AppLocalizations.of(context)?.today ?? 'Today'
+                                    : isTomorrow
+                                        ? AppLocalizations.of(context)?.tomorrow ?? 'Tomorrow'
+                                        : AppLocalizations.of(context)?.yesterday ?? 'Yesterday',
+                                style: TextStyle(
+                                  color: isSelected ? Colors.black : isToday ? const Color(0xFFFFE6AC) : Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                                textAlign: TextAlign.center,
+                              )
+                            : Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 0),
+                                    child: Text(
+                                      DateFormat('MMM').format(date), // Csak a hónap neve
+                                      style: TextStyle(
+                                        color: isSelected ? Colors.black : Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: 30, // Fixált szélesség a számnak
+                                    child: Text(
+                                      DateFormat('d').format(date), // Csak a nap száma
+                                      style: TextStyle(
+                                        color: isSelected ? Colors.black : Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 20,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                ],
+                              ),
                       ),
                     ),
                   );
@@ -1174,6 +1370,30 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
         ],
       ),
     );
+  }
+  
+  double _findTodayScrollOffset() {
+    // A ma gomb a _dateRange lista közepén van (index 2), 
+    // de ahhoz, hogy a képernyő közepén jelenjen meg, figyelembe kell vennünk
+    // a képernyő szélességét és a gombok szélességét.
+
+    // Mivel 5 nap van a listában, és a középső a mai nap (index 2)
+    // Akkor az első két gomb szélességét és a margókat kell figyelembe vennünk
+
+    // Yesterday gomb = 90 pixel széles + 8 pixel margó (2*4)
+    // A többi gomb = 70 pixel széles + 8 pixel margó (2*4)
+    // Az első két gomb (indexes 0 és 1) egyike lehet "Yesterday"
+
+    // Ellenőrizzük, hogy a tegnapi nap melyik pozícióban van
+    bool isYesterdayAtIndex0 = _isYesterday(_dateRange[0]);
+    bool isYesterdayAtIndex1 = _isYesterday(_dateRange[1]);
+    
+    // Az offset számítása: az első gomb és a második gomb szélessége + margók
+    double firstButtonWidth = isYesterdayAtIndex0 ? 90.0 : 70.0;
+    double secondButtonWidth = isYesterdayAtIndex1 ? 90.0 : 70.0;
+    
+    // A teljes offset = a két gomb szélessége + a margók (mindkét gomb előtt és után)
+    return firstButtonWidth + secondButtonWidth + (4 * 8.0);
   }
   
   bool _isToday(DateTime date) {
@@ -1231,7 +1451,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF1D1D1D),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.grey.withOpacity(0.3)),
       ),
       margin: const EdgeInsets.symmetric(vertical: 16.0),
@@ -1306,6 +1526,9 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 16.0),
       color: const Color(0xFF292929),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16.0),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(12.0),
         child: Row(
