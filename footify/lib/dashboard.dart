@@ -25,14 +25,10 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   List<dynamic> _matchesByDay = [];
   DateTime _selectedDate = DateTime.now();
   List<DateTime> _dateRange = [];
-  int _currentDateIndex = 10; // Default to middle date (today) - changed to 10 for 21 days
+  int _currentDateIndex = 2; // Default to middle date (today)
   late AnimationController _animationController;
   late Animation<Offset> _slideAnimation;
   Map<String, dynamic>? _nationalTeamStandings;
-
-  // Cache for matches by date to reduce API calls
-  Map<String, List<dynamic>> _matchesCache = {};
-  bool _isLoadingDateRange = false;
 
   @override
   void initState() {
@@ -66,19 +62,12 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   }
   
   void _generateDateRange() {
-    // Generate 21 days from 10 days ago to 10 days in the future
+    // Generate 5 days centered around selected date
     _dateRange = [];
-    
-    final DateTime today = DateTime.now();
-    
-    // Add dates from 10 days ago to 10 days in the future
-    for (int i = -10; i <= 10; i++) {
-      _dateRange.add(today.add(Duration(days: i)));
+    for (int i = -2; i <= 2; i++) {
+      _dateRange.add(_selectedDate.add(Duration(days: i)));
     }
-    
-    // Set current date index to today (which is at index 10)
-    _currentDateIndex = 10;
-    _selectedDate = today;
+    _currentDateIndex = 2; // Always keep selected date in the middle
   }
 
   Future<void> _loadDashboardData() async {
@@ -89,11 +78,9 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     final provider = Provider.of<FirebaseProvider>(context, listen: false);
     final userData = provider.userData;
 
-    // Load matches for the entire date range first - this is the most important for the calendar
-    await _loadMatchesForDateRange();
-
-    // If not logged in, just show the matches
+    // If not logged in, show login page and just load matches
     if (userData == null) {
+      await _loadMatchesForDay(_formatDate(_selectedDate));
       setState(() {
         _isLoading = false;
       });
@@ -108,6 +95,9 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     
     // Ne állítsuk be a zászló URL-t az adatbázisban, mindig ID alapján jelenítjük meg
     Map<String, dynamic> updatedUserData = Map<String, dynamic>.from(userData);
+    
+    // Load matches for selected date
+    await _loadMatchesForDay(_formatDate(_selectedDate));
     
     // Get upcoming matches for the week
     final upcomingMatchesData = await DashboardService.getUpcomingMatches();
@@ -212,121 +202,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     return DateFormat('yyyy-MM-dd').format(date);
   }
   
-  // Load matches for the date range in two separate API calls (past and future)
-  Future<void> _loadMatchesForDateRange() async {
-    if (_isLoadingDateRange) return; // Prevent concurrent API calls
-    
-    setState(() {
-      _isLoadingDateRange = true;
-      // Show loading indicator while fetching all matches
-      _matchesByDay = []; // Clear current matches while loading
-    });
-    
-    try {
-      // Today's date will be included in both past and future requests
-      final String today = _formatDate(DateTime.now());
-      
-      // Calculate date ranges
-      final String tenDaysAgo = _formatDate(DateTime.now().subtract(const Duration(days: 10)));
-      final String tenDaysLater = _formatDate(DateTime.now().add(const Duration(days: 10)));
-      
-      debugPrint('Loading matches for two date ranges:');
-      debugPrint('1. Past: $tenDaysAgo to $today');
-      debugPrint('2. Future: $today to $tenDaysLater');
-      
-      // Make both API calls concurrently
-      final futures = await Future.wait([
-        DashboardService.getMatchesForDateRange(tenDaysAgo, today),
-        DashboardService.getMatchesForDateRange(today, tenDaysLater)
-      ]);
-      
-      final pastMatchesData = futures[0];
-      final futureMatchesData = futures[1];
-      
-      // Check if both API calls were successful
-      if (!pastMatchesData.containsKey('error') && 
-          !futureMatchesData.containsKey('error') &&
-          pastMatchesData.containsKey('matchesByDate') && 
-          futureMatchesData.containsKey('matchesByDate')) {
-        
-        debugPrint('Successfully loaded all matches for the date range');
-        
-        setState(() {
-          // Clear existing cache to avoid stale data
-          _matchesCache = {};
-          
-          // Store past days' matches in the cache
-          final Map<String, dynamic> pastMatchesByDate = pastMatchesData['matchesByDate'];
-          pastMatchesByDate.forEach((date, matches) {
-            debugPrint('Caching ${matches.length} matches for $date (past)');
-            _matchesCache[date] = matches;
-          });
-          
-          // Store future days' matches in the cache
-          final Map<String, dynamic> futureMatchesByDate = futureMatchesData['matchesByDate'];
-          futureMatchesByDate.forEach((date, matches) {
-            // For today's date, which appears in both responses, combine the matches
-            if (date == today && _matchesCache.containsKey(date)) {
-              // Combine matches, making sure to avoid duplicates
-              final List<dynamic> existingMatches = _matchesCache[date]!;
-              final List<dynamic> newMatches = matches;
-              final Set<String> existingMatchIds = existingMatches
-                  .map((m) => m['id']?.toString() ?? '')
-                  .toSet();
-              
-              final List<dynamic> uniqueNewMatches = newMatches
-                  .where((m) => !existingMatchIds.contains(m['id']?.toString() ?? ''))
-                  .toList();
-              
-              _matchesCache[date] = [...existingMatches, ...uniqueNewMatches];
-              debugPrint('Combined ${existingMatches.length} + ${uniqueNewMatches.length} matches for $date');
-            } else {
-              debugPrint('Caching ${matches.length} matches for $date (future)');
-              _matchesCache[date] = matches;
-            }
-          });
-          
-          // Set current day's matches
-          _updateSelectedDayMatches();
-        });
-      } else {
-        // If either API call failed, try the single-day approach as fallback
-        debugPrint('Error loading matches for date range, using fallback');
-        await _loadMatchesForDay(_formatDate(_selectedDate));
-      }
-    } catch (e) {
-      debugPrint('Exception loading matches for date range: $e');
-      // Fallback to single day loading if the range API fails
-      await _loadMatchesForDay(_formatDate(_selectedDate));
-    } finally {
-      setState(() {
-        _isLoadingDateRange = false;
-      });
-    }
-  }
-  
-  // Update the displayed matches based on the selected date
-  void _updateSelectedDayMatches() {
-    final formattedDate = _formatDate(_selectedDate);
-    
-    setState(() {
-      if (_matchesCache.containsKey(formattedDate)) {
-        _matchesByDay = _matchesCache[formattedDate]!;
-        debugPrint('Using cached matches for $formattedDate: ${_matchesByDay.length} matches');
-      } else {
-        _matchesByDay = [];
-        debugPrint('No cached matches found for $formattedDate');
-      }
-    });
-  }
-  
-  // This method will only be used as a fallback if the range API fails
   Future<void> _loadMatchesForDay(String date) async {
-    debugPrint('Fallback: Loading single day matches for $date');
-    setState(() {
-      _matchesByDay = []; // Clear while loading
-    });
-    
     final matchesData = await DashboardService.getMatchesByDate(date);
     if (!matchesData.containsKey('error')) {
       // Debug the response to see what we're getting
@@ -354,9 +230,6 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
         
         _matchesByDay = matches;
         
-        // Update cache with this day's matches
-        _matchesCache[date] = matches;
-        
         if (matches.isEmpty) {
           debugPrint('No matches found for $date');
         }
@@ -370,109 +243,47 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   }
   
   void _changeDate(int direction) {
-    final newDate = _selectedDate.add(Duration(days: direction));
-    final now = DateTime.now();
+    // Set animation direction
+    _slideAnimation = Tween<Offset>(
+      begin: Offset(direction.toDouble() * -1, 0), // -1 for right, 1 for left
+      end: const Offset(0, 0),
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    ));
     
-    // Check if the new date is outside the current date range
-    // (more than 10 days in the past or future from today)
-    bool needsRangeRefresh = false;
-    if (newDate.difference(now).inDays < -10 || newDate.difference(now).inDays > 10) {
-      needsRangeRefresh = true;
-    }
+    _animationController.forward(from: 0.0);
     
     setState(() {
-      _selectedDate = newDate;
-      
-      if (needsRangeRefresh) {
-        // Generate a new date range if we're going outside the 20-day window
-        _generateDateRange();
-        // Override the selected date since _generateDateRange resets to today
-        _selectedDate = newDate;
-        
-        // Find the appropriate index for the selected date in the new range
-        _currentDateIndex = _dateRange.indexWhere(
-          (date) => date.year == newDate.year && 
-                    date.month == newDate.month && 
-                    date.day == newDate.day
-        );
-        
-        // If somehow the date isn't in the range, use the first or last date
-        if (_currentDateIndex == -1) {
-          if (newDate.isBefore(_dateRange.first)) {
-            _currentDateIndex = 0;
-            _selectedDate = _dateRange.first;
-          } else {
-            _currentDateIndex = _dateRange.length - 1;
-            _selectedDate = _dateRange.last;
-          }
-        }
-      } else {
-        // Just update the current index within the existing range
-        _currentDateIndex = _dateRange.indexWhere(
-          (date) => date.year == newDate.year && 
-                    date.month == newDate.month && 
-                    date.day == newDate.day
-        );
-      }
+      _selectedDate = _selectedDate.add(Duration(days: direction));
+      _generateDateRange(); // This will rebuild the date range around the selected date
     });
     
-    if (needsRangeRefresh) {
-      // Load new date range data if we've moved outside the current range
-      _loadMatchesForDateRange();
-    } else {
-      // Just display matches from cache since we should have all data
-      _updateSelectedDayMatches();
-    }
+    _loadMatchesForDay(_formatDate(_selectedDate));
   }
   
   void _selectDate(DateTime date, int index) {
     if (index == _currentDateIndex) return;
     
-    final now = DateTime.now();
+    // Set animation direction
+    _slideAnimation = Tween<Offset>(
+      begin: Offset((index - _currentDateIndex).toDouble() * -0.2, 0),
+      end: const Offset(0, 0),
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    ));
     
-    // Check if the selected date is outside the current date range
-    // (more than 10 days in the past or future from today)
-    bool needsRangeRefresh = false;
-    if (date.difference(now).inDays < -10 || date.difference(now).inDays > 10) {
-      needsRangeRefresh = true;
-    }
+    _animationController.forward(from: 0.0);
     
     setState(() {
       _selectedDate = date;
-      
-      if (needsRangeRefresh) {
-        // Generate a new date range if we're going outside the 20-day window
-        _generateDateRange();
-        // Override the selected date since _generateDateRange resets to today
-        _selectedDate = date;
-        
-        // Find the appropriate index for the selected date in the new range
-        _currentDateIndex = _dateRange.indexWhere(
-          (d) => d.year == date.year && d.month == date.month && d.day == date.day
-        );
-        
-        // If somehow the date isn't in the range, use the first or last date
-        if (_currentDateIndex == -1) {
-          if (date.isBefore(_dateRange.first)) {
-            _currentDateIndex = 0;
-            _selectedDate = _dateRange.first;
-          } else {
-            _currentDateIndex = _dateRange.length - 1;
-            _selectedDate = _dateRange.last;
-          }
-        }
-      } else {
-        _currentDateIndex = index;
-      }
+      // Always regenerate date range to keep selected date in middle
+      _generateDateRange();
+      // Now current date index will always be 2 (middle)
     });
     
-    if (needsRangeRefresh) {
-      // Load new date range data if we've moved outside the current range
-      _loadMatchesForDateRange();
-    } else {
-      // Always use cached data - we should have all data loaded
-      _updateSelectedDayMatches();
-    }
+    _loadMatchesForDay(_formatDate(date));
   }
 
   void _navigateToTeamDetails(String teamId, String teamName) {
@@ -557,11 +368,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                   setState(() {
                     _selectedDate = DateTime.now();
                     _generateDateRange();
-                    _currentDateIndex = 10; // Today is at index 10
                   });
-                  
-                  // Always reload matches when returning to today
-                  _loadMatchesForDateRange();
+                  _loadMatchesForDay(_formatDate(_selectedDate));
                 },
                 icon: const Icon(Icons.today, size: 16),
                 label: Text(AppLocalizations.of(context)?.today ?? 'Today'),
@@ -631,11 +439,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                     setState(() {
                       _selectedDate = DateTime.now();
                       _generateDateRange();
-                      _currentDateIndex = 10; // Today is at index 10
                     });
-                    
-                    // Always reload matches when returning to today
-                    _loadMatchesForDateRange();
+                    _loadMatchesForDay(_formatDate(_selectedDate));
                   },
                   icon: const Icon(Icons.today, size: 16),
                   label: Text(AppLocalizations.of(context)?.today ?? 'Today'),
@@ -662,8 +467,16 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     return Container(
       height: 120,
       decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF292929) : Colors.white,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFFE6AC), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: InkWell(
         onTap: favoriteTeamId.isNotEmpty 
@@ -678,7 +491,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
               Text(
                 AppLocalizations.of(context)?.favoriteTeam ?? 'Favorite Team',
                 style: TextStyle(
-                  color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFFFFE6AC) : Colors.black,
+                  color: Colors.black,
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                 ),
@@ -715,8 +528,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                         ? _buildTeamNameWithWordWrap(favoriteTeam)
                         : Text(
                             AppLocalizations.of(context)?.noTeamSelected ?? 'No team selected',
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: Colors.black,
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
@@ -734,6 +547,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
 
   // A csapatnév szóköznél való töréshez egy új segédfüggvény
   Widget _buildTeamNameWithWordWrap(String teamName) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     // Megkeressük az első szóközt a sorban, hogy ott törjük a szöveget
     final words = teamName.split(' ');
     
@@ -741,8 +556,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     if (words.length <= 1 || teamName.length < 15) {
       return Text(
         teamName,
-        style: const TextStyle(
-          color: Colors.white,
+        style: TextStyle(
+          color: isDark ? Colors.white : Colors.black,
           fontSize: 16,
           fontWeight: FontWeight.bold,
         ),
@@ -781,8 +596,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
       children: [
         Text(
           firstLine,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: isDark ? Colors.white : Colors.black,
             fontSize: 15,
             fontWeight: FontWeight.bold,
           ),
@@ -791,8 +606,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
         const SizedBox(height: 2),
         Text(
           secondLine,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: isDark ? Colors.white : Colors.black,
             fontSize: 15,
             fontWeight: FontWeight.bold,
           ),
@@ -855,8 +670,16 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     return Container(
       height: 120,
       decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF292929) : Colors.white,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFFE6AC), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: InkWell(
         onTap: favoriteNationId.isNotEmpty 
@@ -871,7 +694,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
               Text(
                 AppLocalizations.of(context)?.favoriteNation ?? 'Favorite Nation',
                 style: TextStyle(
-                  color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFFFFE6AC) : Colors.black,
+                  color: Colors.black,
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                 ),
@@ -905,8 +728,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                         ? _buildTeamNameWithWordWrap(favoriteNation)
                         : Text(
                             AppLocalizations.of(context)?.noNationSelected ?? 'No nation selected',
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: Colors.black,
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
@@ -992,8 +815,16 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1D1D1D) : Colors.white,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFFE6AC), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -1029,7 +860,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                     Text(
                       leagueName,
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: Colors.black,
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
@@ -1157,7 +988,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                       child: Text(
                         position.toString(),
                         style: TextStyle(
-                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                          color: Colors.black,
                           fontWeight: isFavorite ? FontWeight.bold : FontWeight.normal,
                         ),
                       ),
@@ -1185,7 +1016,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                             child: Text(
                               teamName,
                               style: TextStyle(
-                                color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                                color: Colors.black,
                                 fontWeight: isFavorite ? FontWeight.bold : FontWeight.normal,
                               ),
                               overflow: TextOverflow.ellipsis,
@@ -1199,7 +1030,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                       child: Text(
                         playedGames.toString(),
                         style: TextStyle(
-                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                          color: Colors.black,
                           fontWeight: isFavorite ? FontWeight.bold : FontWeight.normal,
                         ),
                         textAlign: TextAlign.center,
@@ -1210,7 +1041,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                       child: Text(
                         won.toString(),
                         style: TextStyle(
-                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                          color: Colors.black,
                           fontWeight: isFavorite ? FontWeight.bold : FontWeight.normal,
                         ),
                         textAlign: TextAlign.center,
@@ -1221,7 +1052,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                       child: Text(
                         draw.toString(),
                         style: TextStyle(
-                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                          color: Colors.black,
                           fontWeight: isFavorite ? FontWeight.bold : FontWeight.normal,
                         ),
                         textAlign: TextAlign.center,
@@ -1232,7 +1063,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                       child: Text(
                         lost.toString(),
                         style: TextStyle(
-                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                          color: Colors.black,
                           fontWeight: isFavorite ? FontWeight.bold : FontWeight.normal,
                         ),
                         textAlign: TextAlign.center,
@@ -1243,7 +1074,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                       child: Text(
                         points.toString(),
                         style: TextStyle(
-                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                          color: Colors.black,
                           fontWeight: FontWeight.bold,
                         ),
                         textAlign: TextAlign.center,
@@ -1284,10 +1115,20 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     final formattedDate = DateFormat('MMM d, yyyy').format(matchDate);
     final formattedTime = DateFormat('HH:mm').format(matchDate);
     
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1D1D1D) : Colors.white,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFFE6AC), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -1322,8 +1163,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                     const SizedBox(width: 12),
                     Text(
                       competition['name'],
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: Colors.black,
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
@@ -1332,8 +1173,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                 ),
                 Text(
                   AppLocalizations.of(context)?.nextMatch ?? 'Next Match',
-                  style: const TextStyle(
-                    color: Color(0xFFFFE6AC),
+                  style: TextStyle(
+                    color: Colors.black,
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
                   ),
@@ -1380,8 +1221,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                         const SizedBox(height: 16),
                         Text(
                           homeTeam['name'],
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: Colors.black,
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
                           ),
@@ -1399,8 +1240,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                     children: [
                       Text(
                         formattedDate,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: Colors.black,
                           fontSize: 14,
                         ),
                         textAlign: TextAlign.center,
@@ -1408,8 +1249,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                       const SizedBox(height: 16),
                       Text(
                         formattedTime,
-                        style: const TextStyle(
-                          color: Color(0xFFFFE6AC),
+                        style: TextStyle(
+                          color: Colors.black,
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
                         ),
@@ -1451,8 +1292,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                         const SizedBox(height: 16),
                         Text(
                           awayTeam['name'],
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: Colors.black,
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
                           ),
@@ -1474,128 +1315,146 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   }
   
   Widget _buildDateSelector() {
-    // Create a ScrollController
-    final ScrollController scrollController = ScrollController();
-    
-    // Calculate screen width to center selected date
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (scrollController.hasClients) {
-        // Get the width of the ListView (minus the arrows)
-        double viewportWidth = scrollController.position.viewportDimension;
-        
-        // Calculate the position of the selected item - accounting for varying widths
-        double offset = 0;
-        for (int i = 0; i < _currentDateIndex; i++) {
-          // Check if this date is Yesterday or Tomorrow
-          final DateTime date = _dateRange[i];
-          final bool isTomorrow = _isTomorrow(date);
-          final bool isYesterday = _isYesterday(date);
-          
-          // Use wider box for Yesterday/Tomorrow
-          offset += (isTomorrow || isYesterday) ? 100.0 : 80.0;
-        }
-        
-        // Add half the width of the selected item
-        final bool isSelectedTomorrowOrYesterday = 
-            _isTomorrow(_dateRange[_currentDateIndex]) || 
-            _isYesterday(_dateRange[_currentDateIndex]);
-        offset += isSelectedTomorrowOrYesterday ? 50.0 : 40.0;
-        
-        // Center the selected item
-        offset -= viewportWidth / 2;
-        
-        // Ensure the offset is within bounds
-        offset = offset.clamp(0.0, scrollController.position.maxScrollExtent);
-        
-        // Scroll to the calculated offset
-        scrollController.jumpTo(offset);
-      }
-    });
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return Container(
-      height: 70, // Reduce height since we removed day of week
+      height: 70,
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.arrow_back_ios),
+            icon: Icon(
+              Icons.arrow_back_ios,
+              color: isDark ? Colors.white : Colors.black,
+            ),
             onPressed: () => _changeDate(-1),
           ),
           Expanded(
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: _dateRange.length,
-              controller: scrollController,
-              cacheExtent: 2000, // Ensure all items can be cached
-              physics: const BouncingScrollPhysics(),
-              itemBuilder: (context, index) {
-                final date = _dateRange[index];
-                final isSelected = index == _currentDateIndex;
-                final isToday = _isToday(date);
-                final isTomorrow = _isTomorrow(date);
-                final isYesterday = _isYesterday(date);
-                
-                // Make Yesterday and Tomorrow boxes slightly wider
-                final double buttonWidth = (isYesterday || isTomorrow) ? 92.0 : 72.0;
-                
-                return InkWell(
-                  onTap: () => _selectDate(date, index),
-                  child: Container(
-                    width: buttonWidth,
-                    margin: const EdgeInsets.symmetric(horizontal: 4.0),
-                    decoration: BoxDecoration(
-                      color: isSelected ? const Color(0xFFFFE6AC) : Colors.grey[800],
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 4),
-                            child: Text(
-                              isToday 
-                                  ? AppLocalizations.of(context)?.today ?? 'Today'
-                                  : isTomorrow
-                                      ? AppLocalizations.of(context)?.tomorrow ?? 'Tomorrow'
-                                      : isYesterday
-                                          ? AppLocalizations.of(context)?.yesterday ?? 'Yesterday'
-                                          : DateFormat('MMM').format(date),
-                              style: TextStyle(
-                                color: isSelected ? Colors.black : isToday ? const Color(0xFFFFE6AC) : Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
+            child: SlideTransition(
+              position: _slideAnimation,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: _dateRange.length,
+                controller: ScrollController(
+                  initialScrollOffset: _findTodayScrollOffset(),
+                ),
+                itemBuilder: (context, index) {
+                  final date = _dateRange[index];
+                  final isSelected = index == _currentDateIndex;
+                  final isToday = _isToday(date);
+                  final isTomorrow = _isTomorrow(date);
+                  final isYesterday = _isYesterday(date);
+                  
+                  final double buttonWidth = isYesterday || isTomorrow ? 90.0 : 70.0;
+                  
+                  return InkWell(
+                    onTap: () => _selectDate(date, index),
+                    child: Container(
+                      width: buttonWidth,
+                      margin: const EdgeInsets.symmetric(horizontal: 4.0),
+                      decoration: BoxDecoration(
+                        color: isSelected 
+                            ? const Color(0xFFFFE6AC)
+                            : isDark 
+                                ? Colors.grey[800]
+                                : Colors.grey[200],
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isSelected
+                              ? Colors.transparent
+                              : isDark
+                                  ? Colors.grey[700]!
+                                  : Colors.grey[300]!,
+                          width: 1,
+                        ),
+                      ),
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 0),
+                              child: Text(
+                                isToday 
+                                    ? AppLocalizations.of(context)?.today ?? 'Today'
+                                    : isTomorrow
+                                        ? AppLocalizations.of(context)?.tomorrow ?? 'Tomorrow'
+                                        : isYesterday
+                                            ? AppLocalizations.of(context)?.yesterday ?? 'Yesterday'
+                                            : DateFormat('MMM').format(date),
+                                style: TextStyle(
+                                  color: isSelected 
+                                      ? Colors.black 
+                                      : isToday 
+                                          ? const Color(0xFFFFE6AC)
+                                          : isDark
+                                              ? Colors.white
+                                              : Colors.black87,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                                textAlign: TextAlign.center,
                               ),
-                              textAlign: TextAlign.center,
                             ),
-                          ),
-                          SizedBox(
-                            width: 30,
-                            child: Text(
-                              DateFormat('d').format(date),
-                              style: TextStyle(
-                                color: isSelected ? Colors.black : Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 20,
+                            SizedBox(
+                              width: 30,
+                              child: Text(
+                                DateFormat('d').format(date),
+                                style: TextStyle(
+                                  color: isSelected 
+                                      ? Colors.black 
+                                      : isDark
+                                          ? Colors.white
+                                          : Colors.black87,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 20,
+                                ),
+                                textAlign: TextAlign.center,
                               ),
-                              textAlign: TextAlign.center,
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.arrow_forward_ios),
+            icon: Icon(
+              Icons.arrow_forward_ios,
+              color: isDark ? Colors.white : Colors.black,
+            ),
             onPressed: () => _changeDate(1),
           ),
         ],
       ),
     );
+  }
+  
+  double _findTodayScrollOffset() {
+    // A ma gomb a _dateRange lista közepén van (index 2), 
+    // de ahhoz, hogy a képernyő közepén jelenjen meg, figyelembe kell vennünk
+    // a képernyő szélességét és a gombok szélességét.
+
+    // Mivel 5 nap van a listában, és a középső a mai nap (index 2)
+    // Akkor az első két gomb szélességét és a margókat kell figyelembe vennünk
+
+    // Yesterday gomb = 90 pixel széles + 8 pixel margó (2*4)
+    // A többi gomb = 70 pixel széles + 8 pixel margó (2*4)
+    // Az első két gomb (indexes 0 és 1) egyike lehet "Yesterday"
+
+    // Ellenőrizzük, hogy a tegnapi nap melyik pozícióban van
+    bool isYesterdayAtIndex0 = _isYesterday(_dateRange[0]);
+    bool isYesterdayAtIndex1 = _isYesterday(_dateRange[1]);
+    
+    // Az offset számítása: az első gomb és a második gomb szélessége + margók
+    double firstButtonWidth = isYesterdayAtIndex0 ? 90.0 : 70.0;
+    double secondButtonWidth = isYesterdayAtIndex1 ? 90.0 : 70.0;
+    
+    // A teljes offset = a két gomb szélessége + a margók (mindkét gomb előtt és után)
+    return firstButtonWidth + secondButtonWidth + (4 * 8.0);
   }
   
   bool _isToday(DateTime date) {
@@ -1614,14 +1473,11 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   }
   
   Widget _buildMatchesForDay() {
-    final Widget content;
-    
     if (_matchesByDay.isEmpty) {
-      content = Center(
+      return Center(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(
                 Icons.sports_soccer,
@@ -1641,19 +1497,35 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
           ),
         ),
       );
-    } else {
-      // Group matches by competition
-      Map<String, List<dynamic>> matchesByCompetition = {};
-      for (var match in _matchesByDay) {
-        final competitionName = match['competition']['name'];
-        if (!matchesByCompetition.containsKey(competitionName)) {
-          matchesByCompetition[competitionName] = [];
-        }
-        matchesByCompetition[competitionName]!.add(match);
+    }
+    
+    // Group matches by competition
+    Map<String, List<dynamic>> matchesByCompetition = {};
+    for (var match in _matchesByDay) {
+      final competitionName = match['competition']['name'];
+      if (!matchesByCompetition.containsKey(competitionName)) {
+        matchesByCompetition[competitionName] = [];
       }
-      
-      content = ListView.builder(
-        physics: const AlwaysScrollableScrollPhysics(),
+      matchesByCompetition[competitionName]!.add(match);
+    }
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.withOpacity(0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      margin: const EdgeInsets.symmetric(vertical: 16.0),
+      child: ListView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
         itemCount: matchesByCompetition.length,
         itemBuilder: (context, index) {
           final competitionName = matchesByCompetition.keys.elementAt(index);
@@ -1686,7 +1558,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                     Text(
                       competitionName,
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: Colors.black,
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
@@ -1699,27 +1571,6 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
             ],
           );
         },
-      );
-    }
-    
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1D1D1D) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.withOpacity(0.3)),
-      ),
-      margin: const EdgeInsets.only(
-        top: 16.0,
-        bottom: 120.0, // Increased from 72 to 120 to prevent overflow
-        left: 16.0,
-        right: 16.0,
-      ),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.6, // Keep max height at 60% of screen height
-          minHeight: _matchesByDay.isEmpty ? 200 : 100, // Minimum height to ensure visibility
-        ),
-        child: content,
       ),
     );
   }
@@ -1742,9 +1593,10 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 16.0),
-      color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF292929) : Colors.white,
+      color: Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16.0),
+        side: const BorderSide(color: Color(0xFFFFE6AC), width: 1),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12.0),
@@ -1756,7 +1608,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
               child: Text(
                 formattedTime,
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: Colors.black,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -1776,7 +1628,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                       child: Text(
                         homeTeam['name'],
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: Colors.black,
                         ),
                         textAlign: TextAlign.right,
                         overflow: TextOverflow.ellipsis,
@@ -1842,7 +1694,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                       child: Text(
                         awayTeam['name'],
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: Colors.black,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),

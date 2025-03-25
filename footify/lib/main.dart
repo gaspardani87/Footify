@@ -32,6 +32,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math';
 import 'services/football_api_service.dart' as football_api;
 import 'dashboard.dart';
+import 'popup_demo.dart';
 
 // A simple in-memory image cache
 class ImageCache {
@@ -189,6 +190,16 @@ class _FootifyAppState extends State<FootifyApp> {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: const AnimatedSplashScreen(),
+      // Add builder to ensure the overlay for message popups works
+      builder: (context, child) {
+        return Overlay(
+          initialEntries: [
+            OverlayEntry(
+              builder: (context) => child!,
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -525,6 +536,36 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                   const Icon(Icons.dashboard),
                   const SizedBox(width: 8),
                   Text(AppLocalizations.of(context)?.dashboard ?? 'Dashboard'),
+                ],
+              ),
+            ),
+          ),
+          
+          // Button for testing message popups
+          Positioned(
+            bottom: 150,  // Position it above the dashboard button
+            right: 20,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const PopupDemoPage()),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFFE6AC),
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30.0),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.message),
+                  const SizedBox(width: 8),
+                  Text('Messages'),
                 ],
               ),
             ),

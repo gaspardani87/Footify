@@ -17,8 +17,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:intl/intl.dart';
 import 'dart:math' as math;
 import 'dart:async';
-// Import for web support
-// We'll use a different approach for conditional imports
+import 'services/message_service.dart'; // Import for our new message popup system
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -309,13 +308,18 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                                           icon: Icon(
                                             Icons.logout, 
                                             size: constraints.maxWidth < 350 ? 16 : 20,
-                                            color: const Color(0xFFFFE6AC),
+                                            color: Theme.of(context).brightness == Brightness.dark 
+                                                ? const Color(0xFFFFE6AC) 
+                                                : Colors.black,
                                           ),
                                           label: Text(
                                             AppLocalizations.of(context)!.logOut, 
                                             style: TextStyle(
                                               fontWeight: FontWeight.bold,
                                               fontSize: fontSize,
+                                              color: Theme.of(context).brightness == Brightness.dark 
+                                                  ? const Color(0xFFFFE6AC) 
+                                                  : Colors.black,
                                             )
                                           ),
                                           onPressed: _isEditMode ? null : () => _signOut(context),
@@ -535,95 +539,105 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     super.dispose();
   }
 
-  Future<void> _pickImage(BuildContext context) async {
-    // Store the scaffold messenger and provider before any async operation
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-    final provider = Provider.of<FirebaseProvider>(context, listen: false);
-    
+  Future<void> _uploadProfilePicture() async {
     try {
-      // Use image picker to select an image from the device
-      final XFile? image = await _picker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 75, // Reduce quality to improve performance
-        maxWidth: 800,    // Limit dimensions to reduce file size
-      );
-      
-      if (image == null) {
-        // User canceled the picker
-        return;
-      }
-      
-      if (!mounted) return; // Check if widget is still mounted
-      
-        setState(() {
-        _isLoadingImage = true;
-        if (!kIsWeb) {
-          _profileImage = File(image.path);
-        } else {
-          // For web, we'll keep the XFile path for reference
-          _webImagePath = image.path;
-        }
-      });
-      
-      if (!mounted) return; // Check again after setState
+      if (_profileImage == null && _webImagePath == null) return;
       
       // Show uploading message
-      scaffoldMessenger.showSnackBar(
-            const SnackBar(content: Text('Uploading profile picture...')),
-          );
+      MessageService.showMessage(
+        context,
+        message: 'Uploading profile picture...',
+        type: MessageType.info,
+      );
       
-      try {
-        String? imageUrl;
+      setState(() {
+        _isLoadingImage = true;
+      });
+      
+      final provider = Provider.of<FirebaseProvider>(context, listen: false);
+      final userId = provider.currentUser?.uid;
+      
+      if (userId == null) return;
+      
+      final storageRef = FirebaseStorage.instance.ref('profile_pictures/$userId.jpg');
+      
+      if (kIsWeb) {
+        if (_webImagePath == null) return;
         
-        if (!kIsWeb) {
-          // For mobile/desktop, upload to Firebase Storage
-          imageUrl = await provider.uploadProfileImage(_profileImage!);
-        } else {
-          // For web, use web-specific approach
-          final bytes = await image.readAsBytes();
-          imageUrl = await provider.uploadProfileImageBytes(bytes, 'jpg');
-        }
-        
-        if (imageUrl == null || imageUrl.isEmpty) {
-          throw Exception("Failed to upload image to storage");
-        }
-        
-        // Update Firestore with the image URL
-        await provider.updateProfilePictureUrl(imageUrl);
-        
-        // Refresh user data
-        await provider.refreshUserData();
-        
-        if (!mounted) return; // Check if mounted before showing success
-        
-        scaffoldMessenger.showSnackBar(
-              const SnackBar(content: Text('Profile picture updated successfully')),
-            );
-        } catch (e) {
-        print('Profile picture upload error: $e');
-        
-        if (mounted) { // Only show error if still mounted
-          scaffoldMessenger.showSnackBar(
-            SnackBar(content: Text('Failed to upload profile picture: ${e.toString()}')),
-          );
-        }
-      } finally {
-        if (mounted) {
-          setState(() {
-            _isLoadingImage = false;
-          });
-        }
+        // For web, we upload the selected file using putString
+        final bytes = await rootBundle.load(_webImagePath!);
+        await storageRef.putData(
+          bytes.buffer.asUint8List(),
+          SettableMetadata(contentType: 'image/jpeg'),
+        );
+      } else {
+        // For mobile, use the File object
+        await storageRef.putFile(_profileImage!);
       }
-    } catch (e) {
-      print('Image picker error: $e');
       
-      // Only try to show errors if we're still mounted
-      if (mounted) {
-        scaffoldMessenger.showSnackBar(
-        SnackBar(content: Text('Error selecting image: ${e.toString()}')),
+      // Get the download URL and update user profile
+      final downloadUrl = await storageRef.getDownloadURL();
+      await provider.updateProfilePictureUrl(downloadUrl);
+      
+      setState(() {
+        _isLoadingImage = false;
+      });
+      
+      // Show success message
+      MessageService.showMessage(
+        context,
+        message: 'Profile picture updated successfully',
+        type: MessageType.success,
+      );
+      
+    } catch (e) {
+      setState(() {
+        _isLoadingImage = false;
+      });
+      
+      // Show error message
+      MessageService.showMessage(
+        context,
+        message: 'Failed to upload profile picture: ${e.toString()}',
+        type: MessageType.error,
       );
     }
   }
+
+  Future<void> _pickImage(BuildContext context) async {
+    try {
+      final XFile? pickedFile = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+      
+      if (pickedFile == null) return;
+      
+      if (kIsWeb) {
+        // For web, store the path
+        setState(() {
+          _webImagePath = pickedFile.path;
+        });
+      } else {
+        // For mobile, create a File object
+        setState(() {
+          _profileImage = File(pickedFile.path);
+        });
+      }
+      
+      // Upload the image
+      await _uploadProfilePicture();
+      
+    } catch (e) {
+      // Show error message
+      MessageService.showMessage(
+        context,
+        message: 'Error selecting image: ${e.toString()}',
+        type: MessageType.error,
+      );
+    }
   }
 
   Widget _buildProfileItem(BuildContext context, String label, String value, IconData icon, Color textColor) {
@@ -811,54 +825,72 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     );
   }
 
-  void _showRegistrationFlow(BuildContext context) async {
-    // Step 1: Collect Email and Password
-    final credentials = await _showEmailPasswordDialog(context);
-    if (credentials == null) return;
-    final email = credentials['email']!;
-    final password = credentials['password']!;
+  Future<void> _showRegistrationFlow(BuildContext context) async {
+    // Show a series of dialogs to collect user information
+    try {
+      // Step 1: Collect email and password
+      final credentials = await _showEmailPasswordDialog(context);
+      if (credentials == null) return;
 
-    // Step 2: Collect Full Name
-    final name = await _showNameDialog(context);
-    if (name == null) return;
+      // Step 2: Collect full name
+      final fullName = await _showNameDialog(context);
+      if (fullName == null || fullName.isEmpty) return;
 
-    // Step 3: Collect Username
-    final username = await _showUsernameDialog(context);
-    if (username == null) return;
+      // Step 3: Collect username
+      final username = await _showUsernameDialog(context);
+      if (username == null || username.isEmpty) return;
 
-    // Step 4: Collect Favorite Team
-    final team = await _showTeamSelectionDialog(context);
-    if (team == null) return;
+      // Step 4: Select favorite team
+      final favoriteTeam = await _showTeamSelectionDialog(context);
+      if (favoriteTeam == null) return;
 
-    // Step 5: Collect Favorite National Team
-    final nationalTeam = await _showNationalTeamSelectionDialog(context);
-    if (nationalTeam == null) return;
+      // Step 5: Select national team (league)
+      final nationalTeam = await _showNationalTeamSelectionDialog(context);
+      if (nationalTeam == null) return;
 
-    // Complete Registration with all collected data
-    if (context.mounted) {
+      // Complete the registration process
       final firebaseProvider = Provider.of<FirebaseProvider>(context, listen: false);
-      try {
-        final success = await firebaseProvider.completeSignUp(
-          email: email,
-          password: password,
-          name: name,
-          username: username,
-          favoriteTeam: team['name'] ?? '',
-          favoriteTeamId: team['id'] ?? '',
-          favoriteLeague: nationalTeam['name'] ?? '',
-          favoriteNationalTeamId: nationalTeam['id'] ?? '',
+      
+      // Use our MessageService instead of SnackBar
+      final success = await firebaseProvider.completeSignUp(
+        email: credentials['email']!,
+        password: credentials['password']!,
+        name: fullName,
+        username: username,
+        favoriteTeam: favoriteTeam['name'],
+        favoriteTeamId: favoriteTeam['id'].toString(),
+        favoriteLeague: nationalTeam['name'],
+        favoriteNationalTeamId: nationalTeam['id'].toString(),
+      );
+      
+      if (success && context.mounted) {
+        // Use our MessageService instead of SnackBar
+        MessageService.showMessage(
+          context,
+          message: 'Registration completed successfully',
+          type: MessageType.success,
         );
-        if (success && context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Registration completed successfully')),
-          );
-        }
-      } catch (e) {
+        
+        // Reload the profile page by navigating back to itself
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Registration failed: ${e.toString()}')),
-          );
+          // Delay the navigation slightly to allow Firebase to complete its state updates
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (context.mounted) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfilePage()),
+              );
+            }
+          });
         }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        MessageService.showMessage(
+          context,
+          message: 'Registration failed: ${e.toString()}',
+          type: MessageType.error,
+        );
       }
     }
   }
@@ -948,8 +980,10 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     bool isLoading
   ) async {
     if (passwordController.text != confirmPasswordController.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Passwords do not match')),
+      MessageService.showMessage(
+        context,
+        message: 'Passwords do not match',
+        type: MessageType.error,
       );
       return;
     }
@@ -958,8 +992,10 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     try {
       final methods = await FirebaseAuth.instance.fetchSignInMethodsForEmail(emailController.text);
       if (methods.isNotEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Email already in use')),
+        MessageService.showMessage(
+          context,
+          message: 'Email already in use',
+          type: MessageType.error,
         );
         setState(() => isLoading = false);
         return;
@@ -969,8 +1005,10 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
         'password': passwordController.text,
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error checking email: $e')),
+      MessageService.showMessage(
+        context,
+        message: 'Error checking email: $e',
+        type: MessageType.error,
       );
       setState(() => isLoading = false);
     }
@@ -1034,8 +1072,10 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
               if (usernameController.text.isNotEmpty) {
                 Navigator.pop(context, usernameController.text);
               } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please enter a username')),
+                MessageService.showMessage(
+                  context,
+                  message: 'Please enter a username',
+                  type: MessageType.error,
                 );
               }
             },
@@ -1421,8 +1461,10 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
   Future<void> _performLogin(BuildContext context, StateSetter setState, 
       TextEditingController emailController, TextEditingController passwordController, bool isLoading) async {
     if (emailController.text.isEmpty || passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all fields')),
+      MessageService.showMessage(
+        context,
+        message: 'Please fill in all fields',
+        type: MessageType.error,
       );
       return;
     }
@@ -1430,30 +1472,39 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     setState(() => isLoading = true);
 
     try {
-      final firebaseProvider = Provider.of<FirebaseProvider>(context, listen: false);
-      final success = await firebaseProvider.signIn(
-        emailController.text,
-        passwordController.text,
-      );
-
+      final success = await Provider.of<FirebaseProvider>(context, listen: false)
+          .signIn(emailController.text, passwordController.text);
+      
+      // Close the dialog if login was successful
       if (success && context.mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Login successful')),
+        Navigator.pop(context); // Dismiss the dialog
+        
+        // Use our MessageService instead of SnackBar
+        MessageService.showMessage(
+          context,
+          message: 'Login successful',
+          type: MessageType.success,
         );
       } else if (context.mounted) {
         setState(() => isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Login failed')),
+        
+        MessageService.showMessage(
+          context,
+          message: 'Login failed',
+          type: MessageType.error,
         );
       }
+      
     } catch (e) {
       setState(() => isLoading = false);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
+        MessageService.showMessage(
+          context,
+          message: 'Login failed',
+          type: MessageType.error,
         );
       }
+      print(e);
     }
   }
 
@@ -1513,14 +1564,18 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     try {
       await firebaseProvider.deleteAccount();
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Account deleted successfully')),
+        MessageService.showMessage(
+          context,
+          message: 'Account deleted successfully',
+          type: MessageType.success,
         );
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error deleting account: ${e.toString()}')),
+        MessageService.showMessage(
+          context,
+          message: 'Error deleting account: ${e.toString()}',
+          type: MessageType.error,
         );
       }
     }
@@ -1605,15 +1660,19 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
       await provider.refreshUserData();
       
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile picture removed')),
+        MessageService.showMessage(
+          context,
+          message: 'Profile picture removed',
+          type: MessageType.success,
         );
       }
     } catch (e) {
       print('Error removing profile picture: $e');
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to remove profile picture: ${e.toString()}')),
+        MessageService.showMessage(
+          context,
+          message: 'Failed to remove profile picture: ${e.toString()}',
+          type: MessageType.error,
         );
       }
     } finally {
@@ -1628,8 +1687,10 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
   void _editProfile(BuildContext context) {
     // Navigate to profile edit screen or show edit dialog
     // Implementation depends on your app's navigation structure
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Edit profile feature coming soon')),
+    MessageService.showMessage(
+      context,
+      message: 'Edit profile feature coming soon',
+      type: MessageType.info,
     );
   }
 
@@ -1639,14 +1700,18 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
       await provider.signOut();
       if (context.mounted) {
         // Navigate to login page or show a success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Signed out successfully')),
+        MessageService.showMessage(
+          context,
+          message: 'Signed out successfully',
+          type: MessageType.success,
         );
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error signing out: ${e.toString()}')),
+        MessageService.showMessage(
+          context,
+          message: 'Error signing out: ${e.toString()}',
+          type: MessageType.error,
         );
       }
     }
@@ -2022,14 +2087,18 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
           await provider.refreshUserData();
           
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Profile updated successfully')),
+            MessageService.showMessage(
+              context,
+              message: 'Profile updated successfully',
+              type: MessageType.success,
             );
           }
         } catch (e) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Error updating profile: ${e.toString()}')),
+            MessageService.showMessage(
+              context,
+              message: 'Error updating profile: ${e.toString()}',
+              type: MessageType.error,
             );
           }
         }
@@ -2243,11 +2312,10 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                         Navigator.of(context).pop();
                         
                         // Show success message
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Password updated successfully'),
-                            backgroundColor: Colors.green,
-                          ),
+                        MessageService.showMessage(
+                          context,
+                          message: 'Password updated successfully',
+                          type: MessageType.success,
                         );
                       }
                     } on FirebaseAuthException catch (e) {

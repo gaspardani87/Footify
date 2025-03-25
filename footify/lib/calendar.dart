@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'providers/firebase_provider.dart';
 import 'services/team_matches_service.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'services/message_service.dart';
 
 class CalendarPage extends StatefulWidget {
   const CalendarPage({super.key});
@@ -79,12 +80,11 @@ class _CalendarPageState extends State<CalendarPage> {
           setState(() {
             _isLoading = false;
           });
-          // Show error to user
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${AppLocalizations.of(context)!.failedToLoadMatches}'.replaceAll('{error}', '${data['error']}')),
-              duration: const Duration(seconds: 5),
-            ),
+          // Show error to user using MessageService instead of SnackBar
+          MessageService.showMessage(
+            context, 
+            message: '${AppLocalizations.of(context)!.failedToLoadMatches}'.replaceAll('{error}', '${data['error']}'),
+            type: MessageType.error,
           );
         }
         return;
@@ -165,12 +165,11 @@ class _CalendarPageState extends State<CalendarPage> {
         setState(() {
           _isLoading = false;
         });
-        // Show error to user
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error loading matches: $e'),
-            duration: const Duration(seconds: 5),
-          ),
+        // Show error to user using MessageService instead of SnackBar
+        MessageService.showMessage(
+          context, 
+          message: 'Error loading matches: $e',
+          type: MessageType.error,
         );
       }
     }
