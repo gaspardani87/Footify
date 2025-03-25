@@ -1508,3 +1508,75 @@ exports.getUpcomingMatches = functions.https.onRequest(async (req, res) => {
     });
   }
 });
+
+// Function to fetch matches for a date range
+exports.getMatchesForDateRange = functions.https.onRequest(async (req, res) => {
+  setCorsHeaders(res);
+  
+  if (handleOptions(req, res)) return;
+
+  const dateFrom = req.query.dateFrom;
+  const dateTo = req.query.dateTo;
+  
+  if (!dateFrom || !dateTo) {
+    res.status(400).json({ error: 'Missing dateFrom and dateTo parameters (format: YYYY-MM-DD)' });
+    return;
+  }
+
+  try {
+    console.log(`Fetching matches for date range: ${dateFrom} to ${dateTo}`);
+    
+    // Date validation
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(dateFrom) || !dateRegex.test(dateTo)) {
+      res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD' });
+      return;
+    }
+    
+    // Get matches for the specified date range
+    const response = await axios.get(`${BASE_URL}/matches`, {
+      headers: {
+        'X-Auth-Token': API_KEY,
+      },
+      params: {
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+      }
+    });
+    
+    if (response.status === 200) {
+      const matches = response.data.matches || [];
+      
+      // Organize matches by date for easier lookup
+      const matchesByDate = {};
+      
+      matches.forEach(match => {
+        // Extract date from match.utcDate (format: YYYY-MM-DD)
+        const matchDate = match.utcDate.split('T')[0];
+        
+        if (!matchesByDate[matchDate]) {
+          matchesByDate[matchDate] = [];
+        }
+        
+        matchesByDate[matchDate].push(match);
+      });
+      
+      res.status(200).json({
+        success: true,
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+        totalMatchCount: matches.length,
+        matchesByDate: matchesByDate
+      });
+    } else {
+      throw new Error(`API returned status: ${response.status}`);
+    }
+  } catch (error) {
+    console.error(`Error fetching matches for date range ${dateFrom} to ${dateTo}:`, error.message);
+    res.status(500).json({
+      error: 'Failed to fetch matches by date range',
+      details: error.message || 'Unknown error',
+      status: error.response ? error.response.status : null,
+    });
+  }
+});

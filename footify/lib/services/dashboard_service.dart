@@ -219,6 +219,50 @@ class DashboardService {
     }
   }
   
+  /// Get matches for a date range
+  static Future<Map<String, dynamic>> getMatchesForDateRange(String dateFrom, String dateTo) async {
+    try {
+      final String url = '$_firebaseFunctionsBaseUrl/getMatchesForDateRange?dateFrom=$dateFrom&dateTo=$dateTo';
+      debugPrint('Requesting matches for date range from Firebase: $url');
+      
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      ).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          throw Exception('Request timed out. Please check your connection and try again.');
+        },
+      );
+
+      debugPrint('Response status code: ${response.statusCode}');
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        debugPrint('Successfully fetched matches for date range $dateFrom to $dateTo');
+        debugPrint('Total matches: ${data['totalMatchCount'] ?? 0}');
+        return data;
+      } else {
+        final errorData = json.decode(response.body);
+        debugPrint('Failed to load matches for date range: ${response.statusCode}');
+        debugPrint('Error details: ${errorData['error'] ?? 'Unknown error'}');
+        return {
+          'error': errorData['error'] ?? 'Failed to load matches for date range', 
+          'status': response.statusCode,
+          'matchesByDate': {}, 
+        };
+      }
+    } catch (e) {
+      debugPrint('Error getting matches by date range: $e');
+      return {
+        'error': e.toString(),
+        'matchesByDate': {}, 
+      };
+    }
+  }
+  
   /// Get upcoming matches, not limited to today
   static Future<Map<String, dynamic>> getUpcomingMatches() async {
     try {

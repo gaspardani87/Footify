@@ -1147,17 +1147,18 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                                 children: [
                                   Image.network(
                                     team['crest'] ?? '',
-                                    height: 36, // Növelve 28-ról 36-ra
+                                    height: 36,
                                     errorBuilder: (context, error, stackTrace) =>
-                                        const Icon(Icons.sports_soccer, size: 36), // Növelve 28-ról 36-ra
+                                        const Icon(Icons.sports_soccer, size: 36),
                                   ),
+                                  const SizedBox(height: 16),
                                   Padding(
-                                    padding: const EdgeInsets.all(2), // Increased from 1
+                                    padding: const EdgeInsets.all(2),
                                     child: Text(
                                       team['name'] ?? 'Unknown Team',
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
-                                        fontSize: isSmallScreen ? 9.0 : 9.5, // Responsive font size
+                                        fontSize: isSmallScreen ? 9.0 : 9.5,
                                       ),
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
@@ -1304,12 +1305,12 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                           children: [
                             Image.network(
                               team['crest'] ?? '',
-                              height: 36, // Növelve 28-ról 36-ra
+                              height: 36,
                               errorBuilder: (context, error, stackTrace) {
                                 return Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(Icons.flag, size: 36), // Növelve 28-ról 36-ra
+                                    const Icon(Icons.flag, size: 36),
                                     if (team['countryCode'] != null)
                                       Text(
                                         team['countryCode'],
@@ -1319,6 +1320,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                                 );
                               },
                             ),
+                            const SizedBox(height: 16),
                             Padding(
                               padding: const EdgeInsets.all(2),
                               child: Text(
