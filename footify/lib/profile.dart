@@ -87,9 +87,9 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     if (userData != null && userData.containsKey('joinDate')) {
       final dynamic joinDateValue = userData['joinDate'];
       if (joinDateValue is Timestamp) {
-        joinDate = DateFormat('MMMM d, yyyy').format(joinDateValue.toDate());
+        joinDate = DateFormat('MMMM yyyy').format(joinDateValue.toDate());
       } else if (joinDateValue is DateTime) {
-        joinDate = DateFormat('MMMM d, yyyy').format(joinDateValue);
+        joinDate = DateFormat('MMMM yyyy').format(joinDateValue);
       }
     }
     
@@ -129,7 +129,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
         ),
         const SizedBox(height: 4),
         Text(
-          '${AppLocalizations.of(context)!.joinedIn}'.replaceAll('{month}', joinDate),
+          AppLocalizations.of(context)!.joinedIn(joinDate),
           style: TextStyle(
             color: Theme.of(context).brightness == Brightness.dark ? Colors.grey[400] : Colors.black54,
             fontSize: 14,
@@ -139,8 +139,9 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
         const SizedBox(height: 20),
         Card(
           color: Theme.of(context).brightness == Brightness.dark ? const Color.fromARGB(255, 32, 32, 32) : Colors.white,
+          elevation: 4,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
           ),
           child: Padding(
             padding: const EdgeInsets.all(20),
@@ -1870,7 +1871,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                 onPressed: () => _showRegistrationFlow(context),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: backgroundColor, // Match app background color
-                  foregroundColor: (Colors.black), // Yellowish text
+                  foregroundColor: isDarkMode ? const Color(0xFFFFE6AC) : (Colors.black), // Yellowish text in dark mode, black in light mode
                   elevation: 0, // No shadow for outline style
                   padding: EdgeInsets.symmetric(
                     horizontal: baseFontSize * 0.75,

@@ -130,6 +130,11 @@ class _SettingsPageState extends State<SettingsPage> {
           // Theme Switcher
           Card(
             margin: const EdgeInsets.only(bottom: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF292929) : Colors.white,
+            elevation: 4,
             child: Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
@@ -182,6 +187,11 @@ class _SettingsPageState extends State<SettingsPage> {
           // Language Selector
           Card(
             margin: const EdgeInsets.only(bottom: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF292929) : Colors.white,
+            elevation: 4,
             child: Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
@@ -243,6 +253,11 @@ class _SettingsPageState extends State<SettingsPage> {
           // Accessibility Card
           Card(
             margin: const EdgeInsets.only(bottom: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF292929) : Colors.white,
+            elevation: 4,
             child: Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
@@ -317,6 +332,11 @@ class _SettingsPageState extends State<SettingsPage> {
           // About Us Card
           Card(
             margin: const EdgeInsets.only(bottom: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF292929) : Colors.white,
+            elevation: 4,
             child: Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
@@ -355,6 +375,22 @@ class _SettingsPageState extends State<SettingsPage> {
                           size: 30,
                         ),
                         onPressed: () => _openURL('https://www.x.com'),
+                      ),
+                      const SizedBox(width: 32),
+                      IconButton(
+                        icon: Icon(FontAwesomeIcons.linkedin, 
+                          color: isDarkMode ? Colors.white : Colors.black,
+                          size: 30,
+                        ),
+                        onPressed: () => _openURL('https://www.linkedin.com'),
+                      ),
+                      const SizedBox(width: 32),
+                      IconButton(
+                        icon: Icon(FontAwesomeIcons.facebook, 
+                          color: isDarkMode ? Colors.white : Colors.black,
+                          size: 30,
+                        ),
+                        onPressed: () => _openURL('https://www.facebook.com'),
                       ),
                     ],
                   ),

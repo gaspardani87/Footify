@@ -134,63 +134,137 @@ class CommonLayout extends StatelessWidget {
                 ),
               ),
               Spacer(),
-              IconButton(
-                icon: Icon(Icons.search, color: isDarkMode ? Colors.white : Colors.black),
-                iconSize: 24,
-                constraints: BoxConstraints(maxWidth: 34, maxHeight: 34),
-                padding: EdgeInsets.zero,
-                onPressed: () {
-                  showSearch(
-                    context: context,
-                    delegate: CustomSearchDelegate(),
-                  );
-                },
-              ),
-              if (isLoggedIn)
-                IconButton(
-                  icon: Icon(
-                    Icons.notifications,
-                    color: isDarkMode ? Colors.white : Colors.black,
+              if (isWeb)
+                Container(
+                  padding: const EdgeInsets.only(right: 16),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.search, color: isDarkMode ? Colors.white : Colors.black),
+                        iconSize: 24,
+                        constraints: const BoxConstraints(maxWidth: 34, maxHeight: 34),
+                        padding: EdgeInsets.zero,
+                        onPressed: () {
+                          showSearch(
+                            context: context,
+                            delegate: CustomSearchDelegate(),
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      if (isLoggedIn)
+                        IconButton(
+                          icon: Icon(
+                            Icons.notifications,
+                            color: isDarkMode ? Colors.white : Colors.black,
+                          ),
+                          iconSize: 24,
+                          constraints: const BoxConstraints(maxWidth: 34, maxHeight: 34),
+                          padding: EdgeInsets.zero,
+                          onPressed: () {
+                            // Handle notifications
+                          },
+                        )
+                      else
+                        SizedBox(
+                          width: 80,
+                          child: TextButton(
+                            onPressed: () {
+                              // Navigate to profile/login page
+                              Navigator.pushReplacement(
+                                context,
+                                PageRouteBuilder(
+                                  pageBuilder: (context, animation, secondaryAnimation) => const ProfilePage(),
+                                  transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                                    return FadeTransition(
+                                      opacity: animation,
+                                      child: child,
+                                    );
+                                  },
+                                ),
+                              );
+                            },
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                            ),
+                            child: Text(
+                              AppLocalizations.of(context)!.loginRegister,
+                              style: TextStyle(
+                                color: isDarkMode ? Colors.white : Colors.black,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                  iconSize: 24,
-                  constraints: BoxConstraints(maxWidth: 34, maxHeight: 34),
-                  padding: EdgeInsets.zero,
-                  onPressed: () {
-                    // Handle notifications
-                  },
                 )
               else
-                SizedBox(
-                  width: 80,
-                  child: TextButton(
-                    onPressed: () {
-                      // Navigate to profile/login page
-                      Navigator.pushReplacement(
-                        context,
-                        PageRouteBuilder(
-                          pageBuilder: (context, animation, secondaryAnimation) => const ProfilePage(),
-                          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                            return FadeTransition(
-                              opacity: animation,
-                              child: child,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.search, color: isDarkMode ? Colors.white : Colors.black),
+                      iconSize: 24,
+                      constraints: const BoxConstraints(maxWidth: 34, maxHeight: 34),
+                      padding: EdgeInsets.zero,
+                      onPressed: () {
+                        showSearch(
+                          context: context,
+                          delegate: CustomSearchDelegate(),
+                        );
+                      },
+                    ),
+                    if (isLoggedIn)
+                      IconButton(
+                        icon: Icon(
+                          Icons.notifications,
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
+                        iconSize: 24,
+                        constraints: const BoxConstraints(maxWidth: 34, maxHeight: 34),
+                        padding: EdgeInsets.zero,
+                        onPressed: () {
+                          // Handle notifications
+                        },
+                      )
+                    else
+                      SizedBox(
+                        width: 80,
+                        child: TextButton(
+                          onPressed: () {
+                            // Navigate to profile/login page
+                            Navigator.pushReplacement(
+                              context,
+                              PageRouteBuilder(
+                                pageBuilder: (context, animation, secondaryAnimation) => const ProfilePage(),
+                                transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                                  return FadeTransition(
+                                    opacity: animation,
+                                    child: child,
+                                  );
+                                },
+                              ),
                             );
                           },
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                          ),
+                          child: Text(
+                            AppLocalizations.of(context)!.loginRegister,
+                            style: TextStyle(
+                              color: isDarkMode ? Colors.white : Colors.black,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                      );
-                    },
-                    style: TextButton.styleFrom(
-                      padding: EdgeInsets.symmetric(horizontal: 8),
-                    ),
-                    child: Text(
-                      AppLocalizations.of(context)!.loginRegister,
-                      style: TextStyle(
-                        color: isDarkMode ? Colors.white : Colors.black,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
                       ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
+                  ],
                 ),
             ],
           ),

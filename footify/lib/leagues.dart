@@ -231,6 +231,10 @@ class LeagueTile extends StatelessWidget {
         },
         child: Card(
           elevation: 4,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF292929) : Colors.white,
           child: Padding(
             // Adaptive padding based on screen size
             padding: EdgeInsets.all(isSmallScreen ? 10.0 : 8.0),

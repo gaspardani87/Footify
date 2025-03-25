@@ -91,14 +91,16 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     final String? favoriteTeamId = userData['favoriteTeamId'];
     final String? favoriteNationalTeamId = userData['favoriteNationalTeamId'];
     
+    debugPrint('Dashboard betöltése, nemzeti csapat ID: $favoriteNationalTeamId');
+    
+    // Ne állítsuk be a zászló URL-t az adatbázisban, mindig ID alapján jelenítjük meg
+    Map<String, dynamic> updatedUserData = Map<String, dynamic>.from(userData);
+    
     // Load matches for selected date
     await _loadMatchesForDay(_formatDate(_selectedDate));
     
     // Get upcoming matches for the week
     final upcomingMatchesData = await DashboardService.getUpcomingMatches();
-    
-    // Load team logos and info
-    Map<String, dynamic> updatedUserData = Map<String, dynamic>.from(userData);
     
     // Load team's league and standings data
     if (favoriteTeamId != null && favoriteTeamId.isNotEmpty) {
@@ -180,40 +182,6 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
           
           debugPrint('Using national team standings instead: ${_leagueStandings != null ? 'Data available' : 'Null data'}');
         });
-      }
-      
-      // Módosított rész: Mindig frissítjük a logót, ha elérhető, függetlenül attól, hogy már létezik-e
-      // Save national team logo if available
-      if (nationalTeamLeagueData.containsKey('team') && 
-          nationalTeamLeagueData['team'] != null && 
-          nationalTeamLeagueData['team']['crest'] != null) {
-        // Mindig frissítjük a logót, ha elérhető
-        updatedUserData['favoriteNationalTeamLogo'] = nationalTeamLeagueData['team']['crest'];
-        provider.updateUserSettings(updatedUserData);
-        debugPrint('Updated favorite national team logo in user settings: ${nationalTeamLeagueData['team']['crest']}');
-      } else {
-        // Ha nincs a válaszban, hozzunk létre egy hardcoded map-et a legnépszerűbb nemzeti csapatok zászlóival
-        final Map<String, String> nationalTeamFlags = {
-          '759': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/ba/Flag_of_Germany.svg/800px-Flag_of_Germany.svg.png', // Németország
-          '760': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/Flag_of_Spain.svg/800px-Flag_of_Spain.svg.png', // Spanyolország
-          '770': 'https://upload.wikimedia.org/wikipedia/en/thumb/b/be/Flag_of_England.svg/1200px-Flag_of_England.svg.png', // Anglia
-          '764': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Flag_of_Brazil.svg/800px-Flag_of_Brazil.svg.png', // Brazília
-          '762': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Flag_of_Argentina.svg/800px-Flag_of_Argentina.svg.png', // Argentína
-          '773': 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Flag_of_France.svg/800px-Flag_of_France.svg.png', // Franciaország
-          '784': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/Flag_of_Italy.svg/800px-Flag_of_Italy.svg.png', // Olaszország
-          '785': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/20/Flag_of_the_Netherlands.svg/800px-Flag_of_the_Netherlands.svg.png', // Hollandia
-          '765': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5c/Flag_of_Portugal.svg/800px-Flag_of_Portugal.svg.png', // Portugália
-          '805': 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/65/Flag_of_Belgium.svg/800px-Flag_of_Belgium.svg.png', // Belgium
-          '799': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Flag_of_Croatia.svg/800px-Flag_of_Croatia.svg.png', // Horvátország
-          '825': 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Flag_of_Hungary.svg/800px-Flag_of_Hungary.svg.png', // Magyarország
-        };
-        
-        // Ha van zászló a kiválasztott nemzeti csapathoz, mentjük
-        if (nationalTeamFlags.containsKey(favoriteNationalTeamId)) {
-          updatedUserData['favoriteNationalTeamLogo'] = nationalTeamFlags[favoriteNationalTeamId];
-          provider.updateUserSettings(updatedUserData);
-          debugPrint('Set hardcoded flag for national team: ${nationalTeamFlags[favoriteNationalTeamId]}');
-        }
       }
       
       // Get national team's next match
@@ -434,7 +402,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                   flex: 1,
                   child: _buildFavoriteTeamBox(userData),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 16),
                 // Favorite Nation Box (1/2 width)
                 Expanded(
                   flex: 1,
@@ -499,7 +467,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     return Container(
       height: 120,
       decoration: BoxDecoration(
-        color: const Color(0xFF292929),
+        color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF292929) : Colors.white,
         borderRadius: BorderRadius.circular(16),
       ),
       child: InkWell(
@@ -514,8 +482,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
             children: [
               Text(
                 AppLocalizations.of(context)?.favoriteTeam ?? 'Favorite Team',
-                style: const TextStyle(
-                  color: Color(0xFFFFE6AC),
+                style: TextStyle(
+                  color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFFFFE6AC) : Colors.black,
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                 ),
@@ -642,12 +610,57 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   Widget _buildFavoriteNationBox(Map<String, dynamic> userData) {
     final String favoriteNation = userData['favoriteNationalTeam'] ?? '';
     final String favoriteNationId = userData['favoriteNationalTeamId'] ?? '';
-    final String? nationLogo = userData['favoriteNationalTeamLogo'];
     
+    final Map<String, String> flagUrls = {
+      '2106': 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Flag_of_Hungary.svg/800px-Flag_of_Hungary.svg.png',
+      '759': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/ba/Flag_of_Germany.svg/800px-Flag_of_Germany.svg.png',
+      '760': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/Flag_of_Spain.svg/800px-Flag_of_Spain.svg.png',
+      '770': 'https://upload.wikimedia.org/wikipedia/en/thumb/b/be/Flag_of_England.svg/1200px-Flag_of_England.svg.png',
+      '764': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Flag_of_Brazil.svg/800px-Flag_of_Brazil.svg.png',
+      '762': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Flag_of_Argentina.svg/800px-Flag_of_Argentina.svg.png',
+      '773': 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Flag_of_France.svg/800px-Flag_of_France.svg.png',
+      '784': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/Flag_of_Italy.svg/800px-Flag_of_Italy.svg.png',
+      '785': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/20/Flag_of_the_Netherlands.svg/800px-Flag_of_the_Netherlands.svg.png',
+      '765': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5c/Flag_of_Portugal.svg/800px-Flag_of_Portugal.svg.png',
+      '805': 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/65/Flag_of_Belgium.svg/800px-Flag_of_Belgium.svg.png',
+      '799': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Flag_of_Croatia.svg/800px-Flag_of_Croatia.svg.png',
+      '825': 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Flag_of_Switzerland.svg/1024px-Flag_of_Switzerland.svg.png',
+      '772': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Flag_of_Poland.svg/1280px-Flag_of_Poland.svg.png',
+      '776': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/Flag_of_Turkey.svg/1280px-Flag_of_Turkey.svg.png',
+      '782': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/20/Flag_of_the_Netherlands.svg/1280px-Flag_of_the_Netherlands.svg.png',
+      '801': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/88/Flag_of_Australia_%28converted%29.svg/1280px-Flag_of_Australia_%28converted%29.svg.png',
+      '794': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Flag_of_Sweden.svg/1280px-Flag_of_Sweden.svg.png',
+      '827': 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d9/Flag_of_Norway.svg/1280px-Flag_of_Norway.svg.png',
+      '793': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9c/Flag_of_Denmark.svg/1280px-Flag_of_Denmark.svg.png',
+      '768': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Flag_of_Finland.svg/1280px-Flag_of_Finland.svg.png',
+      '767': 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fe/Flag_of_Uruguay.svg/1280px-Flag_of_Uruguay.svg.png',
+      '758': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/19/Flag_of_Ghana.svg/1280px-Flag_of_Ghana.svg.png',
+      '804': 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/32/Flag_of_Senegal.svg/1280px-Flag_of_Senegal.svg.png',
+      '815': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Flag_of_Morocco.svg/1280px-Flag_of_Morocco.svg.png',
+      '854': 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/64/Flag_of_Montenegro.svg/1280px-Flag_of_Montenegro.svg.png',
+      '840': 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/ff/Flag_of_Serbia.svg/1280px-Flag_of_Serbia.svg.png',
+      '778': 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/73/Flag_of_Romania.svg/1280px-Flag_of_Romania.svg.png',
+      '2104': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Flag_of_Bosnia_and_Herzegovina.svg/1280px-Flag_of_Bosnia_and_Herzegovina.svg.png',
+      '796': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/Flag_of_Austria.svg/1280px-Flag_of_Austria.svg.png',
+      '786': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/Flag_of_Ireland.svg/1280px-Flag_of_Ireland.svg.png',
+      '832': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/10/Flag_of_Scotland.svg/1280px-Flag_of_Scotland.svg.png',
+      '833': 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/dc/Flag_of_Wales.svg/1280px-Flag_of_Wales.svg.png',
+      '779': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Flag_of_South_Korea.svg/1280px-Flag_of_South_Korea.svg.png',
+      '780': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Flag_of_Japan.svg/1280px-Flag_of_Japan.svg.png',
+      '781': 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/67/Flag_of_Saudi_Arabia.svg/1280px-Flag_of_Saudi_Arabia.svg.png',
+      '802': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/Flag_of_Palestine.svg/1280px-Flag_of_Palestine.svg.png',
+      '791': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/Flag_of_the_United_States.svg/1280px-Flag_of_the_United_States.svg.png',
+      '769': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Flag_of_Canada.svg/1280px-Flag_of_Canada.svg.png',
+      '771': 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Flag_of_Mexico.svg/1280px-Flag_of_Mexico.svg.png',
+      '828': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b7/Flag_of_Europe.svg/1280px-Flag_of_Europe.svg.png'
+    };
+
+    String? flagUrl = favoriteNationId.isNotEmpty ? flagUrls[favoriteNationId] : null;
+
     return Container(
       height: 120,
       decoration: BoxDecoration(
-        color: const Color(0xFF292929),
+        color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF292929) : Colors.white,
         borderRadius: BorderRadius.circular(16),
       ),
       child: InkWell(
@@ -662,8 +675,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
             children: [
               Text(
                 AppLocalizations.of(context)?.favoriteNation ?? 'Favorite Nation',
-                style: const TextStyle(
-                  color: Color(0xFFFFE6AC),
+                style: TextStyle(
+                  color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFFFFE6AC) : Colors.black,
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                 ),
@@ -674,33 +687,23 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    nationLogo != null && nationLogo.isNotEmpty
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Image.network(
-                              _getProxiedImageUrl(nationLogo),
-                              width: 40,
-                              height: 40,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => const Icon(
-                                Icons.flag,
-                                color: Colors.white,
-                                size: 24,
-                              ),
-                            ),
-                          ),
-                        )
-                      : const Icon(
-                          Icons.flag,
-                          color: Colors.white,
-                          size: 24,
-                        ),
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                        image: flagUrl != null ? DecorationImage(
+                          image: NetworkImage(flagUrl),
+                          fit: BoxFit.cover,
+                        ) : null,
+                      ),
+                      child: flagUrl == null ? const Icon(
+                        Icons.flag,
+                        color: Colors.white,
+                        size: 24,
+                      ) : null,
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: favoriteNation.isNotEmpty
@@ -794,7 +797,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1D1D),
+        color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1D1D1D) : Colors.white,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -959,7 +962,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                       child: Text(
                         position.toString(),
                         style: TextStyle(
-                          color: Colors.white,
+                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                           fontWeight: isFavorite ? FontWeight.bold : FontWeight.normal,
                         ),
                       ),
@@ -987,7 +990,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                             child: Text(
                               teamName,
                               style: TextStyle(
-                                color: isFavorite ? const Color(0xFFFFE6AC) : Colors.white,
+                                color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                                 fontWeight: isFavorite ? FontWeight.bold : FontWeight.normal,
                               ),
                               overflow: TextOverflow.ellipsis,
@@ -1001,7 +1004,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                       child: Text(
                         playedGames.toString(),
                         style: TextStyle(
-                          color: Colors.white,
+                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                           fontWeight: isFavorite ? FontWeight.bold : FontWeight.normal,
                         ),
                         textAlign: TextAlign.center,
@@ -1012,7 +1015,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                       child: Text(
                         won.toString(),
                         style: TextStyle(
-                          color: Colors.white,
+                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                           fontWeight: isFavorite ? FontWeight.bold : FontWeight.normal,
                         ),
                         textAlign: TextAlign.center,
@@ -1023,7 +1026,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                       child: Text(
                         draw.toString(),
                         style: TextStyle(
-                          color: Colors.white,
+                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                           fontWeight: isFavorite ? FontWeight.bold : FontWeight.normal,
                         ),
                         textAlign: TextAlign.center,
@@ -1034,7 +1037,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                       child: Text(
                         lost.toString(),
                         style: TextStyle(
-                          color: Colors.white,
+                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                           fontWeight: isFavorite ? FontWeight.bold : FontWeight.normal,
                         ),
                         textAlign: TextAlign.center,
@@ -1045,7 +1048,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                       child: Text(
                         points.toString(),
                         style: TextStyle(
-                          color: isFavorite ? const Color(0xFFFFE6AC) : Colors.white,
+                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                           fontWeight: FontWeight.bold,
                         ),
                         textAlign: TextAlign.center,
@@ -1088,7 +1091,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1D1D),
+        color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1D1D1D) : Colors.white,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -1179,7 +1182,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                               color: Colors.white,
                               size: 30,
                             ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 16),
                         Text(
                           homeTeam['name'],
                           style: const TextStyle(
@@ -1207,7 +1210,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                         ),
                         textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 16),
                       Text(
                         formattedTime,
                         style: const TextStyle(
@@ -1250,7 +1253,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                               color: Colors.white,
                               size: 30,
                             ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 16),
                         Text(
                           awayTeam['name'],
                           style: const TextStyle(
@@ -1312,50 +1315,42 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Center(
-                        child: isToday || isTomorrow || isYesterday
-                            ? Text(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 0),
+                              child: Text(
                                 isToday 
                                     ? AppLocalizations.of(context)?.today ?? 'Today'
                                     : isTomorrow
                                         ? AppLocalizations.of(context)?.tomorrow ?? 'Tomorrow'
-                                        : AppLocalizations.of(context)?.yesterday ?? 'Yesterday',
+                                        : isYesterday
+                                            ? AppLocalizations.of(context)?.yesterday ?? 'Yesterday'
+                                            : DateFormat('MMM').format(date),
                                 style: TextStyle(
                                   color: isSelected ? Colors.black : isToday ? const Color(0xFFFFE6AC) : Colors.white,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 14,
                                 ),
                                 textAlign: TextAlign.center,
-                              )
-                            : Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 0),
-                                    child: Text(
-                                      DateFormat('MMM').format(date), // Csak a hónap neve
-                                      style: TextStyle(
-                                        color: isSelected ? Colors.black : Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ),
-                                  SizedBox(
-                                    width: 30, // Fixált szélesség a számnak
-                                    child: Text(
-                                      DateFormat('d').format(date), // Csak a nap száma
-                                      style: TextStyle(
-                                        color: isSelected ? Colors.black : Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 20,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ),
-                                ],
                               ),
+                            ),
+                            SizedBox(
+                              width: 30,
+                              child: Text(
+                                DateFormat('d').format(date),
+                                style: TextStyle(
+                                  color: isSelected ? Colors.black : Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 20,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   );
@@ -1450,7 +1445,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1D1D),
+        color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1D1D1D) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.grey.withOpacity(0.3)),
       ),
@@ -1525,7 +1520,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 16.0),
-      color: const Color(0xFF292929),
+      color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF292929) : Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16.0),
       ),
@@ -1568,7 +1563,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                   ),
                   if (homeTeamLogo != null && homeTeamLogo.isNotEmpty)
                     Padding(
-                      padding: const EdgeInsets.only(left: 8.0),
+                      padding: const EdgeInsets.only(left: 16.0),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(4),
                         child: Image.network(
@@ -1587,7 +1582,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
             
             // Score separator
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Text(
                 AppLocalizations.of(context)?.versus ?? 'vs',
                 style: const TextStyle(
@@ -1603,7 +1598,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                 children: [
                   if (awayTeamLogo != null && awayTeamLogo.isNotEmpty)
                     Padding(
-                      padding: const EdgeInsets.only(right: 8.0),
+                      padding: const EdgeInsets.only(right: 16.0),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(4),
                         child: Image.network(
