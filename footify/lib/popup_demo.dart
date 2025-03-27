@@ -3,7 +3,7 @@ import 'common_layout.dart';
 import 'services/message_service.dart';
 
 class PopupDemoPage extends StatelessWidget {
-  const PopupDemoPage({Key? key}) : super(key: key);
+  const PopupDemoPage({super.key});
 
   @override
   Widget build(BuildContext context) {

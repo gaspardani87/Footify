@@ -11,6 +11,7 @@ import 'language_provider.dart';
 import 'package:provider/provider.dart';
 import 'providers/firebase_provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'dashboard.dart';
 
 class CommonLayout extends StatelessWidget {
   final Widget child;
@@ -19,18 +20,18 @@ class CommonLayout extends StatelessWidget {
   final bool showBackButton;
 
   const CommonLayout({
-    Key? key, 
+    super.key, 
     required this.child,
     required this.selectedIndex,
     this.useMaxWidth = true,
     this.showBackButton = false,
-  }) : super(key: key);
+  });
 
   void _onItemTapped(BuildContext context, int index) {
     Widget page;
     switch (index) {
       case 0:
-        page = const MainScreen();
+        page = const DashboardPage();
         break;
       case 1:
         page = const CalendarPage();
@@ -45,7 +46,7 @@ class CommonLayout extends StatelessWidget {
         page = const SettingsPage();
         break;
       default:
-        page = const MainScreen();
+        page = const DashboardPage();
     }
 
     Navigator.pushReplacement(
@@ -77,7 +78,7 @@ class CommonLayout extends StatelessWidget {
             flex: 1,
             child: Container(),
           ),
-          Container(
+          SizedBox(
             width: 1000,
             child: child,
           ),
@@ -127,7 +128,7 @@ class CommonLayout extends StatelessWidget {
                   onTap: () {
                     Navigator.pushReplacement(
                       context,
-                      MaterialPageRoute(builder: (context) => const MainScreen()),
+                      MaterialPageRoute(builder: (context) => const DashboardPage()),
                     );
                   },
                   child: _buildResponsiveLogo(context, isDarkMode),

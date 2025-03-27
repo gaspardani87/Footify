@@ -4,9 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/scheduler.dart';
 import 'main.dart';
+import 'dashboard.dart';
 
 class AnimatedSplashScreen extends StatefulWidget {
-  const AnimatedSplashScreen({Key? key}) : super(key: key);
+  const AnimatedSplashScreen({super.key});
 
   @override
   State<AnimatedSplashScreen> createState() => _AnimatedSplashScreenState();
@@ -104,19 +105,57 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
   // Adatok betöltése (módosított)
   Future<void> _startDataLoading() async {
     try {
+      debugPrint('AnimatedSplashScreen: Starting data loading');
+      
+      // Track start time to ensure minimum splash screen duration
+      final startTime = DateTime.now();
+      
       // Előre betöltjük a főképernyőt
-      _preloadedMainScreen = const MainScreen();
+      _preloadedMainScreen = const DashboardPage();
+      debugPrint('AnimatedSplashScreen: DashboardPage preloaded');
 
       // Adatok betöltése (aszinkron módon, yield-del)
       if (!isDataPreloaded) {
+        debugPrint('AnimatedSplashScreen: Calling preloadData()');
         await preloadData();
         await _yieldToMain(); // YIELD a fő szálnak
+        debugPrint('AnimatedSplashScreen: preloadData() completed');
+      } else {
+        debugPrint('AnimatedSplashScreen: Data already preloaded');
       }
-      await _preloadAllMatchesAndLogos();
-      await _yieldToMain(); // YIELD a fő szálnak
+      
+      // Wait for the dashboard to signal it has loaded its data
+      debugPrint('AnimatedSplashScreen: Waiting for DashboardPage.dataLoaded');
+      
+      // CRITICAL: Always wait for DashboardPage.dataLoaded before proceeding
+      try {
+        // Wait with a more generous timeout for dashboard data loading
+        // This is the critical path to ensure we don't show the dashboard until it's ready
+        bool dataLoadResult = await DashboardPage.dataLoaded.timeout(
+          const Duration(seconds: 20),
+          onTimeout: () {
+            debugPrint('AnimatedSplashScreen: TIMEOUT waiting for dashboard data');
+            return true; // Continue anyway after timeout
+          },
+        );
+        debugPrint('AnimatedSplashScreen: DashboardPage.dataLoaded completed with result: $dataLoadResult');
+      } catch (e) {
+        debugPrint('AnimatedSplashScreen: Error waiting for dashboard data: $e');
+      }
+
+      // Ensure minimum display time for the splash screen (1.5 seconds)
+      final elapsedMillis = DateTime.now().difference(startTime).inMilliseconds;
+      const minSplashTimeMillis = 1500; // 1.5 seconds minimum display time
+      
+      if (elapsedMillis < minSplashTimeMillis) {
+        final remainingTime = minSplashTimeMillis - elapsedMillis;
+        debugPrint('AnimatedSplashScreen: Waiting additional ${remainingTime}ms to ensure minimum splash time');
+        await Future.delayed(Duration(milliseconds: remainingTime));
+      }
 
       // Amikor az adatok betöltődtek:
       if (mounted) {
+        debugPrint('AnimatedSplashScreen: Setting state to start circle animation');
         setState(() {
           _dataLoaded = true;
           _showCircle = true;
@@ -124,10 +163,14 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
 
         // Indítjuk a kör növekedését
         _circleGrowController.forward();
+        debugPrint('AnimatedSplashScreen: Circle grow animation started');
+      } else {
+        debugPrint('AnimatedSplashScreen: Not mounted anymore');
       }
     } catch (e) {
-      print('Error loading data: $e');
+      debugPrint('Error loading data in AnimatedSplashScreen: $e');
       if (mounted && !_dataLoaded) {
+        debugPrint('AnimatedSplashScreen: Retrying data loading after error');
         Future.delayed(const Duration(seconds: 1), _startDataLoading);
       }
     }
@@ -141,7 +184,7 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
       await _yieldToMain(); // YIELD a fő szálnak
 
       // Betöltünk egy képet példaként
-      await precacheImage(const AssetImage('assets/images/default_team_logo.png'), context);
+      await precacheImage(const AssetImage('assets/images/Footify-Logo.png'), context);
       await _yieldToMain(); // YIELD a fő szálnak
     } catch (e) {
       print('Error preloading assets: $e');

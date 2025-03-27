@@ -9,9 +9,64 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'team_details.dart';
 import 'profile.dart';
 import 'services/football_api_service.dart' as football_api;
+import 'dart:async';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
+
+  // Static Completer to track when dashboard data is fully loaded
+  static Completer<bool> dataLoadedCompleter = Completer<bool>();
+  
+  /// Returns a Future that completes when dashboard data is loaded
+  static Future<bool> get dataLoaded => dataLoadedCompleter.future;
+  
+  // Cache system
+  static bool _hasInitialDataLoaded = false;
+  static Map<String, dynamic>? _cachedLeagueStandings;
+  static Map<String, dynamic>? _cachedNextMatch;
+  static Map<String, dynamic>? _cachedNationalTeamNextMatch;
+  static Map<String, dynamic>? _cachedUpcomingMatches;
+  static Map<String, List<dynamic>> _cachedMatchesByDate = {};
+  static DateTime _lastDataRefreshTime = DateTime.now().subtract(const Duration(days: 1));
+  
+  // Cache duration - only refresh data after this time period
+  static const Duration _cacheDuration = Duration(minutes: 30);
+  
+  /// Check if cache is still valid
+  static bool get isCacheValid {
+    return _hasInitialDataLoaded && 
+           DateTime.now().difference(_lastDataRefreshTime) < _cacheDuration;
+  }
+  
+  /// Reset loading state for new dashboard instances
+  static void resetLoadingState() {
+    debugPrint('DashboardPage: Resetting loading state...');
+    if (dataLoadedCompleter.isCompleted) {
+      debugPrint('DashboardPage: Creating new Completer, old one was completed');
+      dataLoadedCompleter = Completer<bool>();
+    } else {
+      debugPrint('DashboardPage: Existing Completer not completed yet');
+    }
+    
+    // Shorter timeout to prevent endless loading
+    Future.delayed(const Duration(seconds: 10), () {
+      if (!dataLoadedCompleter.isCompleted) {
+        debugPrint('DashboardPage: TIMEOUT - Forcing completion of dataLoadedCompleter');
+        dataLoadedCompleter.complete(true);
+      }
+    });
+  }
+  
+  /// Clear all cached data and force reload
+  static void clearCache() {
+    _hasInitialDataLoaded = false;
+    _cachedLeagueStandings = null;
+    _cachedNextMatch = null;
+    _cachedNationalTeamNextMatch = null;
+    _cachedUpcomingMatches = null;
+    _cachedMatchesByDate.clear();
+    _lastDataRefreshTime = DateTime.now().subtract(const Duration(days: 1));
+  }
 
   @override
   _DashboardPageState createState() => _DashboardPageState();
@@ -33,11 +88,23 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   // Cache for matches by date to reduce API calls
   Map<String, List<dynamic>> _matchesCache = {};
   bool _isLoadingDateRange = false;
+  
+  // Background refresh timer
+  Timer? _backgroundRefreshTimer;
+  static const Duration _backgroundRefreshInterval = Duration(minutes: 15);
+  bool _isBackgroundRefreshing = false;
 
   @override
   void initState() {
     super.initState();
     _generateDateRange();
+    
+    // Only reset loading state if cache is invalid
+    if (!DashboardPage.isCacheValid) {
+      DashboardPage.resetLoadingState();
+    } else {
+      debugPrint('DashboardPage: Using cached data, no need to reset loading state');
+    }
     
     // Initialize animation controller
     _animationController = AnimationController(
@@ -56,13 +123,99 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     // Load data after widget is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadDashboardData();
+      
+      // Start background refresh timer
+      _startBackgroundRefreshTimer();
     });
   }
   
   @override
   void dispose() {
     _animationController.dispose();
+    _backgroundRefreshTimer?.cancel();
     super.dispose();
+  }
+  
+  // Start a timer to refresh data in the background
+  void _startBackgroundRefreshTimer() {
+    _backgroundRefreshTimer?.cancel();
+    _backgroundRefreshTimer = Timer.periodic(_backgroundRefreshInterval, (_) {
+      _refreshDataInBackground();
+    });
+  }
+  
+  // Refresh data in the background without blocking UI
+  Future<void> _refreshDataInBackground() async {
+    if (_isBackgroundRefreshing) return; // Prevent concurrent background refreshes
+    
+    _isBackgroundRefreshing = true;
+    debugPrint('Starting background data refresh...');
+    
+    try {
+      // Today's date will be included in both past and future requests
+      final String today = _formatDate(DateTime.now());
+      
+      // Calculate date ranges
+      final String tenDaysAgo = _formatDate(DateTime.now().subtract(const Duration(days: 10)));
+      final String tenDaysLater = _formatDate(DateTime.now().add(const Duration(days: 10)));
+      
+      // Stage 1: Load future matches (more important)
+      try {
+        final futureMatchesData = await DashboardService.getMatchesForDateRange(today, tenDaysLater);
+        
+        if (!futureMatchesData.containsKey('error') && futureMatchesData.containsKey('matchesByDate')) {
+          // Store future days' matches in the cache
+          final Map<String, dynamic> futureMatchesByDate = futureMatchesData['matchesByDate'];
+          
+          futureMatchesByDate.forEach((date, matches) {
+            DashboardPage._cachedMatchesByDate[date] = matches;
+            _matchesCache[date] = matches;
+          });
+          
+          debugPrint('Background refresh: Updated future matches');
+        }
+      } catch (e) {
+        debugPrint('Background refresh: Error updating future matches: $e');
+      }
+      
+      // Wait to avoid hitting rate limits
+      await Future.delayed(const Duration(seconds: 3));
+      
+      // Stage 2: Load user-specific data (if logged in)
+      final provider = Provider.of<FirebaseProvider>(context, listen: false);
+      final userData = provider.userData;
+      
+      if (userData != null) {
+        final String? favoriteTeamId = userData['favoriteTeamId'];
+        final String? favoriteNationalTeamId = userData['favoriteNationalTeamId'];
+        
+        if (favoriteTeamId != null && favoriteTeamId.isNotEmpty) {
+          try {
+            final nextMatchData = await DashboardService.getNextMatch(favoriteTeamId);
+            if (!nextMatchData.containsKey('error') && nextMatchData['match'] != null) {
+              DashboardPage._cachedNextMatch = nextMatchData['match'];
+              if (mounted) {
+                setState(() {
+                  _nextMatch = nextMatchData['match'];
+                });
+              }
+            }
+          } catch (e) {
+            debugPrint('Background refresh: Error updating next match: $e');
+          }
+        }
+      }
+      
+      // Update last refresh time
+      DashboardPage._lastDataRefreshTime = DateTime.now();
+      DashboardPage._hasInitialDataLoaded = true;
+      
+      debugPrint('Background data refresh completed successfully');
+    } catch (e) {
+      debugPrint('Background refresh error: $e');
+    } finally {
+      _isBackgroundRefreshing = false;
+    }
   }
   
   void _generateDateRange() {
@@ -82,130 +235,195 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   }
 
   Future<void> _loadDashboardData() async {
+    debugPrint('DashboardPage: Starting to load dashboard data...');
     setState(() {
       _isLoading = true;
     });
 
-    final provider = Provider.of<FirebaseProvider>(context, listen: false);
-    final userData = provider.userData;
-
-    // Load matches for the entire date range first - this is the most important for the calendar
-    await _loadMatchesForDateRange();
-
-    // If not logged in, just show the matches
-    if (userData == null) {
-      setState(() {
-        _isLoading = false;
-      });
-      return;
-    }
-
-    // Get favorite team and league info
-    final String? favoriteTeamId = userData['favoriteTeamId'];
-    final String? favoriteNationalTeamId = userData['favoriteNationalTeamId'];
-    
-    debugPrint('Dashboard betöltése, nemzeti csapat ID: $favoriteNationalTeamId');
-    
-    // Ne állítsuk be a zászló URL-t az adatbázisban, mindig ID alapján jelenítjük meg
-    Map<String, dynamic> updatedUserData = Map<String, dynamic>.from(userData);
-    
-    // Get upcoming matches for the week
-    final upcomingMatchesData = await DashboardService.getUpcomingMatches();
-    
-    // Load team's league and standings data
-    if (favoriteTeamId != null && favoriteTeamId.isNotEmpty) {
-      // Get the team's league information
-      final teamLeagueData = await DashboardService.getTeamLeague(favoriteTeamId);
-      debugPrint('Team league data received: ${teamLeagueData.containsKey('error') ? 'Error' : 'Success'}');
-      
-      if (!teamLeagueData.containsKey('error') && teamLeagueData['standings'] != null) {
+    try {
+      // Check if we can use cached data
+      if (DashboardPage.isCacheValid) {
+        debugPrint('DashboardPage: Using cached data (valid for ${DashboardPage._cacheDuration.inMinutes} minutes)');
+        // Use the cached data
+        if (DashboardPage._cachedLeagueStandings != null) {
+          _leagueStandings = DashboardPage._cachedLeagueStandings;
+        }
+        if (DashboardPage._cachedNextMatch != null) {
+          _nextMatch = DashboardPage._cachedNextMatch;
+        }
+        if (DashboardPage._cachedNationalTeamNextMatch != null) {
+          _nationalTeamNextMatch = DashboardPage._cachedNationalTeamNextMatch;
+        }
+        _matchesCache = DashboardPage._cachedMatchesByDate;
+        
+        // Complete loading immediately when using cached data
         setState(() {
+          _isLoading = false;
+        });
+        
+        // Complete the dataLoadedCompleter if not already completed
+        if (!DashboardPage.dataLoadedCompleter.isCompleted) {
+          debugPrint('DashboardPage: Completing dataLoadedCompleter (using cached data)');
+          DashboardPage.dataLoadedCompleter.complete(true);
+        }
+        return;
+      }
+      
+      debugPrint('DashboardPage: Cache invalid or expired, loading fresh data');
+      
+      // OPTIMIZATION: Priority loading - first load minimum required data to show UI
+      
+      // 1. First, load matches for today only to show something quickly
+      final today = _formatDate(DateTime.now());
+      final dayMatchesData = await DashboardService.getMatchesByDate(today);
+      if (!dayMatchesData.containsKey('error') && dayMatchesData.containsKey('matches')) {
+        _matchesCache[today] = dayMatchesData['matches'];
+        _matchesByDay = dayMatchesData['matches'];
+      }
+      
+      // Load user data for personalization if available
+      final provider = Provider.of<FirebaseProvider>(context, listen: false);
+      final userData = provider.userData;
+
+      // 2. If not logged in, show matches and complete loading
+      if (userData == null) {
+        debugPrint('DashboardPage: No user data, completing data loading');
+        
+        // Load matches for date range in background after showing UI
+        _loadMatchesForDateRange();
+        
+        setState(() {
+          _isLoading = false;
+        });
+        
+        // Set cached data
+        DashboardPage._cachedMatchesByDate = _matchesCache;
+        DashboardPage._hasInitialDataLoaded = true;
+        DashboardPage._lastDataRefreshTime = DateTime.now();
+        
+        // Complete the loading future if not already completed
+        if (!DashboardPage.dataLoadedCompleter.isCompleted) {
+          debugPrint('DashboardPage: Completing dataLoadedCompleter (no user)');
+          DashboardPage.dataLoadedCompleter.complete(true);
+        }
+        return;
+      }
+
+      // 3. Load essential data for logged-in users
+      final String? favoriteTeamId = userData['favoriteTeamId'];
+      final String? favoriteNationalTeamId = userData['favoriteNationalTeamId'];
+      
+      // OPTIMIZATION: Single critical request first, then load rest in background
+      if (favoriteTeamId != null && favoriteTeamId.isNotEmpty) {
+        // Load team's league standings only - this is visually important
+        final teamLeagueData = await DashboardService.getTeamLeague(favoriteTeamId);
+        if (!teamLeagueData.containsKey('error') && teamLeagueData['standings'] != null) {
           _leagueStandings = teamLeagueData['standings'];
+          DashboardPage._cachedLeagueStandings = teamLeagueData['standings'];
           
-          // Mérkőzésnap hozzáadása közvetlenül a standings objektumhoz a league adatokból
+          // Add matchday info directly to standings object if available
           if (teamLeagueData['league'] != null && 
               teamLeagueData['league']['currentSeason'] != null && 
               teamLeagueData['league']['currentSeason']['currentMatchday'] != null) {
-            
-            // Ha a standings objektum még nem létezik vagy null, akkor üres Map-et hozunk létre
-            if (_leagueStandings == null) {
-              _leagueStandings = {};
-            }
-            
-            // Adjuk hozzá a mérkőzésnap információt a standings objektumhoz
+            _leagueStandings ??= {};
             _leagueStandings!['season'] = {
               'currentMatchday': teamLeagueData['league']['currentSeason']['currentMatchday']
             };
           }
-          
-          debugPrint('League standings updated with ${_leagueStandings != null ? 'data' : 'null'}');
-        });
-        
-        // Save team logo if available and not already saved
-        if (teamLeagueData['team'] != null && 
-            teamLeagueData['team']['crest'] != null &&
-            (!userData.containsKey('favoriteTeamLogo') || userData['favoriteTeamLogo'] == null)) {
-          updatedUserData['favoriteTeamLogo'] = teamLeagueData['team']['crest'];
-          provider.updateUserSettings(updatedUserData);
-          debugPrint('Updated favorite team logo in user settings');
         }
-      } else {
-        debugPrint('No league standings available: ${teamLeagueData['message'] ?? 'Unknown error'}');
       }
       
-      // Load team's next match
-      final nextMatchData = await DashboardService.getNextMatch(favoriteTeamId);
-      if (!nextMatchData.containsKey('error') && nextMatchData['match'] != null) {
-        setState(() {
-          _nextMatch = nextMatchData['match'];
-        });
+      // We now have enough data to show a basic dashboard
+      // OPTIMIZATION: Mark loading as complete and show UI
+      setState(() {
+        _isLoading = false;
+      });
+      
+      // Complete loading to signal that dashboard is visible
+      if (!DashboardPage.dataLoadedCompleter.isCompleted) {
+        debugPrint('DashboardPage: Completing dataLoadedCompleter (with essential data)');
+        DashboardPage.dataLoadedCompleter.complete(true);
+      }
+      
+      // OPTIMIZATION: Load remaining data in background without blocking UI
+      _loadRemainingDataInBackground(userData);
+      
+    } catch (e) {
+      debugPrint('Error loading dashboard data: $e');
+      // Even on error, we should show dashboard
+      setState(() {
+        _isLoading = false;
+      });
+      
+      // Complete loading even on error to prevent splash screen hanging
+      if (!DashboardPage.dataLoadedCompleter.isCompleted) {
+        debugPrint('DashboardPage: Completing dataLoadedCompleter (after error)');
+        DashboardPage.dataLoadedCompleter.complete(true);
       }
     }
-
-    // Load national team's next match if available
-    if (favoriteNationalTeamId != null && favoriteNationalTeamId.isNotEmpty) {
-      // Get the national team's competition information
-      final nationalTeamLeagueData = await DashboardService.getNationalTeamLeague(favoriteNationalTeamId);
-      debugPrint('National team competition data received: ${nationalTeamLeagueData.containsKey('error') ? 'Error' : 'Success'}');
+  }
+  
+  // New method to load remaining data in background
+  Future<void> _loadRemainingDataInBackground(Map<String, dynamic> userData) async {
+    debugPrint('DashboardPage: Loading remaining data in background');
+    
+    final String? favoriteTeamId = userData['favoriteTeamId'];
+    final String? favoriteNationalTeamId = userData['favoriteNationalTeamId'];
+    
+    try {
+      // Load remaining data with sequential requests to avoid rate limiting
       
-      // If no team league standings but national team standings available, use those instead
-      if (_leagueStandings == null && !nationalTeamLeagueData.containsKey('error') && 
-          nationalTeamLeagueData['standings'] != null) {
-        setState(() {
-          _leagueStandings = nationalTeamLeagueData['standings'];
-          
-          // Mérkőzésnap hozzáadása közvetlenül a standings objektumhoz a competition adatokból
-          if (nationalTeamLeagueData['competition'] != null && 
-              nationalTeamLeagueData['competition']['currentSeason'] != null && 
-              nationalTeamLeagueData['competition']['currentSeason']['currentMatchday'] != null) {
-            
-            // Ha a standings objektum még nem létezik vagy null, akkor üres Map-et hozunk létre
-            if (_leagueStandings == null) {
-              _leagueStandings = {};
-            }
-            
-            // Adjuk hozzá a mérkőzésnap információt a standings objektumhoz
-            _leagueStandings!['season'] = {
-              'currentMatchday': nationalTeamLeagueData['competition']['currentSeason']['currentMatchday']
-            };
+      // 1. First load matches for entire date range
+      await _loadMatchesForDateRange();
+      
+      // 2. Load next match for favorite team if available (sequential to avoid rate limits)
+      if (favoriteTeamId != null && favoriteTeamId.isNotEmpty && 
+          DashboardPage._cachedNextMatch == null) {
+        try {
+          final nextMatchData = await DashboardService.getNextMatch(favoriteTeamId);
+          if (!nextMatchData.containsKey('error') && nextMatchData['match'] != null) {
+            setState(() {
+              _nextMatch = nextMatchData['match'];
+            });
+            // Cache next match
+            DashboardPage._cachedNextMatch = nextMatchData['match'];
+            debugPrint('DashboardPage: Next match loaded in background');
           }
-          
-          debugPrint('Using national team standings instead: ${_leagueStandings != null ? 'Data available' : 'Null data'}');
-        });
+        } catch (e) {
+          debugPrint('DashboardPage: Error loading next match in background: $e');
+        }
+        
+        // Small delay to avoid hitting rate limits
+        await Future.delayed(const Duration(milliseconds: 800));
       }
       
-      // Get national team's next match
-      final nationalTeamMatchData = await DashboardService.getNationalTeamNextMatch(favoriteNationalTeamId);
-      if (!nationalTeamMatchData.containsKey('error') && nationalTeamMatchData['match'] != null) {
-        setState(() {
-          _nationalTeamNextMatch = nationalTeamMatchData['match'];
-        });
+      // 3. Load national team's data if available (sequential to avoid rate limits)
+      if (favoriteNationalTeamId != null && favoriteNationalTeamId.isNotEmpty && 
+          DashboardPage._cachedNationalTeamNextMatch == null) {
+        try {
+          final nationalTeamMatchData = await DashboardService.getNationalTeamNextMatch(favoriteNationalTeamId);
+          if (!nationalTeamMatchData.containsKey('error') && nationalTeamMatchData['match'] != null) {
+            setState(() {
+              _nationalTeamNextMatch = nationalTeamMatchData['match'];
+            });
+            // Cache national team next match
+            DashboardPage._cachedNationalTeamNextMatch = nationalTeamMatchData['match'];
+            debugPrint('DashboardPage: National team next match loaded in background');
+          }
+        } catch (e) {
+          debugPrint('DashboardPage: Error loading national team match in background: $e');
+        }
       }
+      
+      // Update cache timestamp
+      DashboardPage._cachedMatchesByDate = _matchesCache;
+      DashboardPage._hasInitialDataLoaded = true;
+      DashboardPage._lastDataRefreshTime = DateTime.now();
+      
+      debugPrint('DashboardPage: Background data loading complete');
+    } catch (e) {
+      debugPrint('DashboardPage: Error in background data loading: $e');
     }
-
-    setState(() {
-      _isLoading = false;
-    });
   }
   
   String _formatDate(DateTime date) {
@@ -218,8 +436,10 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     
     setState(() {
       _isLoadingDateRange = true;
-      // Show loading indicator while fetching all matches
-      _matchesByDay = []; // Clear current matches while loading
+      if (_matchesByDay.isEmpty) {
+        // Only clear current matches if they aren't already loaded
+        _matchesByDay = []; 
+      }
     });
     
     try {
@@ -230,67 +450,82 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
       final String tenDaysAgo = _formatDate(DateTime.now().subtract(const Duration(days: 10)));
       final String tenDaysLater = _formatDate(DateTime.now().add(const Duration(days: 10)));
       
+      // Check if we already have sufficient cached data
+      if (DashboardPage.isCacheValid && _matchesCache.isNotEmpty) {
+        debugPrint('Using cached match data (valid for ${DashboardPage._cacheDuration.inMinutes} minutes)');
+        _updateSelectedDayMatches();
+        setState(() {
+          _isLoadingDateRange = false;
+        });
+        return;
+      }
+      
       debugPrint('Loading matches for two date ranges:');
       debugPrint('1. Past: $tenDaysAgo to $today');
       debugPrint('2. Future: $today to $tenDaysLater');
       
-      // Make both API calls concurrently
-      final futures = await Future.wait([
-        DashboardService.getMatchesForDateRange(tenDaysAgo, today),
-        DashboardService.getMatchesForDateRange(today, tenDaysLater)
-      ]);
+      // RATE LIMITING: Only load future matches first, which are more critical
+      // Then load past matches only if needed and with a delay to avoid rate limits
       
-      final pastMatchesData = futures[0];
-      final futureMatchesData = futures[1];
+      // First, load future matches
+      final futureMatchesData = await DashboardService.getMatchesForDateRange(today, tenDaysLater);
       
-      // Check if both API calls were successful
-      if (!pastMatchesData.containsKey('error') && 
-          !futureMatchesData.containsKey('error') &&
-          pastMatchesData.containsKey('matchesByDate') && 
-          futureMatchesData.containsKey('matchesByDate')) {
-        
-        debugPrint('Successfully loaded all matches for the date range');
-        
+      if (!futureMatchesData.containsKey('error') && futureMatchesData.containsKey('matchesByDate')) {
+        // Process future matches first to show upcoming content
         setState(() {
-          // Clear existing cache to avoid stale data
-          _matchesCache = {};
-          
-          // Store past days' matches in the cache
-          final Map<String, dynamic> pastMatchesByDate = pastMatchesData['matchesByDate'];
-          pastMatchesByDate.forEach((date, matches) {
-            debugPrint('Caching ${matches.length} matches for $date (past)');
+          // Store future days' matches in the cache  
+          final Map<String, dynamic> futureMatchesByDate = futureMatchesData['matchesByDate'];
+          futureMatchesByDate.forEach((date, matches) {
+            debugPrint('Caching ${matches.length} matches for $date (future)');
             _matchesCache[date] = matches;
           });
           
-          // Store future days' matches in the cache
-          final Map<String, dynamic> futureMatchesByDate = futureMatchesData['matchesByDate'];
-          futureMatchesByDate.forEach((date, matches) {
-            // For today's date, which appears in both responses, combine the matches
-            if (date == today && _matchesCache.containsKey(date)) {
-              // Combine matches, making sure to avoid duplicates
-              final List<dynamic> existingMatches = _matchesCache[date]!;
-              final List<dynamic> newMatches = matches;
-              final Set<String> existingMatchIds = existingMatches
-                  .map((m) => m['id']?.toString() ?? '')
-                  .toSet();
-              
-              final List<dynamic> uniqueNewMatches = newMatches
-                  .where((m) => !existingMatchIds.contains(m['id']?.toString() ?? ''))
-                  .toList();
-              
-              _matchesCache[date] = [...existingMatches, ...uniqueNewMatches];
-              debugPrint('Combined ${existingMatches.length} + ${uniqueNewMatches.length} matches for $date');
-            } else {
-              debugPrint('Caching ${matches.length} matches for $date (future)');
-              _matchesCache[date] = matches;
-            }
-          });
-          
-          // Set current day's matches
+          // Update display with current day matches immediately
           _updateSelectedDayMatches();
         });
+        
+        // After a delay to avoid rate limits, load past matches if needed
+        // Only do this if cache is not already valid (for revisits)
+        if (!DashboardPage.isCacheValid) {
+          await Future.delayed(const Duration(seconds: 2)); // Rate limiting delay
+          
+          final pastMatchesData = await DashboardService.getMatchesForDateRange(tenDaysAgo, today);
+          
+          if (!pastMatchesData.containsKey('error') && pastMatchesData.containsKey('matchesByDate')) {
+            setState(() {
+              // Store past days' matches in the cache
+              final Map<String, dynamic> pastMatchesByDate = pastMatchesData['matchesByDate'];
+              pastMatchesByDate.forEach((date, matches) {
+                // For today's date, which appears in both responses, combine the matches
+                if (date == today && _matchesCache.containsKey(date)) {
+                  // Combine matches, making sure to avoid duplicates
+                  final List<dynamic> existingMatches = _matchesCache[date]!;
+                  final List<dynamic> newMatches = matches;
+                  final Set<String> existingMatchIds = existingMatches
+                      .map((m) => m['id']?.toString() ?? '')
+                      .toSet();
+                  
+                  final List<dynamic> uniqueNewMatches = newMatches
+                      .where((m) => !existingMatchIds.contains(m['id']?.toString() ?? ''))
+                      .toList();
+                  
+                  _matchesCache[date] = [...existingMatches, ...uniqueNewMatches];
+                  debugPrint('Combined ${existingMatches.length} + ${uniqueNewMatches.length} matches for $date');
+                } else {
+                  debugPrint('Caching ${matches.length} matches for $date (past)');
+                  _matchesCache[date] = matches;
+                }
+              });
+              
+              // Update the display after loading past matches
+              _updateSelectedDayMatches();
+            });
+          }
+        }
+        
+        debugPrint('Successfully loaded matches for the date range');
       } else {
-        // If either API call failed, try the single-day approach as fallback
+        // If API call failed, try the single-day approach as fallback
         debugPrint('Error loading matches for date range, using fallback');
         await _loadMatchesForDay(_formatDate(_selectedDate));
       }
@@ -520,61 +755,66 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   }
 
   Widget _buildNotLoggedInView() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            AppLocalizations.of(context)?.loginToViewDashboard ?? 'Log in to view your personalized dashboard',
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 18),
-          ),
-          const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ProfilePage()),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFFE6AC),
-              foregroundColor: Colors.black,
+    return SingleChildScrollView(
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              AppLocalizations.of(context)?.loginToViewDashboard ?? 'Log in to view your personalized dashboard',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 18),
             ),
-            child: Text(AppLocalizations.of(context)?.login ?? 'Login'),
-          ),
-          const SizedBox(height: 40),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                AppLocalizations.of(context)?.upcomingMatches ?? 'Upcoming Matches',
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              // Today button
-              TextButton.icon(
+            const SizedBox(height: 20),
+            Center(
+              child: ElevatedButton(
                 onPressed: () {
-                  setState(() {
-                    _selectedDate = DateTime.now();
-                    _generateDateRange();
-                    _currentDateIndex = 10; // Today is at index 10
-                  });
-                  
-                  // Always reload matches when returning to today
-                  _loadMatchesForDateRange();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ProfilePage()),
+                  );
                 },
-                icon: const Icon(Icons.today, size: 16),
-                label: Text(AppLocalizations.of(context)?.today ?? 'Today'),
-                style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFFFFE6AC),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFFE6AC),
+                  foregroundColor: Colors.black,
                 ),
+                child: Text(AppLocalizations.of(context)?.login ?? 'Login'),
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _buildDateSelector(),
-          _buildMatchesForDay(),
-        ],
+            ),
+            const SizedBox(height: 40),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  AppLocalizations.of(context)?.upcomingMatches ?? 'Upcoming Matches',
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                // Today button
+                TextButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _selectedDate = DateTime.now();
+                      _generateDateRange();
+                      _currentDateIndex = 10; // Today is at index 10
+                    });
+                    
+                    // Always reload matches when returning to today
+                    _loadMatchesForDateRange();
+                  },
+                  icon: const Icon(Icons.today, size: 16),
+                  label: Text(AppLocalizations.of(context)?.today ?? 'Today'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFFFFE6AC),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _buildDateSelector(),
+            _buildMatchesForDay(),
+          ],
+        ),
       ),
     );
   }
@@ -1253,7 +1493,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                 ),
               ),
             );
-          }).toList(),
+          }),
           
           const SizedBox(height: 16),
         ],
@@ -1262,8 +1502,41 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   }
 
   Widget _buildNextMatchBox() {
-    // Use team match if available, otherwise national team match
-    final matchData = _nextMatch ?? _nationalTeamNextMatch;
+    // Check if there's a match today (in the _matchesByDay collection)
+    Map<String, dynamic>? todayMatch;
+    
+    // Get today's date and check _matchesByDay for matches today
+    final today = DateTime.now();
+    final todayDate = DateTime(today.year, today.month, today.day);
+    
+    if (_matchesByDay.isNotEmpty) {
+      for (var match in _matchesByDay) {
+        try {
+          final matchDate = DateTime.parse(match['utcDate']);
+          final matchDateOnly = DateTime(matchDate.year, matchDate.month, matchDate.day);
+          
+          // Check if this match is today
+          if (matchDateOnly.isAtSameMomentAs(todayDate)) {
+            final status = match['status'] ?? '';
+            // Prioritize matches that are IN_PLAY or PAUSED
+            if (status == 'IN_PLAY' || status == 'PAUSED') {
+              todayMatch = match;
+              break;  // Found a live match, use this one
+            } 
+            // Also check for matches today that haven't finished yet
+            else if (status != 'FINISHED' && (todayMatch == null || todayMatch['status'] == 'FINISHED')) {
+              todayMatch = match;
+              // Don't break - continue looking for a live match
+            }
+          }
+        } catch (e) {
+          debugPrint('Error parsing match date: $e');
+        }
+      }
+    }
+    
+    // Use today's match if found, otherwise use favorite team match if available, otherwise national team match
+    final matchData = todayMatch ?? _nextMatch ?? _nationalTeamNextMatch;
     if (matchData == null) return const SizedBox.shrink();
     
     final competition = matchData['competition'] ?? {'name': 'Unknown'};
@@ -1272,6 +1545,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     final String? competitionLogo = competition['emblem'];
     final String? homeTeamLogo = homeTeam['crest'];
     final String? awayTeamLogo = awayTeam['crest'];
+    final matchStatus = matchData['status'] ?? '';
     
     // Parse match date
     DateTime matchDate;
@@ -1283,6 +1557,12 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     
     final formattedDate = DateFormat('MMM d, yyyy').format(matchDate);
     final formattedTime = DateFormat('HH:mm').format(matchDate);
+    
+    // Get score information if available
+    final homeScore = matchData['score']?['fullTime']?['home'];
+    final awayScore = matchData['score']?['fullTime']?['away'];
+    final hasScore = homeScore != null && awayScore != null;
+    final scoreText = hasScore ? '$homeScore - $awayScore' : 'vs';
     
     return Container(
       decoration: BoxDecoration(
@@ -1330,19 +1610,34 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                     ),
                   ],
                 ),
-                Text(
-                  AppLocalizations.of(context)?.nextMatch ?? 'Next Match',
-                  style: const TextStyle(
-                    color: Color(0xFFFFE6AC),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
+                // Display appropriate header based on match status
+                Row(
+                  children: [
+                    if (matchStatus == 'IN_PLAY' || matchStatus == 'PAUSED')
+                      Container(
+                        width: 8,
+                        height: 8,
+                        margin: const EdgeInsets.only(right: 6),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    Text(
+                      _getStatusText(matchStatus),
+                      style: TextStyle(
+                        color: _getStatusColor(matchStatus),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
           
-          // Teams and match time
+          // Teams and match time/score
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Row(
@@ -1393,30 +1688,9 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                   ),
                 ),
                 
-                // Match time and date
+                // Match time/date or score
                 Expanded(
-                  child: Column(
-                    children: [
-                      Text(
-                        formattedDate,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        formattedTime,
-                        style: const TextStyle(
-                          color: Color(0xFFFFE6AC),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
+                  child: _buildMatchCenterInfo(matchStatus, formattedDate, formattedTime, homeScore, awayScore),
                 ),
                 
                 // Away team
@@ -1473,6 +1747,117 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     );
   }
   
+  // Helper method to build the center info for a match (time/date or score depending on status)
+  Widget _buildMatchCenterInfo(String status, String formattedDate, String formattedTime, dynamic homeScore, dynamic awayScore) {
+    // For live or finished matches, show the score prominently
+    if ((status == 'IN_PLAY' || status == 'PAUSED' || status == 'FINISHED') && 
+        homeScore != null && awayScore != null) {
+      return Column(
+        children: [
+          Text(
+            formattedDate,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: status == 'FINISHED' ? Colors.green.withOpacity(0.2) : 
+                     (status == 'IN_PLAY' || status == 'PAUSED') ? Colors.red.withOpacity(0.2) : 
+                     const Color(0xFF252525),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: status == 'FINISHED' ? Colors.green : 
+                       (status == 'IN_PLAY' || status == 'PAUSED') ? Colors.red : 
+                       Colors.grey,
+                width: 1.5,
+              ),
+            ),
+            child: Text(
+              '$homeScore - $awayScore',
+              style: TextStyle(
+                color: const Color(0xFFFFE6AC),
+                fontWeight: FontWeight.bold,
+                fontSize: status == 'IN_PLAY' || status == 'PAUSED' ? 22 : 20,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ],
+      );
+    } 
+    // For upcoming matches, show the date and time
+    else {
+      return Column(
+        children: [
+          Text(
+            formattedDate,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            formattedTime,
+            style: const TextStyle(
+              color: Color(0xFFFFE6AC),
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      );
+    }
+  }
+  
+  // Helper method to get appropriate status text
+  String _getStatusText(String status) {
+    switch (status) {
+      case 'FINISHED': 
+        return AppLocalizations.of(context)?.finished ?? 'FINISHED';
+      case 'IN_PLAY': 
+        return AppLocalizations.of(context)?.live ?? 'LIVE';
+      case 'PAUSED': 
+        return 'PAUSED';
+      case 'TIMED': 
+        return 'UPCOMING';
+      case 'SCHEDULED': 
+        return AppLocalizations.of(context)?.scheduled ?? 'SCHEDULED';
+      case 'POSTPONED': 
+        return AppLocalizations.of(context)?.postponed ?? 'POSTPONED';
+      case 'SUSPENDED': 
+        return 'SUSPENDED';
+      case 'CANCELLED': 
+        return 'CANCELLED';
+      default: 
+        return AppLocalizations.of(context)?.nextMatch ?? 'NEXT MATCH';
+    }
+  }
+  
+  // Helper method to get appropriate status color
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'FINISHED': 
+        return Colors.green;
+      case 'IN_PLAY': 
+      case 'PAUSED': 
+        return Colors.red;
+      case 'POSTPONED': 
+      case 'SUSPENDED': 
+      case 'CANCELLED': 
+        return Colors.orange;
+      default: 
+        return const Color(0xFFFFE6AC);
+    }
+  }
+  
   Widget _buildDateSelector() {
     // Create a ScrollController
     final ScrollController scrollController = ScrollController();
@@ -1512,7 +1897,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
       }
     });
     
-    return Container(
+    return SizedBox(
       height: 70, // Reduce height since we removed day of week
       child: Row(
         children: [
@@ -1694,7 +2079,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                   ],
                 ),
               ),
-              ...matches.map((match) => _buildMatchItem(match)).toList(),
+              ...matches.map((match) => _buildMatchItem(match)),
               const SizedBox(height: 16),
             ],
           );

@@ -1021,7 +1021,7 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTicker
                 ),
               ),
               const SizedBox(height: 16),
-              ...snapshot.data!.map((scorer) => _buildScorerCard(scorer, snapshot.data!.indexOf(scorer) + 1, isDarkMode)).toList(),
+              ...snapshot.data!.map((scorer) => _buildScorerCard(scorer, snapshot.data!.indexOf(scorer) + 1, isDarkMode)),
             ],
           ),
         );
@@ -1040,7 +1040,7 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTicker
       child: Row(
         children: [
           // Helyezés
-          Container(
+          SizedBox(
             width: 30,
             child: Row(
               children: [
@@ -1176,7 +1176,7 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTicker
                 ],
               ),
             );
-          }).toList(),
+          }),
         ],
       ),
     );

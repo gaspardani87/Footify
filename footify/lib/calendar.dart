@@ -389,7 +389,7 @@ class _CalendarPageState extends State<CalendarPage> {
                   cursor: SystemMouseCursors.click,
                   onEnter: (_) => _updateHoveredDay(day),
                   onExit: (_) => _updateHoveredDay(null),
-                  child: Container(
+                  child: SizedBox(
                     height: 48, // Fixed height for all cells
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -437,7 +437,7 @@ class _CalendarPageState extends State<CalendarPage> {
                   cursor: SystemMouseCursors.click,
                   onEnter: (_) => _updateHoveredDay(day),
                   onExit: (_) => _updateHoveredDay(null),
-                  child: Container(
+                  child: SizedBox(
                     height: 48, // Fixed height for all cells
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -487,7 +487,7 @@ class _CalendarPageState extends State<CalendarPage> {
                   cursor: SystemMouseCursors.click,
                   onEnter: (_) => _updateHoveredDay(day),
                   onExit: (_) => _updateHoveredDay(null),
-                  child: Container(
+                  child: SizedBox(
                     height: 48, // Fixed height for all cells
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -543,7 +543,7 @@ class _CalendarPageState extends State<CalendarPage> {
                   cursor: SystemMouseCursors.click,
                   onEnter: (_) => _updateHoveredDay(day),
                   onExit: (_) => _updateHoveredDay(null),
-                  child: Container(
+                  child: SizedBox(
                     height: 48, // Fixed height for all cells
                     child: Column(
                       mainAxisSize: MainAxisSize.min,

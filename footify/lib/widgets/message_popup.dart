@@ -9,11 +9,11 @@ class MessagePopup extends StatefulWidget {
   final VoidCallback onDismiss;
 
   const MessagePopup({
-    Key? key,
+    super.key,
     required this.message,
     required this.type,
     required this.onDismiss,
-  }) : super(key: key);
+  });
 
   @override
   State<MessagePopup> createState() => MessagePopupState();
@@ -29,9 +29,9 @@ class MessagePopupState extends State<MessagePopup> with SingleTickerProviderSta
   bool _isDismissing = false;
 
   // Store the initial position and final position for better control
-  double _initialY = -60.0; // Starting position (above screen)
-  double _finalY = 0.0;     // Final resting position
-  double _dismissY = -250.0; // Position to animate to when dismissing (above screen)
+  final double _initialY = -60.0; // Starting position (above screen)
+  final double _finalY = 0.0;     // Final resting position
+  final double _dismissY = -250.0; // Position to animate to when dismissing (above screen)
 
   @override
   void initState() {

@@ -900,8 +900,8 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     final passwordController = TextEditingController();
     final confirmPasswordController = TextEditingController();
     bool isLoading = false;
-    bool _obscurePassword = true;
-    bool _obscureConfirmPassword = true;
+    bool obscurePassword = true;
+    bool obscureConfirmPassword = true;
 
     return showDialog<Map<String, String>>(
       context: context,
@@ -924,15 +924,15 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                 decoration: InputDecoration(
                   labelText: 'Password',
                   suffixIcon: IconButton(
-                    icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+                    icon: Icon(obscurePassword ? Icons.visibility : Icons.visibility_off),
                     onPressed: () {
                       setState(() {
-                        _obscurePassword = !_obscurePassword;
+                        obscurePassword = !obscurePassword;
                       });
                     },
                   ),
                 ),
-                obscureText: _obscurePassword,
+                obscureText: obscurePassword,
                 enabled: !isLoading,
                 onSubmitted: !isLoading ? (_) => _performRegistration(context, setState, emailController, passwordController, confirmPasswordController, isLoading) : null,
               ),
@@ -941,15 +941,15 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                 decoration: InputDecoration(
                   labelText: 'Confirm Password',
                   suffixIcon: IconButton(
-                    icon: Icon(_obscureConfirmPassword ? Icons.visibility : Icons.visibility_off),
+                    icon: Icon(obscureConfirmPassword ? Icons.visibility : Icons.visibility_off),
                     onPressed: () {
                       setState(() {
-                        _obscureConfirmPassword = !_obscureConfirmPassword;
+                        obscureConfirmPassword = !obscureConfirmPassword;
                       });
                     },
                   ),
                 ),
-                obscureText: _obscureConfirmPassword,
+                obscureText: obscureConfirmPassword,
                 enabled: !isLoading,
                 onSubmitted: !isLoading ? (_) => _performRegistration(context, setState, emailController, passwordController, confirmPasswordController, isLoading) : null,
               ),
@@ -1400,7 +1400,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     final emailController = TextEditingController();
     final passwordController = TextEditingController();
     bool isLoading = false;
-    bool _obscurePassword = true;
+    bool obscurePassword = true;
 
     return showDialog(
       context: context,
@@ -1424,15 +1424,15 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                 decoration: InputDecoration(
                   labelText: 'Password',
                   suffixIcon: IconButton(
-                    icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+                    icon: Icon(obscurePassword ? Icons.visibility : Icons.visibility_off),
                     onPressed: () {
                       setState(() {
-                        _obscurePassword = !_obscurePassword;
+                        obscurePassword = !obscurePassword;
                       });
                     },
                   ),
                 ),
-                obscureText: _obscurePassword,
+                obscureText: obscurePassword,
                 enabled: !isLoading,
                 onSubmitted: !isLoading ? (_) => _performLogin(context, setState, emailController, passwordController, isLoading) : null,
               ),
@@ -2144,9 +2144,9 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     String? errorText;
     
     // Password visibility toggles
-    bool _obscureCurrentPassword = true;
-    bool _obscureNewPassword = true;
-    bool _obscureConfirmPassword = true;
+    bool obscureCurrentPassword = true;
+    bool obscureNewPassword = true;
+    bool obscureConfirmPassword = true;
     bool isLoading = false;
     
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -2169,17 +2169,17 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                         labelText: 'Current Password',
                         errorText: isCurrentPasswordError ? 'Current password is required' : null,
                         suffixIcon: IconButton(
-                          icon: Icon(_obscureCurrentPassword ? Icons.visibility : Icons.visibility_off),
+                          icon: Icon(obscureCurrentPassword ? Icons.visibility : Icons.visibility_off),
                           onPressed: () {
                             setState(() {
-                              _obscureCurrentPassword = !_obscureCurrentPassword;
+                              obscureCurrentPassword = !obscureCurrentPassword;
                             });
                           },
                         ),
                         enabled: !isLoading,
                       ),
-                      obscureText: _obscureCurrentPassword,
-                      onSubmitted: !isLoading ? (_) => null : null,
+                      obscureText: obscureCurrentPassword,
+                      onSubmitted: !isLoading ? (_) {} : null,
                     ),
                     const SizedBox(height: 16),
                     
@@ -2190,17 +2190,17 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                         labelText: 'New Password',
                         errorText: isNewPasswordError ? 'Password must be at least 6 characters' : null,
                         suffixIcon: IconButton(
-                          icon: Icon(_obscureNewPassword ? Icons.visibility : Icons.visibility_off),
+                          icon: Icon(obscureNewPassword ? Icons.visibility : Icons.visibility_off),
                           onPressed: () {
                             setState(() {
-                              _obscureNewPassword = !_obscureNewPassword;
+                              obscureNewPassword = !obscureNewPassword;
                             });
                           },
                         ),
                         enabled: !isLoading,
                       ),
-                      obscureText: _obscureNewPassword,
-                      onSubmitted: !isLoading ? (_) => null : null,
+                      obscureText: obscureNewPassword,
+                      onSubmitted: !isLoading ? (_) {} : null,
                     ),
                     Padding(
                       padding: const EdgeInsets.only(top: 4.0, left: 4.0),
@@ -2234,17 +2234,17 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                         labelText: 'Confirm New Password',
                         errorText: isConfirmPasswordError ? 'Passwords do not match' : null,
                         suffixIcon: IconButton(
-                          icon: Icon(_obscureConfirmPassword ? Icons.visibility : Icons.visibility_off),
+                          icon: Icon(obscureConfirmPassword ? Icons.visibility : Icons.visibility_off),
                           onPressed: () {
                             setState(() {
-                              _obscureConfirmPassword = !_obscureConfirmPassword;
+                              obscureConfirmPassword = !obscureConfirmPassword;
                             });
                           },
                         ),
                         enabled: !isLoading,
                       ),
-                      obscureText: _obscureConfirmPassword,
-                      onSubmitted: !isLoading ? (_) => null : null,
+                      obscureText: obscureConfirmPassword,
+                      onSubmitted: !isLoading ? (_) {} : null,
                     ),
                     
                     // Display error message if any

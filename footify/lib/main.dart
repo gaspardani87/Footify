@@ -265,8 +265,6 @@ class _FootifyAppState extends State<FootifyApp> {
         onSecondary: colors['text']!,
         error: Colors.red,
         onError: Colors.white,
-        background: colors['background']!,
-        onBackground: colors['text']!,
         surface: colors['surface']!,
         onSurface: colors['text']!,
       ),
@@ -332,13 +330,13 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateMixin {
   int _selectedIndex = 0;
   late Future<Map<String, dynamic>> _futureData;
-  Map<String, bool> _expandedCompetitions = {};
-  Map<String, bool> _expandedMatches = {};
+  final Map<String, bool> _expandedCompetitions = {};
+  final Map<String, bool> _expandedMatches = {};
   late AnimationController _blinkController;
   late Animation<double> _blinkAnimation;
   bool _hasError = false;
-  String _errorMessage = '';
-  int _totalMatchesLoaded = 0;
+  final String _errorMessage = '';
+  final int _totalMatchesLoaded = 0;
 
   @override
   void initState() {
@@ -368,7 +366,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     Widget page;
     switch (index) {
       case 0:
-        page = const MainScreen();
+        page = const DashboardPage();
         break;
       case 1:
         page = const CalendarPage();
@@ -435,7 +433,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
         width: 24,
         height: 24,
         decoration: BoxDecoration(
-          color: colorScheme.surfaceVariant,
+          color: colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(4)
         ),
         child: Icon(Icons.sports_soccer, size: 16, color: colorScheme.onSurface),
@@ -454,7 +452,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
         width: 24,
         height: 24,
         decoration: BoxDecoration(
-          color: colorScheme.surfaceVariant,
+          color: colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(4)
         ),
         child: const SizedBox(
@@ -467,7 +465,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
         width: 24,
         height: 24,
         decoration: BoxDecoration(
-          color: colorScheme.surfaceVariant,
+          color: colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(4)
         ),
         child: Icon(Icons.sports_soccer, size: 16, color: colorScheme.onSurface),
@@ -511,39 +509,10 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
               },
             ),
           ),
-          // Temporary button for testing the dashboard
-          Positioned(
-            bottom: 90,  // Position it just above the bottom navigation
-            right: 20,
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const DashboardPage()),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFFE6AC),
-                foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(30.0),
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.dashboard),
-                  const SizedBox(width: 8),
-                  Text(AppLocalizations.of(context)?.dashboard ?? 'Dashboard'),
-                ],
-              ),
-            ),
-          ),
           
           // Button for testing message popups
           Positioned(
-            bottom: 150,  // Position it above the dashboard button
+            bottom: 90,  // Position it just above the bottom navigation
             right: 20,
             child: ElevatedButton(
               onPressed: () {
@@ -817,7 +786,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
               Text(
                 title,
                 style: TextStyle(
-                  color: colorScheme.onBackground,
+                  color: colorScheme.onSurface,
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                   fontFamily: 'Lexend',
@@ -828,7 +797,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
               Text(
                 subtitle,
                 style: TextStyle(
-                  color: colorScheme.onBackground.withOpacity(0.7),
+                  color: colorScheme.onSurface.withOpacity(0.7),
                   fontSize: 16,
                   fontFamily: 'Lexend',
                 ),
@@ -1071,7 +1040,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       margin: const EdgeInsets.symmetric(horizontal: 8),
                       decoration: BoxDecoration(
-                        color: matchStatus == 'FINISHED' ? colorScheme.primaryContainer : colorScheme.surfaceVariant,
+                        color: matchStatus == 'FINISHED' ? colorScheme.primaryContainer : colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
@@ -1158,7 +1127,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     
     // A problémás ligák világos módban sötét verziójú képet használnak
     if (!isDarkMode && darkVersionLogos.containsKey(competitionId)) {
-      return Container(
+      return SizedBox(
         width: 24,
         height: 24,
         child: Image.network(
@@ -1182,7 +1151,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
               ? 'https://cdn.freelogovectors.net/wp-content/uploads/2021/08/primeira-logo-liga-portugal-freelogovectors.net_.png'  // Primeira Liga fekete logó
               : 'https://upload.wikimedia.org/wikipedia/commons/4/46/Eredivisie_nuovo_logo.png';  // Eredivisie eredeti logó
       
-      return Container(
+      return SizedBox(
         width: 24,
         height: 24,
         child: Image.network(
@@ -1203,7 +1172,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     
     // Champions League esetén fekete szín sötét módban, a sárgás háttéren
     if (competitionId == 2001 && isDarkMode) {
-      return Container(
+      return SizedBox(
         width: 24,
         height: 24,
         child: ColorFiltered(
@@ -1230,7 +1199,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     
     // Ellenőrizzük, hogy van-e helyettesítő online kép
     if (replacementLogos.containsKey(competitionId)) {
-      return Container(
+      return SizedBox(
         width: 24,
         height: 24,
         child: Image.network(
@@ -1250,7 +1219,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     }
     
     // Minden más esetben az eredeti logót használjuk
-    return Container(
+    return SizedBox(
       width: 24,
       height: 24,
       child: _getNetworkImageForLeague(logoUrl, isDarkMode),
@@ -1386,7 +1355,7 @@ class CustomSearchDelegate extends SearchDelegate {
 
 // A clean loading screen with just a pulsating SVG logo
 class LoadingScreen extends StatefulWidget {
-  const LoadingScreen({Key? key}) : super(key: key);
+  const LoadingScreen({super.key});
 
   @override
   _LoadingScreenState createState() => _LoadingScreenState();
@@ -1420,7 +1389,7 @@ class _LoadingScreenState extends State<LoadingScreen> with SingleTickerProvider
         await preloadData();
         if (mounted && isDataPreloaded) {
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const MainScreen()),
+            MaterialPageRoute(builder: (context) => const DashboardPage()),
           );
         }
       } catch (e) {
@@ -1451,7 +1420,7 @@ class _LoadingScreenState extends State<LoadingScreen> with SingleTickerProvider
         : 'assets/images/footify_logo_optimized_light.svg';
     
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: Center(
         child: ScaleTransition(
           scale: _animation,

@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'main.dart';
+import 'dashboard.dart';
 
 class LoadingScreen extends StatefulWidget {
-  const LoadingScreen({Key? key}) : super(key: key);
+  const LoadingScreen({super.key});
 
   @override
   _LoadingScreenState createState() => _LoadingScreenState();
@@ -53,7 +54,7 @@ class _LoadingScreenState extends State<LoadingScreen> with SingleTickerProvider
       // Navigate immediately when data is loaded
       if (mounted && isDataPreloaded) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const MainScreen()),
+          MaterialPageRoute(builder: (context) => const DashboardPage()),
         );
       }
     } catch (e) {
@@ -84,7 +85,7 @@ class _LoadingScreenState extends State<LoadingScreen> with SingleTickerProvider
         : 'assets/images/footify_logo_optimized_light.svg';
     
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: Center(
         child: AnimatedBuilder(
           animation: _animation,

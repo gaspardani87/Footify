@@ -337,7 +337,7 @@ class FirebaseProvider with ChangeNotifier {
       }
     } catch (e) {
       print('Delete account error: $e');
-      throw e;
+      rethrow;
     }
   }
 
@@ -476,7 +476,7 @@ class FirebaseProvider with ChangeNotifier {
       
       // Create upload task with metadata
       final metadata = SettableMetadata(
-        contentType: extension == 'jpg' ? 'image/jpeg' : 'image/${extension}',
+        contentType: extension == 'jpg' ? 'image/jpeg' : 'image/$extension',
         customMetadata: {'userId': _user!.uid},
       );
       

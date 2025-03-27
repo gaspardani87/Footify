@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'storage_service.dart';
 
 class ThemeProvider with ChangeNotifier {

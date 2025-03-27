@@ -110,9 +110,9 @@ class MatchDetailsPage extends StatefulWidget {
   final Map<String, dynamic> matchData;
 
   const MatchDetailsPage({
-    Key? key,
+    super.key,
     required this.matchData,
-  }) : super(key: key);
+  });
 
   @override
   _MatchDetailsPageState createState() => _MatchDetailsPageState();
@@ -2460,7 +2460,7 @@ class _MatchDetailsPageState extends State<MatchDetailsPage> with TickerProvider
                   ),
                   alignment: Alignment.center,
                   child: Text(
-                    '${event['minute']}\'' + (event['injury'] > 0 ? '+${event['injury']}' : ''),
+                    '${event['minute']}\'${event['injury'] > 0 ? '+${event['injury']}' : ''}',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 12,
