@@ -10,219 +10,235 @@ import 'team_details.dart';
 import 'profile.dart';
 import 'services/football_api_service.dart' as football_api;
 import 'dart:async';
+import 'dart:math';
+
+// Add ShimmerLoading widget class after the imports and before the DashboardPage class
+class ShimmerLoading extends StatefulWidget {
+  final Widget child;
+  final bool isLoading;
+
+  const ShimmerLoading({
+    Key? key,
+    required this.child,
+    required this.isLoading,
+  }) : super(key: key);
+
+  @override
+  _ShimmerLoadingState createState() => _ShimmerLoadingState();
+}
+
+class _ShimmerLoadingState extends State<ShimmerLoading> with SingleTickerProviderStateMixin {
+  late AnimationController _shimmerController;
+
+  @override
+  void initState() {
+    super.initState();
+    _shimmerController = AnimationController.unbounded(vsync: this)
+      ..repeat(min: -0.5, max: 1.5, period: const Duration(milliseconds: 1000));
+  }
+
+  @override
+  void dispose() {
+    _shimmerController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.isLoading) {
+      return widget.child;
+    }
+
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final shimmerGradient = LinearGradient(
+      colors: [
+        isDarkMode ? Colors.grey[800]! : Colors.grey[300]!,
+        isDarkMode ? Colors.grey[700]! : Colors.grey[200]!,
+        isDarkMode ? Colors.grey[800]! : Colors.grey[300]!,
+      ],
+      stops: const [0.1, 0.3, 0.4],
+    );
+
+    return AnimatedBuilder(
+      animation: _shimmerController,
+      builder: (context, child) {
+        return ShaderMask(
+          blendMode: BlendMode.srcATop,
+          shaderCallback: (bounds) {
+            return shimmerGradient.createShader(
+              Rect.fromLTWH(
+                -_shimmerController.value * bounds.width * 3,
+                0,
+                bounds.width * 3,
+                bounds.height,
+              ),
+            );
+          },
+          child: widget.child,
+        );
+      },
+    );
+  }
+}
+
+// Replace the _buildLoadingCard method
+Widget _buildLoadingCard(BuildContext context, String title, {double height = 250}) {
+  final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+  
+  return Container(
+    margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+    height: height,
+    decoration: BoxDecoration(
+      color: isDarkMode ? const Color(0xFF222222) : Colors.grey[200],
+      borderRadius: BorderRadius.circular(12.0),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.1),
+          blurRadius: 4.0,
+          offset: const Offset(0, 2),
+        ),
+      ],
+    ),
+    child: ShimmerLoading(
+      isLoading: true,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 18.0,
+                fontWeight: FontWeight.bold,
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
+            const SizedBox(height: 16.0),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: List.generate(
+                  3,
+                  (index) => Container(
+                    height: 24.0,
+                    margin: const EdgeInsets.symmetric(vertical: 8.0),
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? const Color(0xFF333333) : Colors.grey[300],
+                      borderRadius: BorderRadius.circular(4.0),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
 
 class DashboardPage extends StatefulWidget {
-  const DashboardPage({super.key});
-
-  // Static Completer to track when dashboard data is fully loaded
   static Completer<bool> dataLoadedCompleter = Completer<bool>();
   
-  /// Returns a Future that completes when dashboard data is loaded
-  static Future<bool> get dataLoaded => dataLoadedCompleter.future;
-  
-  // Cache system
+  // Cache management
   static bool _hasInitialDataLoaded = false;
+  static DateTime _lastDataRefreshTime = DateTime(2000); // Initial old date
+  static const Duration _cacheDuration = Duration(minutes: 30); // 30 minute cache
+  
+  // Cached data
+  static Map<String, List<dynamic>> _cachedMatchesByDate = {};
   static Map<String, dynamic>? _cachedLeagueStandings;
   static Map<String, dynamic>? _cachedNextMatch;
   static Map<String, dynamic>? _cachedNationalTeamNextMatch;
-  static Map<String, dynamic>? _cachedUpcomingMatches;
-  static Map<String, List<dynamic>> _cachedMatchesByDate = {};
-  static DateTime _lastDataRefreshTime = DateTime.now().subtract(const Duration(days: 1));
   
-  // Cache duration - only refresh data after this time period
-  static const Duration _cacheDuration = Duration(minutes: 30);
   
-  /// Check if cache is still valid
   static bool get isCacheValid {
-    return _hasInitialDataLoaded && 
-           DateTime.now().difference(_lastDataRefreshTime) < _cacheDuration;
+    if (!_hasInitialDataLoaded) return false;
+    final timeSinceLastRefresh = DateTime.now().difference(_lastDataRefreshTime);
+    return timeSinceLastRefresh < _cacheDuration;
   }
   
-  /// Reset loading state for new dashboard instances
+  /// Reset the loading state for new instances
   static void resetLoadingState() {
     debugPrint('DashboardPage: Resetting loading state...');
     if (dataLoadedCompleter.isCompleted) {
-      debugPrint('DashboardPage: Creating new Completer, old one was completed');
+      debugPrint('DashboardPage: Creating new Completer');
       dataLoadedCompleter = Completer<bool>();
     } else {
       debugPrint('DashboardPage: Existing Completer not completed yet');
     }
-    
-    // Shorter timeout to prevent endless loading
-    Future.delayed(const Duration(seconds: 10), () {
-      if (!dataLoadedCompleter.isCompleted) {
-        debugPrint('DashboardPage: TIMEOUT - Forcing completion of dataLoadedCompleter');
-        dataLoadedCompleter.complete(true);
-      }
-    });
   }
   
-  /// Clear all cached data and force reload
-  static void clearCache() {
-    _hasInitialDataLoaded = false;
-    _cachedLeagueStandings = null;
-    _cachedNextMatch = null;
-    _cachedNationalTeamNextMatch = null;
-    _cachedUpcomingMatches = null;
-    _cachedMatchesByDate.clear();
-    _lastDataRefreshTime = DateTime.now().subtract(const Duration(days: 1));
-  }
+  /// Check if data loading has completed
+  static Future<bool> get dataLoaded => dataLoadedCompleter.future;
+  
+  const DashboardPage({super.key});
 
   @override
   _DashboardPageState createState() => _DashboardPageState();
 }
 
 class _DashboardPageState extends State<DashboardPage> with SingleTickerProviderStateMixin {
+  // User preferences and data
   bool _isLoading = true;
+  bool _isLoadingDateRange = false;
+  
+  // Date handling and selection
+  List<DateTime> _dateRange = [];
+  int _currentDateIndex = 0;
+  DateTime _selectedDate = DateTime.now();
+  
+  // Get the current date, either real or demo
+  DateTime get _currentDate {
+    return DateTime.now();
+  }
+  
+  // Use sample match data when in demo mode and API fails
+  void _addSampleMatchData() {
+    // This method is no longer used - removed demo mode functionality
+  }
+  
+  // Match data
+  Map<String, List<dynamic>> _matchesCache = {};
+  List<dynamic> _matchesByDay = [];
   Map<String, dynamic>? _leagueStandings;
   Map<String, dynamic>? _nextMatch;
   Map<String, dynamic>? _nationalTeamNextMatch;
-  List<dynamic> _matchesByDay = [];
-  DateTime _selectedDate = DateTime.now();
-  List<DateTime> _dateRange = [];
-  int _currentDateIndex = 10; // Default to middle date (today) - changed to 10 for 21 days
-  late AnimationController _animationController;
-  late Animation<Offset> _slideAnimation;
-  Map<String, dynamic>? _nationalTeamStandings;
-
-  // Cache for matches by date to reduce API calls
-  Map<String, List<dynamic>> _matchesCache = {};
-  bool _isLoadingDateRange = false;
   
-  // Background refresh timer
-  Timer? _backgroundRefreshTimer;
-  static const Duration _backgroundRefreshInterval = Duration(minutes: 15);
-  bool _isBackgroundRefreshing = false;
-
+  // Add loading state variables at class level
+  bool _isLoadingLeagueStandings = true;
+  bool _isLoadingNextMatch = true;
+  
   @override
   void initState() {
     super.initState();
+    
+    // Set initial loading states
+    _isLoadingLeagueStandings = true;
+    _isLoadingNextMatch = true;
+    
+    // Generate date range centered around current/demo date
     _generateDateRange();
     
-    // Only reset loading state if cache is invalid
-    if (!DashboardPage.isCacheValid) {
-      DashboardPage.resetLoadingState();
-    } else {
-      debugPrint('DashboardPage: Using cached data, no need to reset loading state');
-    }
+    // Set initial date to current/demo date
+    _selectedDate = _currentDate;
     
-    // Initialize animation controller
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-    );
-    
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0),
-      end: const Offset(0, 0),
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    ));
-    
-    // Load data after widget is built
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadDashboardData();
-      
-      // Start background refresh timer
-      _startBackgroundRefreshTimer();
-    });
+    // Start loading dashboard data
+    _loadDashboardData();
   }
   
   @override
   void dispose() {
-    _animationController.dispose();
-    _backgroundRefreshTimer?.cancel();
     super.dispose();
-  }
-  
-  // Start a timer to refresh data in the background
-  void _startBackgroundRefreshTimer() {
-    _backgroundRefreshTimer?.cancel();
-    _backgroundRefreshTimer = Timer.periodic(_backgroundRefreshInterval, (_) {
-      _refreshDataInBackground();
-    });
-  }
-  
-  // Refresh data in the background without blocking UI
-  Future<void> _refreshDataInBackground() async {
-    if (_isBackgroundRefreshing) return; // Prevent concurrent background refreshes
-    
-    _isBackgroundRefreshing = true;
-    debugPrint('Starting background data refresh...');
-    
-    try {
-      // Today's date will be included in both past and future requests
-      final String today = _formatDate(DateTime.now());
-      
-      // Calculate date ranges
-      final String tenDaysAgo = _formatDate(DateTime.now().subtract(const Duration(days: 10)));
-      final String tenDaysLater = _formatDate(DateTime.now().add(const Duration(days: 10)));
-      
-      // Stage 1: Load future matches (more important)
-      try {
-        final futureMatchesData = await DashboardService.getMatchesForDateRange(today, tenDaysLater);
-        
-        if (!futureMatchesData.containsKey('error') && futureMatchesData.containsKey('matchesByDate')) {
-          // Store future days' matches in the cache
-          final Map<String, dynamic> futureMatchesByDate = futureMatchesData['matchesByDate'];
-          
-          futureMatchesByDate.forEach((date, matches) {
-            DashboardPage._cachedMatchesByDate[date] = matches;
-            _matchesCache[date] = matches;
-          });
-          
-          debugPrint('Background refresh: Updated future matches');
-        }
-      } catch (e) {
-        debugPrint('Background refresh: Error updating future matches: $e');
-      }
-      
-      // Wait to avoid hitting rate limits
-      await Future.delayed(const Duration(seconds: 3));
-      
-      // Stage 2: Load user-specific data (if logged in)
-      final provider = Provider.of<FirebaseProvider>(context, listen: false);
-      final userData = provider.userData;
-      
-      if (userData != null) {
-        final String? favoriteTeamId = userData['favoriteTeamId'];
-        final String? favoriteNationalTeamId = userData['favoriteNationalTeamId'];
-        
-        if (favoriteTeamId != null && favoriteTeamId.isNotEmpty) {
-          try {
-            final nextMatchData = await DashboardService.getNextMatch(favoriteTeamId);
-            if (!nextMatchData.containsKey('error') && nextMatchData['match'] != null) {
-              DashboardPage._cachedNextMatch = nextMatchData['match'];
-              if (mounted) {
-                setState(() {
-                  _nextMatch = nextMatchData['match'];
-                });
-              }
-            }
-          } catch (e) {
-            debugPrint('Background refresh: Error updating next match: $e');
-          }
-        }
-      }
-      
-      // Update last refresh time
-      DashboardPage._lastDataRefreshTime = DateTime.now();
-      DashboardPage._hasInitialDataLoaded = true;
-      
-      debugPrint('Background data refresh completed successfully');
-    } catch (e) {
-      debugPrint('Background refresh error: $e');
-    } finally {
-      _isBackgroundRefreshing = false;
-    }
   }
   
   void _generateDateRange() {
     // Generate 21 days from 10 days ago to 10 days in the future
     _dateRange = [];
     
-    final DateTime today = DateTime.now();
+    // Use current date or demo date
+    final DateTime today = _currentDate;
     
     // Add dates from 10 days ago to 10 days in the future
     for (int i = -10; i <= 10; i++) {
@@ -233,11 +249,15 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     _currentDateIndex = 10;
     _selectedDate = today;
   }
-
+  
   Future<void> _loadDashboardData() async {
     debugPrint('DashboardPage: Starting to load dashboard data...');
+    
+    // Set all loading flags to true at the start
     setState(() {
-      _isLoading = true;
+      _isLoading = false; // Set to false immediately to show the dashboard
+      _isLoadingLeagueStandings = true;
+      _isLoadingNextMatch = true;
     });
 
     try {
@@ -247,19 +267,25 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
         // Use the cached data
         if (DashboardPage._cachedLeagueStandings != null) {
           _leagueStandings = DashboardPage._cachedLeagueStandings;
+          // Reset league standings loading flag when using cached data
+          setState(() {
+            _isLoadingLeagueStandings = false;
+          });
         }
         if (DashboardPage._cachedNextMatch != null) {
           _nextMatch = DashboardPage._cachedNextMatch;
+          // Reset next match loading flag when using cached data
+          setState(() {
+            _isLoadingNextMatch = false;
+          });
         }
         if (DashboardPage._cachedNationalTeamNextMatch != null) {
           _nationalTeamNextMatch = DashboardPage._cachedNationalTeamNextMatch;
         }
         _matchesCache = DashboardPage._cachedMatchesByDate;
         
-        // Complete loading immediately when using cached data
-        setState(() {
-          _isLoading = false;
-        });
+        // Update selected day matches from cache
+        _updateSelectedDayMatches();
         
         // Complete the dataLoadedCompleter if not already completed
         if (!DashboardPage.dataLoadedCompleter.isCompleted) {
@@ -274,7 +300,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
       // OPTIMIZATION: Priority loading - first load minimum required data to show UI
       
       // 1. First, load matches for today only to show something quickly
-      final today = _formatDate(DateTime.now());
+      final today = _formatDate(_currentDate);
       final dayMatchesData = await DashboardService.getMatchesByDate(today);
       if (!dayMatchesData.containsKey('error') && dayMatchesData.containsKey('matches')) {
         _matchesCache[today] = dayMatchesData['matches'];
@@ -294,6 +320,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
         
         setState(() {
           _isLoading = false;
+          _isLoadingLeagueStandings = false;
+          _isLoadingNextMatch = false;
         });
         
         // Set cached data
@@ -330,7 +358,16 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
               'currentMatchday': teamLeagueData['league']['currentSeason']['currentMatchday']
             };
           }
+          
+          // Set league standings loading flag to false after loading data
+          _isLoadingLeagueStandings = false;
+        } else {
+          // Reset loading flag even if there's an error or no data
+          _isLoadingLeagueStandings = false;
         }
+      } else {
+        // If there's no favorite team, we don't need to show league standings loading
+        _isLoadingLeagueStandings = false;
       }
       
       // We now have enough data to show a basic dashboard
@@ -350,9 +387,11 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
       
     } catch (e) {
       debugPrint('Error loading dashboard data: $e');
-      // Even on error, we should show dashboard
+      // Even on error, we should show dashboard and reset all loading flags
       setState(() {
         _isLoading = false;
+        _isLoadingLeagueStandings = false;
+        _isLoadingNextMatch = false;
       });
       
       // Complete loading even on error to prevent splash screen hanging
@@ -363,7 +402,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     }
   }
   
-  // New method to load remaining data in background
+  // Update _loadRemainingDataInBackground to handle loading states properly
   Future<void> _loadRemainingDataInBackground(Map<String, dynamic> userData) async {
     debugPrint('DashboardPage: Loading remaining data in background');
     
@@ -371,48 +410,140 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     final String? favoriteNationalTeamId = userData['favoriteNationalTeamId'];
     
     try {
-      // Load remaining data with sequential requests to avoid rate limiting
+      // Load data in parallel with Future.wait for faster loading
+      List<Future> loadingTasks = [];
       
-      // 1. First load matches for entire date range
-      await _loadMatchesForDateRange();
+      // 1. Load matches for entire date range
+      loadingTasks.add(_loadMatchesForDateRange());
       
-      // 2. Load next match for favorite team if available (sequential to avoid rate limits)
+      // 2. Load league standings for favorite team if available
       if (favoriteTeamId != null && favoriteTeamId.isNotEmpty && 
-          DashboardPage._cachedNextMatch == null) {
-        try {
-          final nextMatchData = await DashboardService.getNextMatch(favoriteTeamId);
-          if (!nextMatchData.containsKey('error') && nextMatchData['match'] != null) {
-            setState(() {
-              _nextMatch = nextMatchData['match'];
-            });
-            // Cache next match
-            DashboardPage._cachedNextMatch = nextMatchData['match'];
-            debugPrint('DashboardPage: Next match loaded in background');
-          }
-        } catch (e) {
-          debugPrint('DashboardPage: Error loading next match in background: $e');
+          DashboardPage._cachedLeagueStandings == null) {
+        loadingTasks.add(
+          DashboardService.getTeamLeague(favoriteTeamId).then((teamLeagueData) {
+            if (!teamLeagueData.containsKey('error') && teamLeagueData['standings'] != null) {
+              if (mounted) {
+                setState(() {
+                  _leagueStandings = teamLeagueData['standings'];
+                  _isLoadingLeagueStandings = false; // Set loading to false when data is loaded
+                });
+              }
+              // Add matchday info directly to standings object if available
+              if (teamLeagueData['league'] != null && 
+                  teamLeagueData['league']['currentSeason'] != null && 
+                  teamLeagueData['league']['currentSeason']['currentMatchday'] != null) {
+                _leagueStandings ??= {};
+                _leagueStandings!['season'] = {
+                  'currentMatchday': teamLeagueData['league']['currentSeason']['currentMatchday']
+                };
+              }
+              
+              // Cache league standings
+              DashboardPage._cachedLeagueStandings = teamLeagueData['standings'];
+              debugPrint('DashboardPage: League standings loaded in background');
+            } else {
+              // Set loading to false even if there's an error or no data
+              if (mounted) {
+                setState(() {
+                  _isLoadingLeagueStandings = false;
+                });
+              }
+            }
+          }).catchError((e) {
+            debugPrint('DashboardPage: Error loading league standings in background: $e');
+            // Set loading to false on error
+            if (mounted) {
+              setState(() {
+                _isLoadingLeagueStandings = false;
+              });
+            }
+          })
+        );
+      } else {
+        // If we're not loading league standings, set loading to false
+        if (mounted) {
+          setState(() {
+            _isLoadingLeagueStandings = false;
+          });
         }
-        
-        // Small delay to avoid hitting rate limits
-        await Future.delayed(const Duration(milliseconds: 800));
       }
       
-      // 3. Load national team's data if available (sequential to avoid rate limits)
+      // 3. Load next match for favorite team if available
+      if (favoriteTeamId != null && favoriteTeamId.isNotEmpty && 
+          DashboardPage._cachedNextMatch == null) {
+        loadingTasks.add(
+          DashboardService.getNextMatch(favoriteTeamId).then((nextMatchData) {
+            if (!nextMatchData.containsKey('error') && nextMatchData['match'] != null) {
+              if (mounted) {
+                setState(() {
+                  _nextMatch = nextMatchData['match'];
+                  _isLoadingNextMatch = false; // Set loading to false when data is loaded
+                });
+              }
+              // Cache next match
+              DashboardPage._cachedNextMatch = nextMatchData['match'];
+              debugPrint('DashboardPage: Next match loaded in background');
+            } else {
+              // Set loading to false even if there's an error or no data
+              if (mounted) {
+                setState(() {
+                  _isLoadingNextMatch = false;
+                });
+              }
+            }
+          }).catchError((e) {
+            debugPrint('DashboardPage: Error loading next match in background: $e');
+            // Set loading to false on error
+            if (mounted) {
+              setState(() {
+                _isLoadingNextMatch = false;
+              });
+            }
+          })
+        );
+      } else {
+        // If we're not loading next match data, set loading to false
+        if (mounted) {
+          setState(() {
+            _isLoadingNextMatch = false;
+          });
+        }
+      }
+      
+      // 4. Load national team's data if available
       if (favoriteNationalTeamId != null && favoriteNationalTeamId.isNotEmpty && 
           DashboardPage._cachedNationalTeamNextMatch == null) {
-        try {
-          final nationalTeamMatchData = await DashboardService.getNationalTeamNextMatch(favoriteNationalTeamId);
-          if (!nationalTeamMatchData.containsKey('error') && nationalTeamMatchData['match'] != null) {
-            setState(() {
-              _nationalTeamNextMatch = nationalTeamMatchData['match'];
-            });
-            // Cache national team next match
-            DashboardPage._cachedNationalTeamNextMatch = nationalTeamMatchData['match'];
-            debugPrint('DashboardPage: National team next match loaded in background');
-          }
-        } catch (e) {
-          debugPrint('DashboardPage: Error loading national team match in background: $e');
-        }
+        loadingTasks.add(
+          DashboardService.getNationalTeamNextMatch(favoriteNationalTeamId).then((nationalTeamMatchData) {
+            if (!nationalTeamMatchData.containsKey('error') && nationalTeamMatchData['match'] != null) {
+              if (mounted) {
+                setState(() {
+                  _nationalTeamNextMatch = nationalTeamMatchData['match'];
+                  // Update loading state after both club and national team matches are loaded
+                  if (_nextMatch == null) {
+                    _isLoadingNextMatch = false;
+                  }
+                });
+              }
+              // Cache national team next match
+              DashboardPage._cachedNationalTeamNextMatch = nationalTeamMatchData['match'];
+              debugPrint('DashboardPage: National team next match loaded in background');
+            }
+          }).catchError((e) {
+            debugPrint('DashboardPage: Error loading national team match in background: $e');
+          })
+        );
+      }
+      
+      // Wait for all tasks to complete
+      await Future.wait(loadingTasks);
+      
+      // Ensure all loading states are set to false after everything is done
+      if (mounted) {
+        setState(() {
+          _isLoadingLeagueStandings = false;
+          _isLoadingNextMatch = false;
+        });
       }
       
       // Update cache timestamp
@@ -423,6 +554,13 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
       debugPrint('DashboardPage: Background data loading complete');
     } catch (e) {
       debugPrint('DashboardPage: Error in background data loading: $e');
+      // Make sure all loading states are set to false on error
+      if (mounted) {
+        setState(() {
+          _isLoadingLeagueStandings = false;
+          _isLoadingNextMatch = false;
+        });
+      }
     }
   }
   
@@ -444,11 +582,11 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     
     try {
       // Today's date will be included in both past and future requests
-      final String today = _formatDate(DateTime.now());
+      final String today = _formatDate(_currentDate);
       
       // Calculate date ranges
-      final String tenDaysAgo = _formatDate(DateTime.now().subtract(const Duration(days: 10)));
-      final String tenDaysLater = _formatDate(DateTime.now().add(const Duration(days: 10)));
+      final String tenDaysAgo = _formatDate(_currentDate.subtract(const Duration(days: 10)));
+      final String tenDaysLater = _formatDate(_currentDate.add(const Duration(days: 10)));
       
       // Check if we already have sufficient cached data
       if (DashboardPage.isCacheValid && _matchesCache.isNotEmpty) {
@@ -528,15 +666,26 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
         // If API call failed, try the single-day approach as fallback
         debugPrint('Error loading matches for date range, using fallback');
         await _loadMatchesForDay(_formatDate(_selectedDate));
+        
+        // Check if we need to add sample data for demo mode
+        _addSampleMatchData();
       }
     } catch (e) {
       debugPrint('Exception loading matches for date range: $e');
       // Fallback to single day loading if the range API fails
       await _loadMatchesForDay(_formatDate(_selectedDate));
+      
+      // Check if we need to add sample data for demo mode
+      _addSampleMatchData();
     } finally {
       setState(() {
         _isLoadingDateRange = false;
       });
+      
+      // Set cached data
+      DashboardPage._cachedMatchesByDate = _matchesCache;
+      DashboardPage._hasInitialDataLoaded = true;
+      DashboardPage._lastDataRefreshTime = DateTime.now();
     }
   }
   
@@ -606,7 +755,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   
   void _changeDate(int direction) {
     final newDate = _selectedDate.add(Duration(days: direction));
-    final now = DateTime.now();
+    final now = _currentDate;
     
     // Check if the new date is outside the current date range
     // (more than 10 days in the past or future from today)
@@ -663,7 +812,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   void _selectDate(DateTime date, int index) {
     if (index == _currentDateIndex) return;
     
-    final now = DateTime.now();
+    final now = _currentDate;
     
     // Check if the selected date is outside the current date range
     // (more than 10 days in the past or future from today)
@@ -853,7 +1002,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
             
             // Next match section (full width)
             if (_nextMatch != null || _nationalTeamNextMatch != null)
-              _buildNextMatchBox(),
+              _buildNextMatchBox(userData),
             
             const SizedBox(height: 16),
             
@@ -1163,6 +1312,134 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   }
 
   Widget _buildLeagueStandingsBox(Map<String, dynamic> userData) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    // Create a league standings skeleton for loading state
+    Widget loadingContent = Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'League Standings',
+                style: const TextStyle(
+                  fontSize: 18.0,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Container(
+                width: 60.0,
+                height: 24.0,
+                decoration: BoxDecoration(
+                  color: isDarkMode ? const Color(0xFF333333) : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24.0),
+          // Standings header placeholder
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            decoration: BoxDecoration(
+              color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+              borderRadius: BorderRadius.circular(8.0),
+            ),
+            child: Row(
+              children: List.generate(
+                6,
+                (index) => Expanded(
+                  flex: index == 1 ? 3 : 1,
+                  child: Center(
+                    child: Container(
+                      width: index == 1 ? 60.0 : 20.0,
+                      height: 12.0,
+                      decoration: BoxDecoration(
+                        color: isDarkMode ? Colors.grey[700] : Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2.0),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16.0),
+          // Team rows placeholders
+          ...List.generate(
+            5,
+            (index) => Container(
+              margin: const EdgeInsets.only(bottom: 12.0),
+              child: Row(
+                children: [
+                  Container(
+                    width: 20.0,
+                    height: 20.0,
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? const Color(0xFF333333) : Colors.grey[300],
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8.0),
+                  Expanded(
+                    flex: 3,
+                    child: Container(
+                      height: 16.0,
+                      decoration: BoxDecoration(
+                        color: isDarkMode ? const Color(0xFF333333) : Colors.grey[300],
+                        borderRadius: BorderRadius.circular(4.0),
+                      ),
+                    ),
+                  ),
+                  ...List.generate(
+                    4,
+                    (index) => Expanded(
+                      flex: 1,
+                      child: Center(
+                        child: Container(
+                          width: 20.0,
+                          height: 16.0,
+                          decoration: BoxDecoration(
+                            color: isDarkMode ? const Color(0xFF333333) : Colors.grey[300],
+                            borderRadius: BorderRadius.circular(4.0),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    
+    // Check if we're in loading state and return loading skeleton with shimmer
+    if (_isLoadingLeagueStandings) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(12.0),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 4.0,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: ShimmerLoading(
+          isLoading: true,
+          child: loadingContent,
+        ),
+      );
+    }
+    
     final String favoriteTeam = userData['favoriteTeam'] ?? '';
     final String favoriteTeamId = userData['favoriteTeamId'] ?? '';
     
@@ -1170,6 +1447,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     final standings = _leagueStandings?['standings']?[0]?['table'] ?? [];
     final competition = _leagueStandings?['competition'] ?? {};
     final String leagueName = competition['name'] ?? 'League';
+    final String? leagueLogo = competition['emblem'];
     
     // Javított mérkőzésnap kinyerés - több lehetséges helyen keressük az adatot
     int matchday = 0;
@@ -1186,8 +1464,6 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     else if (_leagueStandings?['matchday'] != null) {
       matchday = _leagueStandings!['matchday'];
     }
-    
-    final String? leagueLogo = competition['emblem'];
     
     // Debug információk kiírása a konzolra
     print('League Standings: ${standings.length} teams available');
@@ -1501,363 +1777,488 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     );
   }
 
-  Widget _buildNextMatchBox() {
-    // Check if there's a match today (in the _matchesByDay collection)
-    Map<String, dynamic>? todayMatch;
+  Widget _buildNextMatchBox(Map<String, dynamic>? userData) {
+    // Show loading animation if data is still loading
+    if (_isLoadingNextMatch) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(12.0),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 4.0,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: ShimmerLoading(
+          isLoading: true,
+          child: _buildNextMatchContentSkeleton(),
+        ),
+      );
+    }
+
+    // Debug the current data structure
+    debugPrint('Next Match data: $_nextMatch');
+    if (_nextMatch != null) {
+      // Log the top-level data structure to understand what we're working with
+      _nextMatch!.forEach((key, value) {
+        debugPrint('Next Match - $key: ${value?.runtimeType}');
+      });
+    }
+    debugPrint('National Team Match data: $_nationalTeamNextMatch');
     
-    // Get today's date and check _matchesByDay for matches today
-    final today = DateTime.now();
-    final todayDate = DateTime(today.year, today.month, today.day);
+    // Check for valid match data - handle BOTH possible structures
+    Map<String, dynamic>? matchToShow;
+    bool isNationalTeam = false;
     
-    if (_matchesByDay.isNotEmpty) {
-      for (var match in _matchesByDay) {
-        try {
-          final matchDate = DateTime.parse(match['utcDate']);
-          final matchDateOnly = DateTime(matchDate.year, matchDate.month, matchDate.day);
-          
-          // Check if this match is today
-          if (matchDateOnly.isAtSameMomentAs(todayDate)) {
-            final status = match['status'] ?? '';
-            // Prioritize matches that are IN_PLAY or PAUSED
-            if (status == 'IN_PLAY' || status == 'PAUSED') {
-              todayMatch = match;
-              break;  // Found a live match, use this one
-            } 
-            // Also check for matches today that haven't finished yet
-            else if (status != 'FINISHED' && (todayMatch == null || todayMatch['status'] == 'FINISHED')) {
-              todayMatch = match;
-              // Don't break - continue looking for a live match
-            }
-          }
-        } catch (e) {
-          debugPrint('Error parsing match date: $e');
-        }
+    // Adapt to the actual structure - check if match is directly in _nextMatch
+    // or nested inside a 'match' property
+    bool hasClubMatch = false;
+    if (_nextMatch != null) {
+      // Match could be directly in _nextMatch
+      if (_nextMatch!.containsKey('homeTeam') && _nextMatch!.containsKey('awayTeam')) {
+        matchToShow = _nextMatch;
+        hasClubMatch = true;
+      } 
+      // Or inside a 'match' property (as we were checking before)
+      else if (_nextMatch!.containsKey('match') && _nextMatch!['match'] != null) {
+        matchToShow = _nextMatch!['match'];
+        hasClubMatch = true;
       }
     }
     
-    // Use today's match if found, otherwise use favorite team match if available, otherwise national team match
-    final matchData = todayMatch ?? _nextMatch ?? _nationalTeamNextMatch;
-    if (matchData == null) return const SizedBox.shrink();
-    
-    final competition = matchData['competition'] ?? {'name': 'Unknown'};
-    final homeTeam = matchData['homeTeam'] ?? {'name': 'Home'};
-    final awayTeam = matchData['awayTeam'] ?? {'name': 'Away'};
-    final String? competitionLogo = competition['emblem'];
-    final String? homeTeamLogo = homeTeam['crest'];
-    final String? awayTeamLogo = awayTeam['crest'];
-    final matchStatus = matchData['status'] ?? '';
-    
-    // Parse match date
-    DateTime matchDate;
-    try {
-      matchDate = DateTime.parse(matchData['utcDate']);
-    } catch (e) {
-      matchDate = DateTime.now().add(const Duration(days: 1));
+    // Similarly check for national team match
+    bool hasNationalMatch = false;
+    if (!hasClubMatch && _nationalTeamNextMatch != null) {
+      // Match could be directly in _nationalTeamNextMatch
+      if (_nationalTeamNextMatch!.containsKey('homeTeam') && _nationalTeamNextMatch!.containsKey('awayTeam')) {
+        matchToShow = _nationalTeamNextMatch;
+        hasNationalMatch = true;
+        isNationalTeam = true;
+      } 
+      // Or inside a 'match' property
+      else if (_nationalTeamNextMatch!.containsKey('match') && _nationalTeamNextMatch!['match'] != null) {
+        matchToShow = _nationalTeamNextMatch!['match'];
+        hasNationalMatch = true;
+        isNationalTeam = true;
+      }
     }
     
-    final formattedDate = DateFormat('MMM d, yyyy').format(matchDate);
-    final formattedTime = DateFormat('HH:mm').format(matchDate);
+    // If we have multiple matches, prioritize based on date
+    if (hasClubMatch && hasNationalMatch) {
+      // Parse dates for both matches
+      DateTime? clubMatchDateTime;
+      DateTime? nationalMatchDateTime;
+      
+      try {
+        // Try to parse date for club match
+        if (matchToShow!.containsKey('utcDate')) {
+          clubMatchDateTime = DateTime.parse(matchToShow['utcDate']);
+        } else if (matchToShow!.containsKey('fixture') && 
+                  matchToShow['fixture'] != null &&
+                  matchToShow['fixture'].containsKey('date')) {
+          clubMatchDateTime = DateTime.parse(matchToShow['fixture']['date']);
+        }
+        
+        // Try to parse date for national team match
+        if (_nationalTeamNextMatch!.containsKey('utcDate')) {
+          nationalMatchDateTime = DateTime.parse(_nationalTeamNextMatch!['utcDate']);
+        } else if (_nationalTeamNextMatch!.containsKey('match') && 
+                  _nationalTeamNextMatch!['match'] != null &&
+                  _nationalTeamNextMatch!['match'].containsKey('utcDate')) {
+          nationalMatchDateTime = DateTime.parse(_nationalTeamNextMatch!['match']['utcDate']);
+        } else if (_nationalTeamNextMatch!.containsKey('fixture') && 
+                  _nationalTeamNextMatch!['fixture'] != null &&
+                  _nationalTeamNextMatch!['fixture'].containsKey('date')) {
+          nationalMatchDateTime = DateTime.parse(_nationalTeamNextMatch!['fixture']['date']);
+        }
+        
+        // Choose the closest upcoming match
+        if (clubMatchDateTime != null && nationalMatchDateTime != null) {
+          if (clubMatchDateTime.isBefore(nationalMatchDateTime)) {
+            // Keep club match (already selected)
+            isNationalTeam = false;
+          } else {
+            // Use national team match
+            matchToShow = _nationalTeamNextMatch!.containsKey('match') ? 
+                          _nationalTeamNextMatch!['match'] : _nationalTeamNextMatch;
+            isNationalTeam = true;
+          }
+        }
+      } catch (e) {
+        debugPrint('Error parsing match dates: $e');
+        // Keep the default selection if date parsing fails
+      }
+    }
     
-    // Get score information if available
-    final homeScore = matchData['score']?['fullTime']?['home'];
-    final awayScore = matchData['score']?['fullTime']?['away'];
-    final hasScore = homeScore != null && awayScore != null;
-    final scoreText = hasScore ? '$homeScore - $awayScore' : 'vs';
+    // If we found a match to display, show it
+    if (matchToShow != null) {
+      debugPrint('Found match to show: ${matchToShow.keys.join(', ')}');
+      return _buildMatchCard(matchToShow, isNationalTeam: isNationalTeam);
+    }
     
+    // If no match found, display a message
     return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
       decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1D1D1D) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(12.0),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 4.0,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Competition header
           Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    competitionLogo != null && competitionLogo.isNotEmpty
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: Image.network(
-                            _getProxiedImageUrl(competitionLogo),
-                            width: 32,
-                            height: 32,
-                            fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) => const Icon(
-                              Icons.emoji_events,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                          ),
-                        )
-                      : const Icon(
-                          Icons.emoji_events,
-                          color: Colors.white,
-                          size: 18,
-                        ),
-                    const SizedBox(width: 12),
-                    Text(
-                      competition['name'],
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
-                ),
-                // Display appropriate header based on match status
-                Row(
-                  children: [
-                    if (matchStatus == 'IN_PLAY' || matchStatus == 'PAUSED')
-                      Container(
-                        width: 8,
-                        height: 8,
-                        margin: const EdgeInsets.only(right: 6),
-                        decoration: const BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    Text(
-                      _getStatusText(matchStatus),
-                      style: TextStyle(
-                        color: _getStatusColor(matchStatus),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+            padding: const EdgeInsets.all(12.0),
+            child: Text(
+              'Next Match',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
-          
-          // Teams and match time/score
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Home team
-                Expanded(
-                  child: InkWell(
-                    onTap: () => _navigateToTeamDetails(
-                      homeTeam['id'].toString(), 
-                      homeTeam['name']
-                    ),
-                    child: Column(
-                      children: [
-                        homeTeamLogo != null && homeTeamLogo.isNotEmpty
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(4),
-                              child: Image.network(
-                                _getProxiedImageUrl(homeTeamLogo),
-                                width: 60,
-                                height: 60,
-                                fit: BoxFit.contain,
-                                errorBuilder: (context, error, stackTrace) => const Icon(
-                                  Icons.sports_soccer,
-                                  color: Colors.white,
-                                  size: 30,
-                                ),
-                              ),
-                            )
-                          : const Icon(
-                              Icons.sports_soccer,
-                              color: Colors.white,
-                              size: 30,
-                            ),
-                        const SizedBox(height: 16),
-                        Text(
-                          homeTeam['name'],
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                          textAlign: TextAlign.center,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
+          Expanded(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  'No upcoming matches found',
+                  textAlign: TextAlign.center,
                 ),
-                
-                // Match time/date or score
-                Expanded(
-                  child: _buildMatchCenterInfo(matchStatus, formattedDate, formattedTime, homeScore, awayScore),
-                ),
-                
-                // Away team
-                Expanded(
-                  child: InkWell(
-                    onTap: () => _navigateToTeamDetails(
-                      awayTeam['id'].toString(), 
-                      awayTeam['name']
-                    ),
-                    child: Column(
-                      children: [
-                        awayTeamLogo != null && awayTeamLogo.isNotEmpty
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(4),
-                              child: Image.network(
-                                _getProxiedImageUrl(awayTeamLogo),
-                                width: 60,
-                                height: 60,
-                                fit: BoxFit.contain,
-                                errorBuilder: (context, error, stackTrace) => const Icon(
-                                  Icons.sports_soccer,
-                                  color: Colors.white,
-                                  size: 30,
-                                ),
-                              ),
-                            )
-                          : const Icon(
-                              Icons.sports_soccer,
-                              color: Colors.white,
-                              size: 30,
-                            ),
-                        const SizedBox(height: 16),
-                        Text(
-                          awayTeam['name'],
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                          textAlign: TextAlign.center,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
-          
-          const SizedBox(height: 16),
         ],
       ),
     );
   }
-  
-  // Helper method to build the center info for a match (time/date or score depending on status)
-  Widget _buildMatchCenterInfo(String status, String formattedDate, String formattedTime, dynamic homeScore, dynamic awayScore) {
-    // For live or finished matches, show the score prominently
-    if ((status == 'IN_PLAY' || status == 'PAUSED' || status == 'FINISHED') && 
-        homeScore != null && awayScore != null) {
-      return Column(
-        children: [
-          Text(
-            formattedDate,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
+
+  Widget _buildMatchCard(Map<String, dynamic>? matchData, {bool isNationalTeam = false}) {
+    if (matchData == null) {
+      // Return a fallback UI if matchData is null
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+        height: 250,
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(12.0),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 4.0,
+              offset: const Offset(0, 2),
             ),
-            textAlign: TextAlign.center,
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Text(
+                'Next Match',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(
+                    'Match data not available',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    // Print debug info to see the structure
+    debugPrint('Building match card with data: ${matchData.keys.join(', ')}');
+    
+    // Extract data with appropriate null checks
+    final Map<String, dynamic> competition = matchData['competition'] ?? {'name': 'Unknown'};
+    final Map<String, dynamic> homeTeam = matchData['homeTeam'] ?? {'name': 'Home'};
+    final Map<String, dynamic> awayTeam = matchData['awayTeam'] ?? {'name': 'Away'};
+    
+    // Extract logos with null checks
+    final String? competitionLogo = competition['emblem'];
+    final String? homeTeamLogo = homeTeam['crest'];
+    final String? awayTeamLogo = awayTeam['crest'];
+    
+    // Extract match status
+    final String matchStatus = matchData['status'] ?? '';
+    
+    // Parse match date with proper error handling
+    DateTime matchDate;
+    try {
+      matchDate = DateTime.parse(matchData['utcDate'] ?? '');
+    } catch (e) {
+      debugPrint('Error parsing match date: $e');
+      matchDate = DateTime.now().add(const Duration(days: 1));
+    }
+    
+    // Format date
+    final formattedDate = DateFormat('MMM d, yyyy').format(matchDate);
+    final formattedTime = DateFormat('HH:mm').format(matchDate);
+    
+    // Get score information if available
+    var homeScore, awayScore;
+    
+    // First check if there's a nested score structure
+    if (matchData.containsKey('score') && matchData['score'] != null) {
+      if (matchData['score'].containsKey('fullTime') && matchData['score']['fullTime'] != null) {
+        homeScore = matchData['score']['fullTime']['home'];
+        awayScore = matchData['score']['fullTime']['away'];
+      }
+    } else if (matchData.containsKey('goals') && matchData['goals'] != null) {
+      // Alternative structure might use 'goals' property
+      homeScore = matchData['goals']['home'];
+      awayScore = matchData['goals']['away'];
+    }
+    
+    final hasScore = homeScore != null && awayScore != null;
+    final scoreText = hasScore ? '$homeScore - $awayScore' : 'vs';
+    
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(12.0),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 4.0,
+            offset: const Offset(0, 2),
           ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: status == 'FINISHED' ? Colors.green.withOpacity(0.2) : 
-                     (status == 'IN_PLAY' || status == 'PAUSED') ? Colors.red.withOpacity(0.2) : 
-                     const Color(0xFF252525),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: status == 'FINISHED' ? Colors.green : 
-                       (status == 'IN_PLAY' || status == 'PAUSED') ? Colors.red : 
-                       Colors.grey,
-                width: 1.5,
-              ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Next Match',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                if (competitionLogo != null && competitionLogo.isNotEmpty)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: Image.network(
+                      _getProxiedImageUrl(competitionLogo),
+                      width: 24,
+                      height: 24,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) => const Icon(
+                        Icons.emoji_events,
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                const SizedBox(width: 8),
+                Text(
+                  competition['name'] ?? 'Unknown Competition',
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white70 : Colors.black54,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
             ),
-            child: Text(
-              '$homeScore - $awayScore',
-              style: TextStyle(
-                color: const Color(0xFFFFE6AC),
-                fontWeight: FontWeight.bold,
-                fontSize: status == 'IN_PLAY' || status == 'PAUSED' ? 22 : 20,
-              ),
-              textAlign: TextAlign.center,
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  children: [
+                    homeTeamLogo != null && homeTeamLogo.isNotEmpty
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              _getProxiedImageUrl(homeTeamLogo),
+                              width: 64,
+                              height: 64,
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) => Container(
+                                width: 64,
+                                height: 64,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(Icons.sports_soccer, size: 32),
+                              ),
+                            ),
+                          )
+                        : Container(
+                            width: 64,
+                            height: 64,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.sports_soccer, size: 32),
+                          ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: 100,
+                      child: Text(
+                        homeTeam['name'] ?? 'Home Team',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        scoreText,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      formattedDate,
+                      style: TextStyle(
+                        color: isDarkMode ? Colors.white70 : Colors.black54,
+                        fontSize: 12,
+                      ),
+                    ),
+                    Text(
+                      formattedTime,
+                      style: TextStyle(
+                        color: isDarkMode ? Colors.white70 : Colors.black54,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                Column(
+                  children: [
+                    awayTeamLogo != null && awayTeamLogo.isNotEmpty
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              _getProxiedImageUrl(awayTeamLogo),
+                              width: 64,
+                              height: 64,
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) => Container(
+                                width: 64,
+                                height: 64,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(Icons.sports_soccer, size: 32),
+                              ),
+                            ),
+                          )
+                        : Container(
+                            width: 64,
+                            height: 64,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.sports_soccer, size: 32),
+                          ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: 100,
+                      child: Text(
+                        awayTeam['name'] ?? 'Away Team',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.location_on,
+                  size: 16,
+                  color: isDarkMode ? Colors.white70 : Colors.black54,
+                ),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    matchData['venue'] ?? 'Venue not available',
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white70 : Colors.black54,
+                      fontSize: 14,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
-      );
-    } 
-    // For upcoming matches, show the date and time
-    else {
-      return Column(
-        children: [
-          Text(
-            formattedDate,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            formattedTime,
-            style: const TextStyle(
-              color: Color(0xFFFFE6AC),
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      );
-    }
+      ),
+    );
   }
-  
-  // Helper method to get appropriate status text
-  String _getStatusText(String status) {
-    switch (status) {
-      case 'FINISHED': 
-        return AppLocalizations.of(context)?.finished ?? 'FINISHED';
-      case 'IN_PLAY': 
-        return AppLocalizations.of(context)?.live ?? 'LIVE';
-      case 'PAUSED': 
-        return 'PAUSED';
-      case 'TIMED': 
-        return 'UPCOMING';
-      case 'SCHEDULED': 
-        return AppLocalizations.of(context)?.scheduled ?? 'SCHEDULED';
-      case 'POSTPONED': 
-        return AppLocalizations.of(context)?.postponed ?? 'POSTPONED';
-      case 'SUSPENDED': 
-        return 'SUSPENDED';
-      case 'CANCELLED': 
-        return 'CANCELLED';
-      default: 
-        return AppLocalizations.of(context)?.nextMatch ?? 'NEXT MATCH';
-    }
-  }
-  
-  // Helper method to get appropriate status color
-  Color _getStatusColor(String status) {
-    switch (status) {
-      case 'FINISHED': 
-        return Colors.green;
-      case 'IN_PLAY': 
-      case 'PAUSED': 
-        return Colors.red;
-      case 'POSTPONED': 
-      case 'SUSPENDED': 
-      case 'CANCELLED': 
-        return Colors.orange;
-      default: 
-        return const Color(0xFFFFE6AC);
-    }
-  }
-  
+
   Widget _buildDateSelector() {
     // Create a ScrollController
     final ScrollController scrollController = ScrollController();
@@ -1984,17 +2385,17 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   }
   
   bool _isToday(DateTime date) {
-    final now = DateTime.now();
+    final now = _currentDate;
     return date.year == now.year && date.month == now.month && date.day == now.day;
   }
   
   bool _isTomorrow(DateTime date) {
-    final tomorrow = DateTime.now().add(const Duration(days: 1));
+    final tomorrow = _currentDate.add(const Duration(days: 1));
     return date.year == tomorrow.year && date.month == tomorrow.month && date.day == tomorrow.day;
   }
   
   bool _isYesterday(DateTime date) {
-    final yesterday = DateTime.now().subtract(const Duration(days: 1));
+    final yesterday = _currentDate.subtract(const Duration(days: 1));
     return date.year == yesterday.year && date.month == yesterday.month && date.day == yesterday.day;
   }
   
@@ -2070,8 +2471,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                       ),
                     Text(
                       competitionName,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
@@ -2114,6 +2515,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     final awayTeam = match['awayTeam'];
     final String? homeTeamLogo = homeTeam['crest'];
     final String? awayTeamLogo = awayTeam['crest'];
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     
     // Parse match date
     DateTime matchDate;
@@ -2127,7 +2529,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 16.0),
-      color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF292929) : Colors.white,
+      color: isDarkMode ? const Color(0xFF292929) : Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16.0),
       ),
@@ -2140,8 +2542,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
               width: 50,
               child: Text(
                 formattedTime,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -2160,8 +2562,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                       ),
                       child: Text(
                         homeTeam['name'],
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
                         ),
                         textAlign: TextAlign.right,
                         overflow: TextOverflow.ellipsis,
@@ -2192,8 +2594,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Text(
                 AppLocalizations.of(context)?.versus ?? 'vs',
-                style: const TextStyle(
-                  color: Color(0xFFFFE6AC),
+                style: TextStyle(
+                  color: const Color(0xFFFFE6AC),
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -2226,9 +2628,10 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                       ),
                       child: Text(
                         awayTeam['name'],
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
                         ),
+                        textAlign: TextAlign.left,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -2239,6 +2642,155 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
           ],
         ),
       ),
+    );
+  }
+
+  // Add a helper method for the next match skeleton
+  Widget _buildNextMatchContentSkeleton() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Next Match',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: isDarkMode ? Colors.grey[800] : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                width: 120,
+                height: 16,
+                decoration: BoxDecoration(
+                  color: isDarkMode ? Colors.grey[800] : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? Colors.grey[800] : Colors.grey[300],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: 100,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? Colors.grey[800] : Colors.grey[300],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ),
+              Column(
+                children: [
+                  Container(
+                    width: 60,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? Colors.grey[800] : Colors.grey[300],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: 80,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? Colors.grey[800] : Colors.grey[300],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    width: 50,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? Colors.grey[800] : Colors.grey[300],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ),
+              Column(
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? Colors.grey[800] : Colors.grey[300],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: 100,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? Colors.grey[800] : Colors.grey[300],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 16,
+                height: 16,
+                decoration: BoxDecoration(
+                  color: isDarkMode ? Colors.grey[800] : Colors.grey[300],
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                width: 180,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: isDarkMode ? Colors.grey[800] : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 } 

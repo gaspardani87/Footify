@@ -1,0 +1,2 @@
+C:/Users/onxy/Documents/GitHub/Footify/footify/android/app/.cxx/Debug/c2j14y1e/x86/CMakeFiles/edit_cache.dir
+C:/Users/onxy/Documents/GitHub/Footify/footify/android/app/.cxx/Debug/c2j14y1e/x86/CMakeFiles/rebuild_cache.dir

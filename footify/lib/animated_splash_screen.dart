@@ -143,9 +143,9 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
         debugPrint('AnimatedSplashScreen: Error waiting for dashboard data: $e');
       }
 
-      // Ensure minimum display time for the splash screen (1.5 seconds)
+      // Ensure minimum display time for the splash screen (0.8 seconds)
       final elapsedMillis = DateTime.now().difference(startTime).inMilliseconds;
-      const minSplashTimeMillis = 1500; // 1.5 seconds minimum display time
+      const minSplashTimeMillis = 800; // Reduced from 1500 to 800ms for faster startup
       
       if (elapsedMillis < minSplashTimeMillis) {
         final remainingTime = minSplashTimeMillis - elapsedMillis;
