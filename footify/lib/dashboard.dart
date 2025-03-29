@@ -184,6 +184,9 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   bool _isLoading = true;
   bool _isLoadingDateRange = false;
   
+  // Competition expansion state
+  final Map<String, bool> _expandedCompetitions = {};
+  
   // Date handling and selection
   List<DateTime> _dateRange = [];
   int _currentDateIndex = 0;
@@ -970,6 +973,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
 
   Widget _buildDashboardContent(Map<String, dynamic> userData) {
     return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -1046,7 +1050,18 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   Widget _buildFavoriteTeamBox(Map<String, dynamic> userData) {
     final String favoriteTeam = userData['favoriteTeam'] ?? '';
     final String favoriteTeamId = userData['favoriteTeamId'] ?? '';
-    final String? teamLogo = userData['favoriteTeamLogo'];
+    
+    // Get team logo from league standings if available
+    String? teamLogo;
+    if (_leagueStandings != null && favoriteTeamId.isNotEmpty) {
+      final standings = _leagueStandings?['standings']?[0]?['table'] ?? [];
+      for (var team in standings) {
+        if (team['team']?['id']?.toString() == favoriteTeamId) {
+          teamLogo = team['team']?['crest'];
+          break;
+        }
+      }
+    }
     
     return Container(
       height: 120,
@@ -1421,7 +1436,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     // Check if we're in loading state and return loading skeleton with shimmer
     if (_isLoadingLeagueStandings) {
       return Container(
-        margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+        margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
         decoration: BoxDecoration(
           color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(12.0),
@@ -1781,7 +1796,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     // Show loading animation if data is still loading
     if (_isLoadingNextMatch) {
       return Container(
-        margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+        margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
         decoration: BoxDecoration(
           color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(12.0),
@@ -1902,7 +1917,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     
     // If no match found, display a message
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12.0),
@@ -1947,7 +1962,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     if (matchData == null) {
       // Return a fallback UI if matchData is null
       return Container(
-        margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+        margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
         height: 250,
         decoration: BoxDecoration(
           color: Theme.of(context).cardColor,
@@ -2039,9 +2054,9 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+      margin: const EdgeInsets.symmetric(horizontal: 0.0, vertical: 8.0),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
+        color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1D1D1D) : Colors.white,
         borderRadius: BorderRadius.circular(12.0),
         boxShadow: [
           BoxShadow(
@@ -2438,53 +2453,100 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
         matchesByCompetition[competitionName]!.add(match);
       }
       
-      content = ListView.builder(
-        physics: const AlwaysScrollableScrollPhysics(),
-        itemCount: matchesByCompetition.length,
-        itemBuilder: (context, index) {
-          final competitionName = matchesByCompetition.keys.elementAt(index);
-          final matches = matchesByCompetition[competitionName]!;
-          final competition = matches.first['competition'];
-          final String? competitionLogo = competition['emblem'];
+      content = Column(
+        children: matchesByCompetition.entries.map((entry) {
+          final competitionName = entry.key;
+          final matches = entry.value;
           
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
+          // Kinyerjük a bajnokság emblémáját és ID-jét az első mérkőzés adataiból
+          final competitionEmblem = matches.isNotEmpty ? matches[0]['competition']['emblem'] : null;
+          final competitionId = matches.isNotEmpty ? matches[0]['competition']['id'] : null;
+          
+          return StatefulBuilder(
+            builder: (context, setState) {
+              return Card(
+                margin: const EdgeInsets.only(bottom: 20),
+                elevation: 4,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1D1D1D) : Colors.white,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (competitionLogo != null && competitionLogo.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8.0),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: Image.network(
-                            _getProxiedImageUrl(competitionLogo),
-                            width: 24,
-                            height: 24,
-                            fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) => 
-                              const SizedBox(width: 24),
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          _expandedCompetitions[competitionName] = !(_expandedCompetitions[competitionName] ?? true);
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFE6AC),
+                          borderRadius: BorderRadius.only(
+                            topLeft: const Radius.circular(12),
+                            topRight: const Radius.circular(12),
+                            bottomLeft: (_expandedCompetitions[competitionName] ?? true) ? Radius.zero : const Radius.circular(12),
+                            bottomRight: (_expandedCompetitions[competitionName] ?? true) ? Radius.zero : const Radius.circular(12),
                           ),
                         ),
+                        child: Row(
+                          children: [
+                            if (competitionEmblem != null && competitionEmblem.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8.0),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: Image.network(
+                                    _getProxiedImageUrl(competitionEmblem),
+                                    width: 24,
+                                    height: 24,
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (context, error, stackTrace) => 
+                                      const SizedBox(width: 24),
+                                  ),
+                                ),
+                              ),
+                            Expanded(
+                              child: Text(
+                                competitionName,
+                                style: const TextStyle(
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                            AnimatedRotation(
+                              turns: (_expandedCompetitions[competitionName] ?? true) ? 0.5 : 0.0,
+                              duration: const Duration(milliseconds: 300),
+                              child: const Icon(Icons.keyboard_arrow_down, color: Colors.black),
+                            ),
+                          ],
+                        ),
                       ),
-                    Text(
-                      competitionName,
-                      style: TextStyle(
-                        color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
+                    ),
+                    // Use AnimatedSize for smoother transitions
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeInOut,
+                      child: _expandedCompetitions[competitionName] ?? true
+                          ? AnimatedSlide(
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeInOut,
+                              offset: const Offset(0, 0),
+                              child: Column(
+                                children: matches.map((match) => _buildMatchItem(match)).toList(),
+                              ),
+                            )
+                          : const SizedBox.shrink(),
                     ),
                   ],
                 ),
-              ),
-              ...matches.map((match) => _buildMatchItem(match)),
-              const SizedBox(height: 16),
-            ],
+              );
+            },
           );
-        },
+        }).toList(),
       );
     }
     
@@ -2492,21 +2554,14 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
       decoration: BoxDecoration(
         color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1D1D1D) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.withOpacity(0.3)),
       ),
       margin: const EdgeInsets.only(
         top: 16.0,
-        bottom: 120.0, // Increased from 72 to 120 to prevent overflow
-        left: 16.0,
-        right: 16.0,
+        bottom: 16.0,
+        left: 0.0,
+        right: 0.0,
       ),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.6, // Keep max height at 60% of screen height
-          minHeight: _matchesByDay.isEmpty ? 200 : 100, // Minimum height to ensure visibility
-        ),
-        child: content,
-      ),
+      child: content,
     );
   }
 

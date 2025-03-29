@@ -827,7 +827,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
               margin: const EdgeInsets.only(bottom: 20),
               elevation: 4,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              color: colorScheme.surface,
+              color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1D1D1D) : Colors.white,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
