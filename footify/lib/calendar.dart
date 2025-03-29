@@ -340,7 +340,17 @@ class _CalendarPageState extends State<CalendarPage> {
             focusedDay: _focusedDay,
             calendarFormat: _calendarFormat,
             startingDayOfWeek: StartingDayOfWeek.monday,
-            daysOfWeekHeight: 25.0,
+            daysOfWeekHeight: 24.0,
+            daysOfWeekStyle: DaysOfWeekStyle(
+              weekdayStyle: TextStyle(
+                color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
+                fontSize: 12,
+              ),
+              weekendStyle: TextStyle(
+                color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
+                fontSize: 12,
+              ),
+            ),
             selectedDayPredicate: (day) {
               return isSameDay(_selectedDay, day);
             },
@@ -390,14 +400,14 @@ class _CalendarPageState extends State<CalendarPage> {
                   onEnter: (_) => _updateHoveredDay(day),
                   onExit: (_) => _updateHoveredDay(null),
                   child: SizedBox(
-                    height: 48, // Fixed height for all cells
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
+                    height: 28,
+                    child: Stack(
+                      alignment: Alignment.center,
                       children: [
                         Container(
-                          width: 36,
-                          height: 36,
-                          margin: const EdgeInsets.all(4.0),
+                          width: 24,
+                          height: 24,
+                          margin: const EdgeInsets.all(2.0),
                           decoration: BoxDecoration(
                             color: backgroundColor,
                             shape: BoxShape.circle,
@@ -410,19 +420,18 @@ class _CalendarPageState extends State<CalendarPage> {
                             ),
                           ),
                         ),
-                        SizedBox(
-                          height: 8, // Fixed space for dot or empty space
-                          child: hasEvents 
-                            ? Container(
-                                width: 6,
-                                height: 6,
-                                decoration: const BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                ),
-                              )
-                            : null, // Empty space if no events
-                        ),
+                        if (hasEvents)
+                          Positioned(
+                            bottom: 2,
+                            child: Container(
+                              width: 2,
+                              height: 2,
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -438,14 +447,14 @@ class _CalendarPageState extends State<CalendarPage> {
                   onEnter: (_) => _updateHoveredDay(day),
                   onExit: (_) => _updateHoveredDay(null),
                   child: SizedBox(
-                    height: 48, // Fixed height for all cells
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
+                    height: 28,
+                    child: Stack(
+                      alignment: Alignment.center,
                       children: [
                         Container(
-                          margin: const EdgeInsets.all(4.0),
-                          width: 36,
-                          height: 36,
+                          margin: const EdgeInsets.all(2.0),
+                          width: 24,
+                          height: 24,
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
                             color: isHovered ? (isDarkMode ? Colors.grey[800] : Colors.grey[300]) : null,
@@ -458,7 +467,6 @@ class _CalendarPageState extends State<CalendarPage> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 8), // Fixed space to match other cells
                       ],
                     ),
                   ),
@@ -488,14 +496,14 @@ class _CalendarPageState extends State<CalendarPage> {
                   onEnter: (_) => _updateHoveredDay(day),
                   onExit: (_) => _updateHoveredDay(null),
                   child: SizedBox(
-                    height: 48, // Fixed height for all cells
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
+                    height: 28,
+                    child: Stack(
+                      alignment: Alignment.center,
                       children: [
                         Container(
-                          width: 36,
-                          height: 36,
-                          margin: const EdgeInsets.all(4.0),
+                          width: 24,
+                          height: 24,
+                          margin: const EdgeInsets.all(2.0),
                           decoration: BoxDecoration(
                             color: backgroundColor,
                             shape: BoxShape.circle,
@@ -508,19 +516,18 @@ class _CalendarPageState extends State<CalendarPage> {
                             ),
                           ),
                         ),
-                        SizedBox(
-                          height: 8, // Fixed space for dot or empty space
-                          child: hasEvents 
-                            ? Container(
-                                width: 6,
-                                height: 6,
-                                decoration: const BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                ),
-                              )
-                            : null, // Empty space if no events
-                        ),
+                        if (hasEvents)
+                          Positioned(
+                            bottom: 2,
+                            child: Container(
+                              width: 2,
+                              height: 2,
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -544,14 +551,14 @@ class _CalendarPageState extends State<CalendarPage> {
                   onEnter: (_) => _updateHoveredDay(day),
                   onExit: (_) => _updateHoveredDay(null),
                   child: SizedBox(
-                    height: 48, // Fixed height for all cells
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
+                    height: 28,
+                    child: Stack(
+                      alignment: Alignment.center,
                       children: [
                         Container(
-                          width: 36,
-                          height: 36,
-                          margin: const EdgeInsets.all(4.0),
+                          width: 24,
+                          height: 24,
+                          margin: const EdgeInsets.all(2.0),
                           decoration: BoxDecoration(
                             color: backgroundColor,
                             shape: BoxShape.circle,
@@ -564,19 +571,18 @@ class _CalendarPageState extends State<CalendarPage> {
                             ),
                           ),
                         ),
-                        SizedBox(
-                          height: 8, // Fixed space for dot or empty space
-                          child: hasEvents 
-                            ? Container(
-                                width: 6,
-                                height: 6,
-                                decoration: const BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                ),
-                              )
-                            : null, // Empty space if no events
-                        ),
+                        if (hasEvents)
+                          Positioned(
+                            bottom: 2,
+                            child: Container(
+                              width: 2,
+                              height: 2,
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),

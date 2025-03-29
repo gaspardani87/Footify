@@ -248,6 +248,17 @@
       }
     },
     "noMatchesFound": "Nessuna partita trovata",
+    "standings": "Classifica",
+    "lastRound": "Ultimo turno",
+    "statistics": "Statistiche",
+    "goals": "gol",
+    "errorLoadingLastMatches": "Errore durante il caricamento delle ultime partite",
+    "errorLoadingStandings": "Impossibile caricare la classifica",
+    "errorLoadingScorers": "Errore durante il caricamento dei marcatori",
+    "noMatchesAvailable": "Nessuna partita disponibile",
+    "noScorersAvailable": "Nessun marcatore disponibile",
+    "unknownPlayer": "Giocatore sconosciuto",
+    "unknownTeam": "Squadra sconosciuta",
     "testNotification": "Testa notifica",
     "notificationSent": "Notifica di sistema inviata. Controlla l'area notifiche del tuo telefono!",
     

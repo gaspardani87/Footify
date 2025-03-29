@@ -53,8 +53,8 @@ class Scorer {
 
   factory Scorer.fromJson(Map<String, dynamic> json) {
     return Scorer(
-      playerName: json['player']['name'] ?? 'Ismeretlen játékos',
-      teamName: json['team']['name'] ?? 'Ismeretlen csapat',
+      playerName: json['player']['name'] ?? 'Unknown Player',
+      teamName: json['team']['name'] ?? 'Unknown Team',
       teamLogo: json['team']['crest'],
       goals: json['goals'] ?? 0,
     );
@@ -90,7 +90,7 @@ class TeamStanding {
   factory TeamStanding.fromJson(Map<String, dynamic> json) {
     return TeamStanding(
       position: json['position'] ?? 0,
-      teamName: json['team']['name'] ?? 'Ismeretlen csapat',
+      teamName: json['team']['name'] ?? 'Unknown Team',
       teamLogo: json['team']['crest'],
       playedGames: json['playedGames'] ?? 0,
       points: json['points'] ?? 0,
@@ -208,11 +208,11 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTicker
         List<dynamic> standings = jsonDecode(response.body)['standings'][0]['table'];
         return standings.map((team) => TeamStanding.fromJson(team)).toList();
       } else {
-        throw Exception('Nem sikerült betölteni a tabellát');
+        throw Exception('Failed to load standings');
       }
     } catch (e) {
       print('Error fetching standings: $e');
-      throw Exception('Nem sikerült betölteni a tabellát');
+      throw Exception('Failed to load standings');
     }
   }
 
@@ -396,24 +396,24 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTicker
           indicatorWeight: 3,
           isScrollable: true,
           labelPadding: const EdgeInsets.symmetric(horizontal: 16),
-          tabs: const [
+          tabs: [
             Tab(
               child: Text(
-                'Tabella',
+                AppLocalizations.of(context)!.standings,
                 maxLines: 1,
                 overflow: TextOverflow.visible,
               ),
             ),
             Tab(
               child: Text(
-                'Előző forduló',
+                AppLocalizations.of(context)!.lastRound,
                 maxLines: 1,
                 overflow: TextOverflow.visible,
               ),
             ),
             Tab(
               child: Text(
-                'Statisztikák',
+                AppLocalizations.of(context)!.statistics,
                 maxLines: 1,
                 overflow: TextOverflow.visible,
               ),
@@ -444,7 +444,7 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTicker
                             } else if (snapshot.hasError) {
                               return Center(child: Text('Hiba: ${snapshot.error}'));
                             } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                              return const Center(child: Text('Nincs elérhető adat'));
+                              return Center(child: Text(AppLocalizations.of(context)!.noMatchesAvailable));
                             }
                             return Column(
                               children: [
@@ -481,7 +481,7 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTicker
                               } else if (snapshot.hasError) {
                                 return Center(child: Text('Hiba: ${snapshot.error}'));
                               } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                                return const Center(child: Text('Nincs elérhető adat'));
+                                return Center(child: Text(AppLocalizations.of(context)!.noMatchesAvailable));
                               }
                               return Column(
                                 children: [
@@ -990,7 +990,7 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTicker
         } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return SizedBox(
             height: 100,
-            child: const Center(child: Text('Nincs elérhető góllövő')),
+            child: Center(child: Text(AppLocalizations.of(context)!.noScorersAvailable)),
           );
         }
 
@@ -1098,7 +1098,7 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTicker
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
-              '${scorer.goals} gól',
+              '${scorer.goals} ${AppLocalizations.of(context)!.goals}',
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
                 color: Colors.black,

@@ -97,8 +97,8 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
       child: userData == null
           ? _buildLoginView(context)
           : SingleChildScrollView(
-            // Webböngészőben letiltjuk a görgetést, hogy ne legyen lehetséges a profil oldalon
-            physics: kIsWeb ? const NeverScrollableScrollPhysics() : const AlwaysScrollableScrollPhysics(),
+            // Eltávolítjuk a webes platformra vonatkozó korlátozást
+            physics: const AlwaysScrollableScrollPhysics(),
             child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
               children: [

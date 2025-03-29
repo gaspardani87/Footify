@@ -288,5 +288,15 @@
     "login": "Login",
     "winsShort": "W",
     "drawsShort": "D",
-    "lossesShort": "L"
+    "lossesShort": "L",
+    "standings": "Standings",
+    "lastRound": "Last Round",
+    "statistics": "Statistics",
+    "goals": "goals",
+    "errorLoadingLastMatches": "Error loading last matches",
+    "errorLoadingStandings": "Failed to load standings",
+    "errorLoadingScorers": "Error loading scorers",
+    "noMatchesAvailable": "No matches available",
+    "noScorersAvailable": "No scorers available",
+    "unknownPlayer": "Unknown Player"
 }

@@ -287,5 +287,16 @@
     "noMatchesScheduled": "Erre a napra nincs mérkőzés",
     "loginToViewDashboard": "Jelentkezz be a személyre szabott vezérlőpult megtekintéséhez",
     "login": "Bejelentkezés",
-    "backToToday": "Mai napra"
+    "backToToday": "Mai napra",
+    "standings": "Tabella",
+    "lastRound": "Előző forduló",
+    "statistics": "Statisztikák",
+    "goals": "gól",
+    "errorLoadingLastMatches": "Hiba az utolsó mérkőzések betöltésekor",
+    "errorLoadingStandings": "Nem sikerült betölteni a tabellát",
+    "errorLoadingScorers": "Hiba a góllövőlista betöltésekor",
+    "noMatchesAvailable": "Nincs elérhető mérkőzés",
+    "noScorersAvailable": "Nincs elérhető góllövő",
+    "unknownPlayer": "Ismeretlen játékos",
+    "unknownTeam": "Ismeretlen csapat"
 }

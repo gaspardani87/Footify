@@ -1082,7 +1082,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
               Text(
                 AppLocalizations.of(context)?.favoriteTeam ?? 'Favorite Team',
                 style: TextStyle(
-                  color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFFFFE6AC) : Colors.black,
+                  color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFFFFE6AC) : Colors.black87,
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                 ),
@@ -1119,8 +1119,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                         ? _buildTeamNameWithWordWrap(favoriteTeam)
                         : Text(
                             AppLocalizations.of(context)?.noTeamSelected ?? 'No team selected',
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87,
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
@@ -1145,8 +1145,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     if (words.length <= 1 || teamName.length < 15) {
       return Text(
         teamName,
-        style: const TextStyle(
-          color: Colors.white,
+        style: TextStyle(
+          color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87,
           fontSize: 16,
           fontWeight: FontWeight.bold,
         ),
@@ -1185,8 +1185,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
       children: [
         Text(
           firstLine,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87,
             fontSize: 15,
             fontWeight: FontWeight.bold,
           ),
@@ -1195,8 +1195,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
         const SizedBox(height: 2),
         Text(
           secondLine,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87,
             fontSize: 15,
             fontWeight: FontWeight.bold,
           ),
@@ -1275,7 +1275,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
               Text(
                 AppLocalizations.of(context)?.favoriteNation ?? 'Favorite Nation',
                 style: TextStyle(
-                  color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFFFFE6AC) : Colors.black,
+                  color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFFFFE6AC) : Colors.black87,
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                 ),
@@ -1309,8 +1309,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                         ? _buildTeamNameWithWordWrap(favoriteNation)
                         : Text(
                             AppLocalizations.of(context)?.noNationSelected ?? 'No nation selected',
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87,
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
@@ -1340,9 +1340,10 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
             children: [
               Text(
                 'League Standings',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18.0,
                   fontWeight: FontWeight.bold,
+                  color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87,
                 ),
               ),
               Container(
@@ -1559,10 +1560,10 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                     const SizedBox(width: 12),
                     Text(
                       leagueName,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        fontSize: 18.0,
                         fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                        color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87,
                       ),
                     ),
                   ],
@@ -1716,8 +1717,9 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                             child: Text(
                               teamName,
                               style: TextStyle(
-                                color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-                                fontWeight: isFavorite ? FontWeight.bold : FontWeight.normal,
+                                color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87,
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -2100,7 +2102,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                 Text(
                   competition['name'] ?? 'Unknown Competition',
                   style: TextStyle(
-                    color: isDarkMode ? Colors.white70 : Colors.black54,
+                    color: const Color(0xFFFFE6AC),
                     fontSize: 14,
                   ),
                 ),
@@ -2465,7 +2467,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
           return StatefulBuilder(
             builder: (context, setState) {
               return Card(
-                margin: const EdgeInsets.only(bottom: 20),
+                margin: const EdgeInsets.only(bottom: 20, left: 8, right: 8),
                 elevation: 4,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1D1D1D) : Colors.white,
@@ -2480,9 +2482,10 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                       },
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                        margin: const EdgeInsets.only(top: 4.0),
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFFE6AC),
+                          color: const Color(0xFF292929),
                           borderRadius: BorderRadius.only(
                             topLeft: const Radius.circular(12),
                             topRight: const Radius.circular(12),
@@ -2497,13 +2500,11 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                                 padding: const EdgeInsets.only(right: 8.0),
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(4),
-                                  child: Image.network(
-                                    _getProxiedImageUrl(competitionEmblem),
-                                    width: 24,
-                                    height: 24,
-                                    fit: BoxFit.contain,
-                                    errorBuilder: (context, error, stackTrace) => 
-                                      const SizedBox(width: 24),
+                                  child: _buildLogoImage(
+                                    competitionId ?? 0,
+                                    competitionEmblem,
+                                    Theme.of(context).brightness == Brightness.dark,
+                                    kIsWeb,
                                   ),
                                 ),
                               ),
@@ -2511,7 +2512,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                               child: Text(
                                 competitionName,
                                 style: const TextStyle(
-                                  color: Colors.black,
+                                  color: Colors.white,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 16,
                                 ),
@@ -2520,7 +2521,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                             AnimatedRotation(
                               turns: (_expandedCompetitions[competitionName] ?? true) ? 0.5 : 0.0,
                               duration: const Duration(milliseconds: 300),
-                              child: const Icon(Icons.keyboard_arrow_down, color: Colors.black),
+                              child: const Icon(Icons.keyboard_arrow_down, color: Colors.white),
                             ),
                           ],
                         ),
@@ -2846,6 +2847,198 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
           ),
         ),
       ],
+    );
+  }
+
+  // Add logo handling logic from leagues.dart
+  Widget _buildLogoImage(int leagueId, String? logoUrl, bool isDarkMode, bool isWeb) {
+    // Jobb minőségű helyettesítő logók a bajnokságokhoz
+    Map<int, String> replacementLogos = {
+      2013: 'https://upload.wikimedia.org/wikipedia/en/0/04/Campeonato_Brasileiro_S%C3%A9rie_A.png', // Brasileiro Série A
+      2018: 'https://static.wikia.nocookie.net/future/images/8/84/Euro_2028_Logo_Concept_v2.png/revision/latest?cb=20231020120018', // European Championship
+      2003: 'https://upload.wikimedia.org/wikipedia/commons/4/46/Eredivisie_nuovo_logo.png', // Eredivisie
+      2000: 'https://upload.wikimedia.org/wikipedia/en/thumb/1/17/2026_FIFA_World_Cup_emblem.svg/1200px-2026_FIFA_World_Cup_emblem.svg.png', // FIFA World Cup
+      2015: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/49/Ligue1_Uber_Eats_logo.png/1200px-Ligue1_Uber_Eats_logo.png', // Ligue 1 (nagyobb felbontás)
+      2019: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e9/Serie_A_logo_2022.svg/1200px-Serie_A_logo_2022.svg.png', // Serie A
+      2014: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/LaLiga_logo_2023.svg/2560px-LaLiga_logo_2023.svg.png', // LaLiga
+      2021: 'https://www.sportmonks.com/wp-content/uploads/2024/08/Premier_League_Logo-1.png', // Premier League 
+      2152: 'https://upload.wikimedia.org/wikipedia/en/thumb/a/a1/Copa_Libertadores_logo.svg/1200px-Copa_Libertadores_logo.svg.png', // Copa Libertadores
+      2001: 'https://assets-us-01.kc-usercontent.com/31dbcbc6-da4c-0033-328a-d7621d0fa726/8e5c2681-8c90-4c64-a79d-2a4fa17834c7/UEFA_Champions_League_Logo.png', // Champions League
+      2002: 'https://upload.wikimedia.org/wikipedia/en/thumb/d/df/Bundesliga_logo_%282017%29.svg/1200px-Bundesliga_logo_%282017%29.svg.png', // Bundesliga
+      2017: 'https://news.22bet.com/wp-content/uploads/2023/11/liga-portugal-logo-white.png', // Primeira Liga
+    };
+    
+    // Sötét témájú verziók a világos módban nem jól látható logókhoz
+    Map<int, String> darkVersionLogos = {
+      2021: 'https://upload.wikimedia.org/wikipedia/en/thumb/f/f2/Premier_League_Logo.svg/1200px-Premier_League_Logo.svg.png', // Premier League (sötét verzió)
+      2001: 'https://upload.wikimedia.org/wikipedia/en/thumb/f/f5/UEFA_Champions_League.svg/1200px-UEFA_Champions_League.svg.png', // Champions League (sötét verzió)
+      2017: 'https://cdn.freelogovectors.net/wp-content/uploads/2021/08/primeira-logo-liga-portugal-freelogovectors.net_.png', // Primeira Liga (sötét verzió)
+    };
+    
+    // Világos témájú verziók a sötét módhoz
+    Map<int, String> lightVersionLogos = {
+      2021: 'https://www.sportmonks.com/wp-content/uploads/2024/08/Premier_League_Logo-1.png', // Premier League (fehér verzió)
+      2017: 'https://news.22bet.com/wp-content/uploads/2023/11/liga-portugal-logo-white.png', // Primeira Liga (fehér verzió)
+    };
+    
+    // Proxy használata a webes verzióban, minőségi paraméterrel
+    String getProxiedUrl(String url) {
+      if (kIsWeb) {
+        // Ha SVG formátumú a kép, közvetlenül használjuk
+        if (url.toLowerCase().endsWith('.svg') || url.toLowerCase().contains('.svg')) {
+          return url;
+        }
+        return 'https://us-central1-footify-13da4.cloudfunctions.net/proxyImage?url=${Uri.encodeComponent(url)}';
+      }
+      return url;
+    }
+
+    // A problémás ligák világos módban sötét verziójú képet használnak
+    if (!isDarkMode && darkVersionLogos.containsKey(leagueId)) {
+      return Image.network(
+        getProxiedUrl(darkVersionLogos[leagueId]!),
+        fit: BoxFit.contain,
+        width: 24,
+        height: 24,
+        headers: kIsWeb ? {'Origin': 'null'} : null,
+        errorBuilder: (context, error, stackTrace) {
+          print("Sötét verzió betöltési hiba (ID: $leagueId): $error");
+          return Icon(
+            Icons.sports_soccer, 
+            size: 24,
+            color: Colors.black54,
+          );
+        },
+      );
+    }
+    
+    // A problémás ligák sötét módban világos/fehér verziójú képet használnak
+    if (isDarkMode && lightVersionLogos.containsKey(leagueId)) {
+      return Image.network(
+        getProxiedUrl(lightVersionLogos[leagueId]!),
+        fit: BoxFit.contain,
+        width: 24,
+        height: 24,
+        headers: kIsWeb ? {'Origin': 'null'} : null,
+        errorBuilder: (context, error, stackTrace) {
+          print("Világos verzió betöltési hiba (ID: $leagueId): $error");
+          return Icon(
+            Icons.sports_soccer, 
+            size: 24,
+            color: Colors.white70,
+          );
+        },
+      );
+    }
+    
+    // Eredivisie esetén fehérre színezzük sötét módban
+    if (leagueId == 2003 && isDarkMode && replacementLogos.containsKey(leagueId)) {
+      return ColorFiltered(
+        colorFilter: const ColorFilter.mode(
+          Colors.white,
+          BlendMode.srcIn,
+        ),
+        child: Image.network(
+          getProxiedUrl(replacementLogos[leagueId]!),
+          fit: BoxFit.contain,
+          width: 24,
+          height: 24,
+          headers: kIsWeb ? {'Origin': 'null'} : null,
+          errorBuilder: (context, error, stackTrace) {
+            print("Helyettesítő kép betöltési hiba (ID: $leagueId): $error");
+            return Icon(
+              Icons.sports_soccer, 
+              size: 24,
+              color: Colors.white70,
+            );
+          },
+        ),
+      );
+    }
+    
+    // Premier League és Bajnokok Ligája esetén fehér szín sötét módban - csak a Champions League esetén használjuk
+    if (leagueId == 2001 && isDarkMode) {
+      return ColorFiltered(
+        colorFilter: const ColorFilter.mode(
+          Colors.white,
+          BlendMode.srcIn,
+        ),
+        child: Image.network(
+          getProxiedUrl(logoUrl ?? replacementLogos[leagueId]!),
+          fit: BoxFit.contain,
+          width: 24,
+          height: 24,
+          headers: kIsWeb ? {'Origin': 'null'} : null,
+          errorBuilder: (context, error, stackTrace) {
+            print("Fehérre színezett logó betöltési hiba (ID: $leagueId): $error");
+            return Icon(
+              Icons.sports_soccer, 
+              size: 24,
+              color: Colors.white70,
+            );
+          },
+        ),
+      );
+    }
+    
+    // Ellenőrizzük, hogy van-e helyettesítő online kép
+    if (replacementLogos.containsKey(leagueId)) {
+      return Image.network(
+        getProxiedUrl(replacementLogos[leagueId]!),
+        fit: BoxFit.contain,
+        width: 24,
+        height: 24,
+        headers: kIsWeb ? {'Origin': 'null'} : null,
+        errorBuilder: (context, error, stackTrace) {
+          print("Helyettesítő kép betöltési hiba (ID: $leagueId): $error");
+          return Icon(
+            Icons.sports_soccer, 
+            size: 24,
+            color: isDarkMode ? Colors.white70 : Colors.black54,
+          );
+        },
+      );
+    }
+    
+    // Minden más esetben az eredeti logót használjuk
+    return _getNetworkImage(logoUrl, isDarkMode, isWeb);
+  }
+  
+  // Segédfüggvény a hálózati kép megjelenítéséhez
+  Widget _getNetworkImage(String? logoUrl, bool isDarkMode, bool isWeb) {
+    if (logoUrl == null || logoUrl.isEmpty) {
+      return Icon(
+        Icons.sports_soccer, 
+        size: 24,
+        color: isDarkMode ? Colors.white70 : Colors.black54,
+      );
+    }
+    
+    // Proxy használata a webes verzióban
+    String proxyUrl = logoUrl;
+    if (kIsWeb) {
+      // Ha SVG formátumú a kép, közvetlenül használjuk
+      if (logoUrl.toLowerCase().endsWith('.svg') || logoUrl.toLowerCase().contains('.svg')) {
+        proxyUrl = logoUrl;
+      } else {
+        proxyUrl = 'https://us-central1-footify-13da4.cloudfunctions.net/proxyImage?url=${Uri.encodeComponent(logoUrl)}';
+      }
+    }
+    
+    return Image.network(
+      proxyUrl,
+      fit: BoxFit.contain,
+      width: 24,
+      height: 24,
+      headers: kIsWeb ? {'Origin': 'null'} : null,
+      errorBuilder: (context, error, stackTrace) {
+        print("Eredeti logó betöltési hiba: $error");
+        return Icon(
+          Icons.sports_soccer, 
+          size: 24,
+          color: isDarkMode ? Colors.white70 : Colors.black54,
+        );
+      },
     );
   }
 } 

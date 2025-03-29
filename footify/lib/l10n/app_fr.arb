@@ -18,5 +18,16 @@
     "yesterday": "Hier",
     "versus": "vs",
     "noTeamSelected": "Aucune équipe sélectionnée",
-    "noNationSelected": "Aucune nation sélectionnée"
+    "noNationSelected": "Aucune nation sélectionnée",
+    "standings": "Classement",
+    "lastRound": "Dernière journée",
+    "statistics": "Statistiques",
+    "goals": "buts",
+    "errorLoadingLastMatches": "Erreur lors du chargement des derniers matchs",
+    "errorLoadingStandings": "Impossible de charger le classement",
+    "errorLoadingScorers": "Erreur lors du chargement des buteurs",
+    "noMatchesAvailable": "Aucun match disponible",
+    "noScorersAvailable": "Aucun buteur disponible",
+    "unknownPlayer": "Joueur inconnu",
+    "unknownTeam": "Équipe inconnue"
 } 

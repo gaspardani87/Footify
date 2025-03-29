@@ -289,5 +289,15 @@
     "tomorrow": "Mañana",
     "yesterday": "Ayer",
     "versus": "vs",
-    "noNationSelected": "Ninguna nación seleccionada"
+    "noNationSelected": "Ninguna nación seleccionada",
+    "standings": "Clasificación",
+    "lastRound": "Última jornada",
+    "statistics": "Estadísticas",
+    "goals": "goles",
+    "errorLoadingLastMatches": "Error al cargar los últimos partidos",
+    "errorLoadingStandings": "No se pudo cargar la clasificación",
+    "errorLoadingScorers": "Error al cargar los goleadores",
+    "noMatchesAvailable": "No hay partidos disponibles",
+    "noScorersAvailable": "No hay goleadores disponibles",
+    "unknownPlayer": "Jugador desconocido"
 }
