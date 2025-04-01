@@ -142,6 +142,16 @@ class FirebaseProvider with ChangeNotifier {
         // Store user data in Firestore
         await _firestore.collection('users').doc(_user!.uid).set(userData);
         
+        // Send verification email
+        try {
+          await _user!.sendEmailVerification();
+          print('Verification email sent successfully to ${_user!.email}');
+        } catch (e) {
+          print('Error sending verification email: $e');
+          // Optionally handle the error, e.g., log it or inform the user slightly differently,
+          // but registration itself is complete at this point.
+        }
+
         // Update local user data
         _userData = userData;
         notifyListeners();

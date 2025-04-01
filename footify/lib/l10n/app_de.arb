@@ -297,5 +297,11 @@
     "errorLoadingScorers": "Fehler beim Laden der Torschützen",
     "noMatchesAvailable": "Keine Spiele verfügbar",
     "noScorersAvailable": "Keine Torschützen verfügbar",
-    "unknownPlayer": "Unbekannter Spieler"
+    "unknownPlayer": "Unbekannter Spieler",
+    "liveStatus": "LIVE",
+    "halfTimeStatus": "HZ",
+    "fullTimeStatus": "ENDE",
+    "postponedStatus": "VERS",
+    "suspendedStatus": "SUSP",
+    "cancelledStatus": "ABG"
 }

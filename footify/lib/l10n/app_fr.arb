@@ -29,5 +29,11 @@
     "noMatchesAvailable": "Aucun match disponible",
     "noScorersAvailable": "Aucun buteur disponible",
     "unknownPlayer": "Joueur inconnu",
-    "unknownTeam": "Équipe inconnue"
+    "unknownTeam": "Équipe inconnue",
+    "liveStatus": "LIVE",
+    "halfTimeStatus": "MT",
+    "fullTimeStatus": "FIN",
+    "postponedStatus": "REP",
+    "suspendedStatus": "SUS",
+    "cancelledStatus": "ANN"
 } 

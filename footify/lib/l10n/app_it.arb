@@ -300,5 +300,11 @@
     "tomorrow": "Domani",
     "yesterday": "Ieri",
     "versus": "vs",
-    "noNationSelected": "Nessuna nazione selezionata"
+    "noNationSelected": "Nessuna nazione selezionata",
+    "liveStatus": "LIVE",
+    "halfTimeStatus": "INT",
+    "fullTimeStatus": "FIN",
+    "postponedStatus": "RIN",
+    "suspendedStatus": "SOS",
+    "cancelledStatus": "ANN"
 }

@@ -7,7 +7,9 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 // Match model for last matches
 class Match {
   final String homeTeam;
+  final String? homeTeamShortName;
   final String awayTeam;
+  final String? awayTeamShortName;
   final String? homeTeamLogo;
   final String? awayTeamLogo;
   final int homeScore;
@@ -17,6 +19,8 @@ class Match {
   Match({
     required this.homeTeam,
     required this.awayTeam,
+    this.homeTeamShortName,
+    this.awayTeamShortName,
     required this.homeTeamLogo,
     required this.awayTeamLogo,
     required this.homeScore,
@@ -26,13 +30,15 @@ class Match {
 
   factory Match.fromJson(Map<String, dynamic> json) {
     return Match(
-      homeTeam: json['homeTeam']['name'] ?? 'Unknown',
-      awayTeam: json['awayTeam']['name'] ?? 'Unknown',
-      homeTeamLogo: json['homeTeam']['crest'],
-      awayTeamLogo: json['awayTeam']['crest'],
-      homeScore: json['score']['fullTime']['home'] ?? 0,
-      awayScore: json['score']['fullTime']['away'] ?? 0,
-      date: DateTime.parse(json['utcDate']),
+      homeTeam: json['homeTeam']?['name'] ?? 'Unknown',
+      awayTeam: json['awayTeam']?['name'] ?? 'Unknown',
+      homeTeamShortName: json['homeTeam']?['shortName'],
+      awayTeamShortName: json['awayTeam']?['shortName'],
+      homeTeamLogo: json['homeTeam']?['crest'],
+      awayTeamLogo: json['awayTeam']?['crest'],
+      homeScore: json['score']?['fullTime']?['home'] ?? 0,
+      awayScore: json['score']?['fullTime']?['away'] ?? 0,
+      date: DateTime.parse(json['utcDate'] ?? DateTime.now().toIso8601String()),
     );
   }
 }
@@ -41,21 +47,24 @@ class Match {
 class Scorer {
   final String playerName;
   final String teamName;
+  final String? teamShortName;
   final String? teamLogo;
   final int goals;
 
   Scorer({
     required this.playerName,
     required this.teamName,
+    this.teamShortName,
     required this.teamLogo,
     required this.goals,
   });
 
   factory Scorer.fromJson(Map<String, dynamic> json) {
     return Scorer(
-      playerName: json['player']['name'] ?? 'Unknown Player',
-      teamName: json['team']['name'] ?? 'Unknown Team',
-      teamLogo: json['team']['crest'],
+      playerName: json['player']?['name'] ?? 'Unknown Player',
+      teamName: json['team']?['name'] ?? 'Unknown Team',
+      teamShortName: json['team']?['shortName'],
+      teamLogo: json['team']?['crest'],
       goals: json['goals'] ?? 0,
     );
   }
@@ -65,6 +74,7 @@ class Scorer {
 class TeamStanding {
   final int position;
   final String teamName;
+  final String? teamShortName;
   final String? teamLogo;
   final int playedGames;
   final int points;
@@ -77,6 +87,7 @@ class TeamStanding {
   TeamStanding({
     required this.position,
     required this.teamName,
+    this.teamShortName,
     required this.teamLogo,
     required this.playedGames,
     required this.points,
@@ -90,8 +101,9 @@ class TeamStanding {
   factory TeamStanding.fromJson(Map<String, dynamic> json) {
     return TeamStanding(
       position: json['position'] ?? 0,
-      teamName: json['team']['name'] ?? 'Unknown Team',
-      teamLogo: json['team']['crest'],
+      teamName: json['team']?['name'] ?? 'Unknown Team',
+      teamShortName: json['team']?['shortName'],
+      teamLogo: json['team']?['crest'],
       playedGames: json['playedGames'] ?? 0,
       points: json['points'] ?? 0,
       won: json['won'] ?? 0,
@@ -246,31 +258,31 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTicker
 
   Color getPositionColor(int position, int leagueId) {
     // Premier League, La Liga, Serie A (UCL, UEL, Relegation)
-    if (leagueId == 39 || leagueId == 140 || leagueId == 135) {
+    if (leagueId == 2021 || leagueId == 2014 || leagueId == 2019) {
       if (position <= 4) return Colors.blue; // UCL
       if (position <= 6) return Colors.orange; // UEL
       if (position >= 18) return Colors.red; // Relegation
     }
     // Bundesliga (UCL, UEL, Relegation)
-    else if (leagueId == 78) {
+    else if (leagueId == 2002) {
       if (position <= 4) return Colors.blue; // UCL
       if (position <= 6) return Colors.orange; // UEL
       if (position >= 16) return Colors.red; // Relegation
     }
     // Ligue 1 (UCL, UEL, Relegation)
-    else if (leagueId == 61) {
+    else if (leagueId == 2015) {
       if (position <= 2) return Colors.blue; // UCL
       if (position <= 4) return Colors.orange; // UEL
       if (position >= 18) return Colors.red; // Relegation
     }
     // Championship (Promotion)
-    else if (leagueId == 41) {
+    else if (leagueId == 2016) {
       if (position <= 2) return Colors.green; // Automatic promotion
       if (position <= 6) return Colors.orange; // Play-off promotion
       if (position >= 22) return Colors.red; // Relegation
     }
     // League One (Promotion)
-    else if (leagueId == 40) {
+    else if (leagueId == 2017) {
       if (position <= 2) return Colors.green; // Automatic promotion
       if (position <= 6) return Colors.orange; // Play-off promotion
       if (position >= 21) return Colors.red; // Relegation
@@ -280,19 +292,19 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTicker
 
   String getQualificationTextForLeague(BuildContext context, int leagueId) {
     switch (leagueId) {
-      case 39: // Premier League
+      case 2021: // Premier League
         return AppLocalizations.of(context)!.premierLeagueQualification;
-      case 140: // La Liga
+      case 2014: // La Liga
         return AppLocalizations.of(context)!.laLigaQualification;
-      case 78: // Bundesliga
-        return AppLocalizations.of(context)!.bundesligaQualification;
-      case 135: // Serie A
+      case 2019: // Serie A
         return AppLocalizations.of(context)!.serieAQualification;
-      case 61: // Ligue 1
+      case 2002: // Bundesliga
+        return AppLocalizations.of(context)!.bundesligaQualification;
+      case 2015: // Ligue 1
         return AppLocalizations.of(context)!.ligue1Qualification;
-      case 41: // Championship
+      case 2016: // Championship
         return AppLocalizations.of(context)!.championshipQualification;
-      case 40: // League One
+      case 2017: // League One
         return AppLocalizations.of(context)!.leagueOneQualification;
       default:
         return '';
@@ -302,23 +314,23 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTicker
   List<Map<String, dynamic>> getRelevantColors(int leagueId) {
     final localizations = AppLocalizations.of(context)!;
     switch (leagueId) {
-      case 39: // Premier League
-      case 140: // La Liga
-      case 135: // Serie A
-      case 78: // Bundesliga
+      case 2021: // Premier League
+      case 2014: // La Liga
+      case 2019: // Serie A
+      case 2002: // Bundesliga
         return [
           {'color': Colors.blue, 'name': localizations.championsLeague},
           {'color': Colors.orange, 'name': localizations.europaLeague},
           {'color': Colors.red, 'name': localizations.relegation},
         ];
-      case 61: // Ligue 1
+      case 2015: // Ligue 1
         return [
           {'color': Colors.blue, 'name': localizations.championsLeague},
           {'color': Colors.orange, 'name': localizations.europaLeague},
           {'color': Colors.red, 'name': localizations.relegation},
         ];
-      case 41: // Championship
-      case 40: // League One
+      case 2016: // Championship
+      case 2017: // League One
         return [
           {'color': Colors.green, 'name': localizations.automaticPromotion},
           {'color': Colors.orange, 'name': localizations.playoffPromotion},
@@ -688,145 +700,145 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTicker
                 ),
                 child: Row(
                   children: [
-                    // Színjelölő
+                    // Color Indicator
                     Container(
-                      width: 2,
-                      height: 56,
+                      width: 4, // Width of the vertical line
+                      height: 56, // Match the approximate row height
                       color: positionColor,
                     ),
-                    
-                    // Helyezés (#)
-                    SizedBox(
-                      width: 32,
-                      height: 56,
-                      child: Center(
-                        child: Text(
-                          team.position.toString(),
-                          style: TextStyle(
-                            color: isDarkMode ? Colors.white : Colors.black87,
-                          ),
-                        ),
-                      ),
-                    ),
-                    
-                    // Csapat név és logó
+                    // Existing Row Content (wrapped in Expanded)
                     Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        child: Row(
-                          children: [
-                            team.teamLogo != null
-                              ? SizedBox(
-                                  width: 32, // Increased from 28
-                                  height: 32, // Increased from 28
-                                  child: Image.network(
-                                    getProxiedImageUrl(team.teamLogo),
-                                    fit: BoxFit.contain,
-                                    width: 32,
-                                    height: 32,
-                                    headers: kIsWeb ? {'Origin': 'null'} : null,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      print("Tabella csapatlogó betöltési hiba: $error");
-                                      return const Icon(Icons.sports_soccer, size: 22);
-                                    },
-                                  ),
-                                )
-                              : SizedBox(
-                                  width: 32,
-                                  height: 32,
-                                  child: const Icon(Icons.sports_soccer, size: 22),
-                                ),
-                            const SizedBox(width: 8),
-                            Expanded(
+                      child: Row(
+                        children: [
+                          // Helyezés (#)
+                          SizedBox(
+                            width: 32,
+                            height: 56,
+                            child: Center(
                               child: Text(
-                                team.teamName,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontWeight: FontWeight.w500),
+                                team.position.toString(),
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white : Colors.black87,
+                                ),
                               ),
                             ),
+                          ),
+                          // Csapat név és logó
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              child: Row(
+                                children: [
+                                  team.teamLogo != null
+                                    ? SizedBox(
+                                        width: 32, // Increased from 28
+                                        height: 32, // Increased from 28
+                                        child: Image.network(
+                                          getProxiedImageUrl(team.teamLogo),
+                                          fit: BoxFit.contain,
+                                          width: 32,
+                                          height: 32,
+                                          headers: kIsWeb ? {'Origin': 'null'} : null,
+                                          errorBuilder: (context, error, stackTrace) {
+                                            print("Tabella csapatlogó betöltési hiba: $error");
+                                            return const Icon(Icons.sports_soccer, size: 22);
+                                          },
+                                        ),
+                                      )
+                                    : SizedBox(
+                                        width: 32,
+                                        height: 32,
+                                        child: const Icon(Icons.sports_soccer, size: 22),
+                                      ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      team.teamShortName?.isNotEmpty == true 
+                                        ? team.teamShortName! 
+                                        : team.teamName,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontWeight: FontWeight.w500),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          // Lejátszott meccsek (M)
+                          SizedBox(
+                            width: 36,
+                            height: 56,
+                            child: Center(
+                              child: Text(
+                                team.playedGames.toString(),
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white : Colors.black87,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4), // Térköz az oszlopok között
+                          // További adatok széles képernyőn
+                          if (isWideScreen) ...[
+                            SizedBox(
+                              width: 36,
+                              height: 56,
+                              child: Center(
+                                child: Text(
+                                  team.goalsFor.toString(),
+                                  style: TextStyle(
+                                    color: isDarkMode ? Colors.white : Colors.black87,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 4), // Térköz az oszlopok között
+                            SizedBox(
+                              width: 36,
+                              height: 56,
+                              child: Center(
+                                child: Text(
+                                  team.goalsAgainst.toString(),
+                                  style: TextStyle(
+                                    color: isDarkMode ? Colors.white : Colors.black87,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 4), // Térköz az oszlopok között
                           ],
-                        ),
-                      ),
-                    ),
-                    
-                    // Lejátszott meccsek (M)
-                    SizedBox(
-                      width: 36,
-                      height: 56,
-                      child: Center(
-                        child: Text(
-                          team.playedGames.toString(),
-                          style: TextStyle(
-                            color: isDarkMode ? Colors.white : Colors.black87,
-                          ),
-                        ),
-                      ),
-                    ),
-                    
-                    const SizedBox(width: 4), // Térköz az oszlopok között
-                    
-                    // További adatok széles képernyőn
-                    if (isWideScreen) ...[
-                      SizedBox(
-                        width: 36,
-                        height: 56,
-                        child: Center(
-                          child: Text(
-                            team.goalsFor.toString(),
-                            style: TextStyle(
-                              color: isDarkMode ? Colors.white : Colors.black87,
+                          // Gólkülönbség (GK)
+                          SizedBox(
+                            width: 36,
+                            height: 56,
+                            child: Center(
+                              child: Text(
+                                (team.goalsFor - team.goalsAgainst).toString(),
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white : Colors.black87,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                      const SizedBox(width: 4), // Térköz az oszlopok között
-                      SizedBox(
-                        width: 36,
-                        height: 56,
-                        child: Center(
-                          child: Text(
-                            team.goalsAgainst.toString(),
-                            style: TextStyle(
-                              color: isDarkMode ? Colors.white : Colors.black87,
+                          const SizedBox(width: 4), // Térköz az oszlopok között
+                          // Pontszám (P)
+                          SizedBox(
+                            width: 36,
+                            height: 56,
+                            child: Center(
+                              child: Text(
+                                team.points.toString(),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: isDarkMode ? const Color(0xFFFFE6AC) : Colors.black,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                      const SizedBox(width: 4), // Térköz az oszlopok között
-                    ],
-                    
-                    // Gólkülönbség (GK)
-                    SizedBox(
-                      width: 36,
-                      height: 56,
-                      child: Center(
-                        child: Text(
-                          (team.goalsFor - team.goalsAgainst).toString(),
-                          style: TextStyle(
-                            color: isDarkMode ? Colors.white : Colors.black87,
-                          ),
-                        ),
+                          const SizedBox(width: 16), // Jobb margó
+                        ],
                       ),
                     ),
-                    
-                    const SizedBox(width: 4), // Térköz az oszlopok között
-                    
-                    // Pontszám (P)
-                    SizedBox(
-                      width: 36,
-                      height: 56,
-                      child: Center(
-                        child: Text(
-                          team.points.toString(),
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: isDarkMode ? const Color(0xFFFFE6AC) : Colors.black,
-                          ),
-                        ),
-                      ),
-                    ),
-                    
-                    const SizedBox(width: 16), // Jobb margó
                   ],
                 ),
               );
@@ -908,7 +920,9 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTicker
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    match.homeTeam,
+                    match.homeTeamShortName?.isNotEmpty == true 
+                      ? match.homeTeamShortName! 
+                      : match.homeTeam,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: isDarkMode ? Colors.white : Colors.black,
@@ -934,7 +948,9 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTicker
               children: [
                 Expanded(
                   child: Text(
-                    match.awayTeam,
+                    match.awayTeamShortName?.isNotEmpty == true 
+                      ? match.awayTeamShortName! 
+                      : match.awayTeam,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.end,
                     style: TextStyle(
@@ -1079,7 +1095,9 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTicker
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  scorer.teamName,
+                  scorer.teamShortName?.isNotEmpty == true 
+                    ? scorer.teamShortName! 
+                    : scorer.teamName,
                   style: TextStyle(
                     fontSize: 12,
                     color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
@@ -1132,17 +1150,6 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTicker
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8.0),
-            child: Text(
-              AppLocalizations.of(context)!.leagueLegend,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
-            ),
-          ),
           ...relevantColors.map((colorInfo) {
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),

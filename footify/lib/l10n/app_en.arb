@@ -298,5 +298,11 @@
     "errorLoadingScorers": "Error loading scorers",
     "noMatchesAvailable": "No matches available",
     "noScorersAvailable": "No scorers available",
-    "unknownPlayer": "Unknown Player"
+    "unknownPlayer": "Unknown Player",
+    "liveStatus": "LIVE",
+    "halfTimeStatus": "HT",
+    "fullTimeStatus": "FT",
+    "postponedStatus": "PST",
+    "suspendedStatus": "SUS",
+    "cancelledStatus": "CAN"
 }

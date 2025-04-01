@@ -299,5 +299,11 @@
     "errorLoadingScorers": "Error al cargar los goleadores",
     "noMatchesAvailable": "No hay partidos disponibles",
     "noScorersAvailable": "No hay goleadores disponibles",
-    "unknownPlayer": "Jugador desconocido"
+    "unknownPlayer": "Jugador desconocido",
+    "liveStatus": "VIVO",
+    "halfTimeStatus": "DES",
+    "fullTimeStatus": "FIN",
+    "postponedStatus": "APL",
+    "suspendedStatus": "SUS",
+    "cancelledStatus": "CAN"
 }

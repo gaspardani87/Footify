@@ -7,6 +7,8 @@ import 'providers/firebase_provider.dart';
 import 'services/team_matches_service.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'services/message_service.dart';
+import 'package:intl/intl.dart'; // Add this for DateFormat
+import 'package:flutter/foundation.dart' show kIsWeb; // Add this for kIsWeb
 
 class CalendarPage extends StatefulWidget {
   const CalendarPage({super.key});
@@ -186,13 +188,151 @@ class _CalendarPageState extends State<CalendarPage> {
 
     if (selectedMatches.isEmpty) return Container();
 
+    // Helper function for image URLs (copied from dashboard)
+    String _getProxiedImageUrl(String? url) {
+      if (url == null || url.isEmpty) return '';
+      // If the URL is already a Firebase storage URL, use it directly
+      if (url.startsWith('https://firebasestorage.googleapis.com')) {
+        return url;
+      }
+      
+      // Use the proxy image endpoint for external URLs
+      // Ensure kIsWeb is checked for web builds
+      if (kIsWeb) {
+        // Optional: Add quality parameter if needed for web proxy
+        return 'https://us-central1-footify-13da4.cloudfunctions.net/proxyImage?url=${Uri.encodeComponent(url)}';
+      } else {
+        // Native platforms might not need the proxy, or use a different one
+        return url; // Assuming direct URL works for native for now
+      }
+    }
+    
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    // --- Start: Logo replacement logic from dashboard.dart ---
+    // Jobb minőségű helyettesítő logók a bajnokságokhoz
+    Map<int, String> replacementLogos = {
+      2013: 'https://upload.wikimedia.org/wikipedia/en/0/04/Campeonato_Brasileiro_S%C3%A9rie_A.png', // Brasileiro Série A
+      2018: 'https://static.wikia.nocookie.net/future/images/8/84/Euro_2028_Logo_Concept_v2.png/revision/latest?cb=20231020120018', // European Championship
+      2003: 'https://upload.wikimedia.org/wikipedia/commons/4/46/Eredivisie_nuovo_logo.png', // Eredivisie
+      2000: 'https://upload.wikimedia.org/wikipedia/en/thumb/1/17/2026_FIFA_World_Cup_emblem.svg/1200px-2026_FIFA_World_Cup_emblem.svg.png', // FIFA World Cup
+      2015: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/49/Ligue1_Uber_Eats_logo.png/1200px-Ligue1_Uber_Eats_logo.png', // Ligue 1 (nagyobb felbontás)
+      2019: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e9/Serie_A_logo_2022.svg/1200px-Serie_A_logo_2022.svg.png', // Serie A
+      2014: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/LaLiga_logo_2023.svg/2560px-LaLiga_logo_2023.svg.png', // LaLiga
+      2021: 'https://www.sportmonks.com/wp-content/uploads/2024/08/Premier_League_Logo-1.png', // Premier League 
+      2152: 'https://upload.wikimedia.org/wikipedia/en/thumb/a/a1/Copa_Libertadores_logo.svg/1200px-Copa_Libertadores_logo.svg.png', // Copa Libertadores
+      2001: 'https://assets-us-01.kc-usercontent.com/31dbcbc6-da4c-0033-328a-d7621d0fa726/8e5c2681-8c90-4c64-a79d-2a4fa17834c7/UEFA_Champions_League_Logo.png', // Champions League
+      2002: 'https://upload.wikimedia.org/wikipedia/en/thumb/d/df/Bundesliga_logo_%282017%29.svg/1200px-Bundesliga_logo_%282017%29.svg.png', // Bundesliga
+      2017: 'https://news.22bet.com/wp-content/uploads/2023/11/liga-portugal-logo-white.png', // Primeira Liga
+    };
+    
+    // Sötét témájú verziók a világos módban nem jól látható logókhoz
+    Map<int, String> darkVersionLogos = {
+      2021: 'https://upload.wikimedia.org/wikipedia/en/thumb/f/f2/Premier_League_Logo.svg/1200px-Premier_League_Logo.svg.png', // Premier League (sötét verzió)
+      2001: 'https://upload.wikimedia.org/wikipedia/en/thumb/f/f5/UEFA_Champions_League.svg/1200px-UEFA_Champions_League.svg.png', // Champions League (sötét verzió)
+      2017: 'https://cdn.freelogovectors.net/wp-content/uploads/2021/08/primeira-logo-liga-portugal-freelogovectors.net_.png', // Primeira Liga (sötét verzió)
+    };
+    
+    // Világos témájú verziók a sötét módhoz
+    Map<int, String> lightVersionLogos = {
+      2021: 'https://www.sportmonks.com/wp-content/uploads/2024/08/Premier_League_Logo-1.png', // Premier League (fehér verzió)
+      2017: 'https://news.22bet.com/wp-content/uploads/2023/11/liga-portugal-logo-white.png', // Primeira Liga (fehér verzió)
+      // Add Champions League white version if available, or rely on ColorFiltered below
+    };
+    
+     // Segédfüggvény a hálózati kép megjelenítéséhez (Generic part from dashboard)
+    Widget _getNetworkImageWidget(String? logoUrl, bool isDarkMode) {
+      if (logoUrl == null || logoUrl.isEmpty) {
+        return Icon(
+          Icons.sports_soccer, 
+          size: 24,
+          color: isDarkMode ? Colors.white70 : Colors.black54,
+        );
+      }
+      
+      String finalUrl = _getProxiedImageUrl(logoUrl); // Use the calendar's proxy function
+      
+      return Image.network(
+        finalUrl,
+        fit: BoxFit.contain,
+        width: 24,
+        height: 24,
+        headers: kIsWeb ? {'Origin': 'null'} : null, // Add headers for web CORS if needed
+        errorBuilder: (context, error, stackTrace) {
+          print("Original logo load error: $error");
+          return Icon(
+            Icons.sports_soccer, 
+            size: 24,
+            color: isDarkMode ? Colors.white70 : Colors.black54,
+          );
+        },
+      );
+    }
+    
+    // Logo builder function (adapted from dashboard)
+    Widget _buildCompetitionLogoImage(int? competitionId, String? logoUrl, bool isDarkMode) {
+       if (competitionId == null) {
+         return _getNetworkImageWidget(logoUrl, isDarkMode);
+       }
+       
+      // A problémás ligák világos módban sötét verziójú képet használnak
+      if (!isDarkMode && darkVersionLogos.containsKey(competitionId)) {
+        return _getNetworkImageWidget(darkVersionLogos[competitionId], isDarkMode);
+      }
+      
+      // A problémás ligák sötét módban világos/fehér verziójú képet használnak
+      if (isDarkMode && lightVersionLogos.containsKey(competitionId)) {
+         return _getNetworkImageWidget(lightVersionLogos[competitionId], isDarkMode);
+      }
+      
+      // Eredivisie esetén fehérre színezzük sötét módban
+      if (competitionId == 2003 && isDarkMode && replacementLogos.containsKey(competitionId)) {
+        return ColorFiltered(
+          colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+          child: _getNetworkImageWidget(replacementLogos[competitionId], isDarkMode),
+        );
+      }
+      
+      // Champions League esetén fehérre színezzük sötét módban
+      if (competitionId == 2001 && isDarkMode) {
+        String? clLogo = logoUrl ?? replacementLogos[competitionId];
+         if (clLogo != null) {
+           return ColorFiltered(
+             colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+             child: _getNetworkImageWidget(clLogo, isDarkMode),
+           );
+         }
+      }
+      
+      // Ellenőrizzük, hogy van-e helyettesítő online kép
+      if (replacementLogos.containsKey(competitionId)) {
+        return _getNetworkImageWidget(replacementLogos[competitionId], isDarkMode);
+      }
+      
+      // Minden más esetben az eredeti logót használjuk
+      return _getNetworkImageWidget(logoUrl, isDarkMode);
+    }
+    // --- End: Logo replacement logic ---
+
     return Expanded(
       child: ListView.builder(
         itemCount: selectedMatches.length,
         itemBuilder: (context, index) {
           final match = selectedMatches[index];
-          final homeTeam = match['homeTeam']['name'];
-          final awayTeam = match['awayTeam']['name'];
+          
+          // Extract data with appropriate null checks
+          final Map<String, dynamic> competition = match['competition'] ?? {'name': 'Unknown'};
+          final Map<String, dynamic> homeTeam = match['homeTeam'] ?? {'name': 'Home'};
+          final Map<String, dynamic> awayTeam = match['awayTeam'] ?? {'name': 'Away'};
+          
+          // Extract competition ID safely
+          final int? competitionId = competition['id'] is int ? competition['id'] : null;
+          
+          // Extract logos with null checks
+          final String? competitionLogo = competition['emblem'];
+          final String? homeTeamLogo = homeTeam['crest'];
+          final String? awayTeamLogo = awayTeam['crest'];
+
           final matchTime = DateTime.parse(match['utcDate']).toLocal();
           final formattedTime = 
               '${matchTime.hour.toString().padLeft(2, '0')}:${matchTime.minute.toString().padLeft(2, '0')}';
@@ -203,41 +343,258 @@ class _CalendarPageState extends State<CalendarPage> {
           final isPastMatch = matchTime.isBefore(DateTime.now());
           
           // For past matches, get the score if available
-          String matchResult = 'vs';
+          var homeScore, awayScore;
           if (isPastMatch && match['score'] != null) {
             final score = match['score'];
             // Check if full time score is available
             if (score['fullTime'] != null && 
                 score['fullTime']['home'] != null && 
                 score['fullTime']['away'] != null) {
-              final homeScore = score['fullTime']['home'];
-              final awayScore = score['fullTime']['away'];
-              matchResult = '$homeScore - $awayScore';
+              homeScore = score['fullTime']['home'];
+              awayScore = score['fullTime']['away'];
             }
           }
-
-          // Get competition name if available
-          String competition = '';
-          if (match['competition'] != null && match['competition']['name'] != null) {
-            competition = match['competition']['name'];
-          }
-
-          return Card(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: ListTile(
-              title: Text('$homeTeam $matchResult $awayTeam'),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (competition.isNotEmpty)
-                    Text('Competition: $competition'),
-                  Text(isPastMatch ? 'Played: $formattedDate at $formattedTime' : 'Time: $formattedDate at $formattedTime'),
-                  if (match['status'] != null)
-                    Text('Status: ${match['status']}'),
-                ],
-              ),
+          
+          final hasScore = homeScore != null && awayScore != null;
+          final scoreText = hasScore ? '$homeScore - $awayScore' : 'vs';
+          final String matchStatus = match['status'] ?? '';
+          
+          // --- Start of Copied/Adapted Structure from _buildMatchCard ---
+          return Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            decoration: BoxDecoration(
+              color: isDarkMode ? const Color(0xFF1D1D1D) : Colors.white,
+              borderRadius: BorderRadius.circular(12.0),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 4.0,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Competition Header (Optional, but good for context)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 8), // Reduced bottom padding
+                  child: Row(
+                    children: [
+                       if (competitionLogo != null && competitionLogo.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8.0),
+                          child: _buildCompetitionLogoImage(
+                            competitionId, 
+                            competitionLogo, 
+                            isDarkMode
+                          ),
+                        ),
+                      Expanded(
+                        child: Text(
+                          competition['name'] ?? 'Unknown Competition',
+                          style: TextStyle(
+                            color: isDarkMode ? const Color(0xFFFFE6AC) : Colors.black87, // Conditional Color
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      // Display status if not 'vs' (e.g., FT, HT)
+                      if(scoreText != 'vs' && matchStatus.isNotEmpty)
+                         Text(
+                           matchStatus,
+                           style: TextStyle(
+                             color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                             fontSize: 12,
+                           ),
+                         ),
+                    ],
+                  ),
+                ),
+                
+                // Main Match Info Row
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Home Team Column
+                      Expanded( // Use Expanded for flexible sizing
+                        child: Column(
+                          children: [
+                            homeTeamLogo != null && homeTeamLogo.isNotEmpty
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.network(
+                                      _getProxiedImageUrl(homeTeamLogo),
+                                      width: 50, // Slightly smaller logos
+                                      height: 50,
+                                      fit: BoxFit.contain,
+                                      errorBuilder: (context, error, stackTrace) => Container(
+                                        width: 50,
+                                        height: 50,
+                                        alignment: Alignment.center,
+                                        decoration: BoxDecoration(
+                                          color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: const Icon(Icons.sports_soccer, size: 24),
+                                      ),
+                                    ),
+                                  )
+                                : Container(
+                                    width: 50,
+                                    height: 50,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(Icons.sports_soccer, size: 24),
+                                  ),
+                            const SizedBox(height: 8),
+                            Text(
+                              homeTeam['shortName']?.isNotEmpty == true 
+                                ? homeTeam['shortName'] 
+                                : homeTeam['name'] ?? 'Home Team', // Fallback to name
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      
+                      // Score/Time Column
+                      Padding( // Add padding around score/time
+                        padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                        child: Column(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                scoreText,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 20,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            // Don't show date, as it's implicit from calendar selection
+                            // Text(
+                            //   formattedDate,
+                            //   style: TextStyle(
+                            //     color: isDarkMode ? Colors.white70 : Colors.black54,
+                            //     fontSize: 12,
+                            //   ),
+                            // ),
+                            Text(
+                              formattedTime,
+                              style: TextStyle(
+                                color: isDarkMode ? Colors.white70 : Colors.black54,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      
+                      // Away Team Column
+                       Expanded( // Use Expanded for flexible sizing
+                        child: Column(
+                          children: [
+                            awayTeamLogo != null && awayTeamLogo.isNotEmpty
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.network(
+                                      _getProxiedImageUrl(awayTeamLogo),
+                                      width: 50,
+                                      height: 50,
+                                      fit: BoxFit.contain,
+                                      errorBuilder: (context, error, stackTrace) => Container(
+                                        width: 50,
+                                        height: 50,
+                                        alignment: Alignment.center,
+                                        decoration: BoxDecoration(
+                                          color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: const Icon(Icons.sports_soccer, size: 24),
+                                      ),
+                                    ),
+                                  )
+                                : Container(
+                                    width: 50,
+                                    height: 50,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(Icons.sports_soccer, size: 24),
+                                  ),
+                            const SizedBox(height: 8),
+                            Text(
+                              awayTeam['shortName']?.isNotEmpty == true 
+                                ? awayTeam['shortName'] 
+                                : awayTeam['name'] ?? 'Away Team', // Fallback to name
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Venue Row (Optional, uncomment if needed)
+                // if (match['venue'] != null)
+                //   Padding(
+                //     padding: const EdgeInsets.fromLTRB(16, 8, 16, 12), // Added padding
+                //     child: Row(
+                //       mainAxisAlignment: MainAxisAlignment.center,
+                //       children: [
+                //         Icon(
+                //           Icons.location_on,
+                //           size: 16,
+                //           color: isDarkMode ? Colors.white70 : Colors.black54,
+                //         ),
+                //         const SizedBox(width: 4),
+                //         Flexible(
+                //           child: Text(
+                //             match['venue'] ?? 'Venue not available',
+                //             style: TextStyle(
+                //               color: isDarkMode ? Colors.white70 : Colors.black54,
+                //               fontSize: 14,
+                //             ),
+                //             overflow: TextOverflow.ellipsis,
+                //           ),
+                //         ),
+                //       ],
+                //     ),
+                //   ),
+              ],
             ),
           );
+          // --- End of Copied/Adapted Structure ---
         },
       ),
     );
@@ -255,8 +612,8 @@ class _CalendarPageState extends State<CalendarPage> {
               Container(
                 width: 8,
                 height: 8,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
+                decoration: BoxDecoration(
+                  color: isDarkMode ? Colors.white : Colors.black,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -424,10 +781,10 @@ class _CalendarPageState extends State<CalendarPage> {
                           Positioned(
                             bottom: 2,
                             child: Container(
-                              width: 2,
-                              height: 2,
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
+                              width: 4,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: isDarkMode ? Colors.white : Colors.black, // Conditional dot color
                                 shape: BoxShape.circle,
                               ),
                             ),
@@ -520,10 +877,10 @@ class _CalendarPageState extends State<CalendarPage> {
                           Positioned(
                             bottom: 2,
                             child: Container(
-                              width: 2,
-                              height: 2,
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
+                              width: 4,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: isDarkMode ? Colors.white : Colors.black, // Conditional dot color
                                 shape: BoxShape.circle,
                               ),
                             ),
@@ -575,10 +932,10 @@ class _CalendarPageState extends State<CalendarPage> {
                           Positioned(
                             bottom: 2,
                             child: Container(
-                              width: 2,
-                              height: 2,
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
+                              width: 4,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: isDarkMode ? Colors.white : Colors.black, // Conditional dot color
                                 shape: BoxShape.circle,
                               ),
                             ),
@@ -612,7 +969,7 @@ class _CalendarPageState extends State<CalendarPage> {
               ),
             ),
             headerStyle: HeaderStyle(
-              formatButtonVisible: true, // Allow user to switch between month/week/2-week views
+              formatButtonVisible: false, // Hide the format button
               titleCentered: true,
               formatButtonShowsNext: false,
               titleTextStyle: TextStyle(

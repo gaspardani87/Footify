@@ -298,5 +298,11 @@
     "noMatchesAvailable": "Nincs elérhető mérkőzés",
     "noScorersAvailable": "Nincs elérhető góllövő",
     "unknownPlayer": "Ismeretlen játékos",
-    "unknownTeam": "Ismeretlen csapat"
+    "unknownTeam": "Ismeretlen csapat",
+    "liveStatus": "ÉLŐ",
+    "halfTimeStatus": "FÉL",
+    "fullTimeStatus": "VÉGE",
+    "postponedStatus": "ELH",
+    "suspendedStatus": "FELF",
+    "cancelledStatus": "TÖR"
 }

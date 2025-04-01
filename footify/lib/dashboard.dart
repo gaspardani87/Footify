@@ -81,6 +81,105 @@ class _ShimmerLoadingState extends State<ShimmerLoading> with SingleTickerProvid
   }
 }
 
+// Animated List Item Wrapper
+class _AnimatedListItemWrapper extends StatefulWidget {
+  final Widget child;
+  final int index;
+  final bool isVisible;
+  final Duration delayDuration;
+  final Duration animationDuration;
+
+  const _AnimatedListItemWrapper({
+    required Key key, // Ensure key is passed
+    required this.child,
+    required this.index,
+    required this.isVisible,
+    required this.delayDuration,
+    this.animationDuration = const Duration(milliseconds: 250), // Duration for the item's own animation
+  }) : super(key: key);
+
+  @override
+  __AnimatedListItemWrapperState createState() => __AnimatedListItemWrapperState();
+}
+
+class __AnimatedListItemWrapperState extends State<_AnimatedListItemWrapper> {
+  bool _isActuallyVisible = false;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    // If initially visible (e.g., starts expanded), trigger animation immediately
+    // The delay is handled by the _scheduleAnimation method
+    if (widget.isVisible) {
+      _scheduleAnimation();
+    } else {
+        // Ensure it's hidden if starting collapsed
+        _isActuallyVisible = false;
+    }
+  }
+
+  @override
+  void didUpdateWidget(_AnimatedListItemWrapper oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isVisible != oldWidget.isVisible) {
+      if (widget.isVisible) {
+        // Becoming visible: schedule animation if not already running/visible
+        _scheduleAnimation();
+      } else {
+        // Becoming hidden: cancel timer and hide immediately
+        _timer?.cancel();
+        // Check if widget is still in the tree before calling setState
+        if (mounted) {
+             setState(() {
+                _isActuallyVisible = false;
+             });
+        }
+      }
+    }
+  }
+
+  void _scheduleAnimation() {
+    // Cancel any existing timer
+    _timer?.cancel();
+    // Don't restart if already visible or widget unmounted
+    if (_isActuallyVisible || !mounted) return;
+
+    // Calculate the actual delay for this specific item
+    final delay = widget.delayDuration * widget.index;
+    _timer = Timer(delay, () {
+       // Check again if it should be visible and mounted when timer fires
+       if (mounted && widget.isVisible) {
+          setState(() {
+            _isActuallyVisible = true;
+          });
+       }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Use AnimatedOpacity and AnimatedSlide controlled by the internal state
+    return AnimatedOpacity(
+      opacity: _isActuallyVisible ? 1.0 : 0.0,
+      duration: widget.animationDuration,
+      curve: Curves.easeOut,
+      child: AnimatedSlide(
+        offset: _isActuallyVisible ? Offset.zero : const Offset(0.0, 0.3), // Slide from bottom
+        duration: widget.animationDuration,
+        curve: Curves.easeOut,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
 // Replace the _buildLoadingCard method
 Widget _buildLoadingCard(BuildContext context, String title, {double height = 250}) {
   final isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -703,6 +802,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
       } else {
         _matchesByDay = [];
         debugPrint('No cached matches found for $formattedDate');
+        // If no matches are cached for the day, try loading them (might be needed if cache expired)
+        _loadMatchesForDay(formattedDate);
       }
     });
   }
@@ -1048,20 +1149,27 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   }
 
   Widget _buildFavoriteTeamBox(Map<String, dynamic> userData) {
-    final String favoriteTeam = userData['favoriteTeam'] ?? '';
+    final String favoriteTeamNameFromUser = userData['favoriteTeam'] ?? '';
     final String favoriteTeamId = userData['favoriteTeamId'] ?? '';
     
-    // Get team logo from league standings if available
+    // Try to find the favorite team's data in the league standings
+    Map<String, dynamic>? favoriteTeamDataFromStandings;
     String? teamLogo;
     if (_leagueStandings != null && favoriteTeamId.isNotEmpty) {
       final standings = _leagueStandings?['standings']?[0]?['table'] ?? [];
-      for (var team in standings) {
-        if (team['team']?['id']?.toString() == favoriteTeamId) {
-          teamLogo = team['team']?['crest'];
+      for (var teamEntry in standings) {
+        if (teamEntry['team']?['id']?.toString() == favoriteTeamId) {
+          favoriteTeamDataFromStandings = teamEntry['team'];
+          teamLogo = favoriteTeamDataFromStandings?['crest'];
           break;
         }
       }
     }
+
+    // Determine the name to display: short name from standings if available, else full name from user data
+    final String teamNameToDisplay = favoriteTeamDataFromStandings != null
+        ? _getShortTeamName(favoriteTeamDataFromStandings)
+        : favoriteTeamNameFromUser;
     
     return Container(
       height: 120,
@@ -1071,7 +1179,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
       ),
       child: InkWell(
         onTap: favoriteTeamId.isNotEmpty 
-            ? () => _navigateToTeamDetails(favoriteTeamId, favoriteTeam)
+            ? () => _navigateToTeamDetails(favoriteTeamId, teamNameToDisplay)
             : null,
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -1115,8 +1223,17 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                         ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: favoriteTeam.isNotEmpty
-                        ? _buildTeamNameWithWordWrap(favoriteTeam)
+                      child: teamNameToDisplay.isNotEmpty
+                        ? Text( // Directly use Text with the determined name
+                            teamNameToDisplay,
+                            style: TextStyle(
+                              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 2, // Allow wrapping up to 2 lines
+                            overflow: TextOverflow.ellipsis, // Add ellipsis if it exceeds 2 lines
+                          )
                         : Text(
                             AppLocalizations.of(context)?.noTeamSelected ?? 'No team selected',
                             style: TextStyle(
@@ -1136,74 +1253,33 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     );
   }
 
-  // A csapatnév szóköznél való töréshez egy új segédfüggvény
-  Widget _buildTeamNameWithWordWrap(String teamName) {
-    // Megkeressük az első szóközt a sorban, hogy ott törjük a szöveget
-    final words = teamName.split(' ');
-    
-    // Ha csak egy szó van, vagy túl rövid a név, akkor egyszerűen visszaadjuk
-    if (words.length <= 1 || teamName.length < 15) {
-      return Text(
-        teamName,
-        style: TextStyle(
-          color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87,
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-        ),
-        maxLines: 2,
-      );
+  // Helper function to get short team name (shortName > name)
+  String _getShortTeamName(Map<String, dynamic>? teamData) {
+    if (teamData == null) return '?';
+    return teamData['shortName']?.isNotEmpty == true 
+           ? teamData['shortName'] 
+           : teamData['name'] ?? '?';
+  }
+
+  // Helper function to get responsive team name (tla > shortName > name on small screens)
+  String _getResponsiveTeamName(Map<String, dynamic>? teamData, BuildContext context) {
+    if (teamData == null) return '?';
+    final screenWidth = MediaQuery.of(context).size.width;
+    final String name = teamData['name'] ?? '?';
+    final String? shortName = teamData['shortName'];
+    final String? tla = teamData['tla'];
+
+    if (screenWidth < 600) { // Threshold for mobile/small screens
+      return tla?.isNotEmpty == true 
+             ? tla! 
+             : shortName?.isNotEmpty == true 
+               ? shortName! 
+               : name;
+    } else { // Larger screens
+      return shortName?.isNotEmpty == true 
+             ? shortName! 
+             : name;
     }
-    
-    // Próbáljuk megtalálni a legjobb helyet a törésre
-    // Körülbelül a név felénél lévő szóközt keresünk
-    int totalLength = teamName.length;
-    int middleIndex = totalLength ~/ 2;
-    
-    // Keressük meg azt a szóközt, amely a legközelebb van a középponthoz
-    int bestBreakIndex = 0;
-    int minDistance = totalLength;
-    
-    int currentPosition = 0;
-    for (int i = 0; i < words.length - 1; i++) {
-      currentPosition += words[i].length + 1; // +1 a szóköz miatt
-      int distance = (currentPosition - middleIndex).abs();
-      
-      if (distance < minDistance) {
-        minDistance = distance;
-        bestBreakIndex = i;
-      }
-    }
-    
-    // Az első sor a 0-tól a bestBreakIndex-ig terjedő szavak
-    String firstLine = words.sublist(0, bestBreakIndex + 1).join(' ');
-    // A második sor a maradék
-    String secondLine = words.sublist(bestBreakIndex + 1).join(' ');
-    
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          firstLine,
-          style: TextStyle(
-            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87,
-            fontSize: 15,
-            fontWeight: FontWeight.bold,
-          ),
-          overflow: TextOverflow.ellipsis,
-        ),
-        const SizedBox(height: 2),
-        Text(
-          secondLine,
-          style: TextStyle(
-            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87,
-            fontSize: 15,
-            fontWeight: FontWeight.bold,
-          ),
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
-    );
   }
 
   Widget _buildFavoriteNationBox(Map<String, dynamic> userData) {
@@ -1306,7 +1382,16 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                     const SizedBox(width: 12),
                     Expanded(
                       child: favoriteNation.isNotEmpty
-                        ? _buildTeamNameWithWordWrap(favoriteNation)
+                        ? Text( // Use a simple Text widget for the nation name
+                            favoriteNation,
+                            style: TextStyle(
+                              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 2, // Allow wrapping up to 2 lines
+                            overflow: TextOverflow.ellipsis, // Add ellipsis if it exceeds 2 lines
+                          )
                         : Text(
                             AppLocalizations.of(context)?.noNationSelected ?? 'No nation selected',
                             style: TextStyle(
@@ -1660,7 +1745,9 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
           // Team rows
           ...teamsToShow.map((team) {
             final position = team['position'];
-            final teamName = team['team']['name'];
+            // final teamName = team['team']['name']; // Use helper instead
+            final teamMap = team['team']; // Get the full team map
+            final teamNameToDisplay = _getShortTeamName(teamMap); // Use helper
             final teamId = team['team']['id'].toString();
             final teamCrest = team['team']['crest'];
             final playedGames = team['playedGames'];
@@ -1672,7 +1759,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
             final bool isFavorite = teamId == favoriteTeamId;
             
             return InkWell(
-              onTap: () => _navigateToTeamDetails(teamId, teamName),
+              onTap: () => _navigateToTeamDetails(teamId, teamNameToDisplay),
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
                 decoration: BoxDecoration(
@@ -1715,7 +1802,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                             ),
                           Expanded(
                             child: Text(
-                              teamName,
+                              teamNameToDisplay,
                               style: TextStyle(
                                 color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87,
                                 fontSize: 15,
@@ -1827,6 +1914,122 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     }
     debugPrint('National Team Match data: $_nationalTeamNextMatch');
     
+    // ---> NEW LOGIC: Prioritize Live Match <----
+    Map<String, dynamic>? matchToShow;
+    bool isNationalTeam = false;
+    
+    // 1. Check for ongoing match today
+    final String? favoriteTeamId = userData?['favoriteTeamId'];
+    final String? favoriteNationalTeamId = userData?['favoriteNationalTeamId'];
+    final todayFormatted = _formatDate(_currentDate);
+    final todaysMatches = _matchesCache[todayFormatted] ?? [];
+    Map<String, dynamic>? liveMatchToShow;
+    bool liveMatchIsNational = false;
+
+    if (favoriteTeamId != null || favoriteNationalTeamId != null) {
+      for (var match in todaysMatches) {
+        final status = match['status']?.toString().toUpperCase();
+        final homeId = match['homeTeam']?['id']?.toString();
+        final awayId = match['awayTeam']?['id']?.toString();
+
+        bool isFavClubMatch = (favoriteTeamId != null && (homeId == favoriteTeamId || awayId == favoriteTeamId));
+        bool isFavNationMatch = (favoriteNationalTeamId != null && (homeId == favoriteNationalTeamId || awayId == favoriteNationalTeamId));
+
+        if (isFavClubMatch || isFavNationMatch) {
+          if (status == 'IN_PLAY' || status == 'LIVE' || status == 'PAUSED' || status == 'HALF_TIME') {
+            liveMatchToShow = match;
+            liveMatchIsNational = isFavNationMatch; // Mark if it's the national team
+            debugPrint('Found live match to prioritize: ${liveMatchToShow?['id']}');
+            break; // Found a live match, no need to check further
+          }
+        }
+      }
+    }
+
+    // 2. Decide which match to show
+    if (liveMatchToShow != null) {
+      // Prioritize the live match found today
+      matchToShow = liveMatchToShow;
+      isNationalTeam = liveMatchIsNational;
+    } else {
+      // No live match today, use existing logic for next scheduled match
+      bool hasClubMatch = false;
+      Map<String, dynamic>? scheduledClubMatchData;
+      if (_nextMatch != null) {
+        if (_nextMatch!.containsKey('homeTeam') && _nextMatch!.containsKey('awayTeam')) {
+          scheduledClubMatchData = _nextMatch;
+          hasClubMatch = true;
+        } else if (_nextMatch!.containsKey('match') && _nextMatch!['match'] != null) {
+          scheduledClubMatchData = _nextMatch!['match'];
+          hasClubMatch = true;
+        }
+      }
+      
+      bool hasNationalMatch = false;
+      Map<String, dynamic>? scheduledNationalMatchData;
+      if (_nationalTeamNextMatch != null) {
+        if (_nationalTeamNextMatch!.containsKey('homeTeam') && _nationalTeamNextMatch!.containsKey('awayTeam')) {
+          scheduledNationalMatchData = _nationalTeamNextMatch;
+          hasNationalMatch = true;
+        } else if (_nationalTeamNextMatch!.containsKey('match') && _nationalTeamNextMatch!['match'] != null) {
+          scheduledNationalMatchData = _nationalTeamNextMatch!['match'];
+          hasNationalMatch = true;
+        }
+      }
+      
+      // Choose which scheduled match is sooner
+      if (hasClubMatch && hasNationalMatch) {
+        DateTime? clubMatchDateTime;
+        DateTime? nationalMatchDateTime;
+        try {
+          // Parse club match date
+          if (scheduledClubMatchData!.containsKey('utcDate')) {
+            clubMatchDateTime = DateTime.parse(scheduledClubMatchData['utcDate']);
+          } // Add other potential date fields if necessary
+          
+          // Parse national match date
+          if (scheduledNationalMatchData!.containsKey('utcDate')) {
+            nationalMatchDateTime = DateTime.parse(scheduledNationalMatchData['utcDate']);
+          } // Add other potential date fields if necessary
+          
+          if (clubMatchDateTime != null && nationalMatchDateTime != null) {
+            if (clubMatchDateTime.isBefore(nationalMatchDateTime)) {
+              matchToShow = scheduledClubMatchData;
+              isNationalTeam = false;
+            } else {
+              matchToShow = scheduledNationalMatchData;
+              isNationalTeam = true;
+            }
+          } else if (clubMatchDateTime != null) {
+            matchToShow = scheduledClubMatchData;
+            isNationalTeam = false;
+          } else if (nationalMatchDateTime != null) {
+            matchToShow = scheduledNationalMatchData;
+            isNationalTeam = true;
+          }
+        } catch (e) {
+          debugPrint('Error parsing scheduled match dates: $e');
+          // Fallback if parsing fails, maybe default to club match if available
+          if (hasClubMatch) {
+             matchToShow = scheduledClubMatchData;
+             isNationalTeam = false;
+          } else if (hasNationalMatch) {
+             matchToShow = scheduledNationalMatchData;
+             isNationalTeam = true;
+          }
+        }
+      } else if (hasClubMatch) {
+        matchToShow = scheduledClubMatchData;
+        isNationalTeam = false;
+      } else if (hasNationalMatch) {
+        matchToShow = scheduledNationalMatchData;
+        isNationalTeam = true;
+      }
+    }
+
+    // ----> END OF NEW LOGIC <----
+    
+    /* ---- Commented out old logic ----
     // Check for valid match data - handle BOTH possible structures
     Map<String, dynamic>? matchToShow;
     bool isNationalTeam = false;
@@ -1849,18 +2052,24 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     
     // Similarly check for national team match
     bool hasNationalMatch = false;
-    if (!hasClubMatch && _nationalTeamNextMatch != null) {
+    if (_nationalTeamNextMatch != null) { // Changed from: if (!hasClubMatch && _nationalTeamNextMatch != null)
       // Match could be directly in _nationalTeamNextMatch
       if (_nationalTeamNextMatch!.containsKey('homeTeam') && _nationalTeamNextMatch!.containsKey('awayTeam')) {
-        matchToShow = _nationalTeamNextMatch;
-        hasNationalMatch = true;
-        isNationalTeam = true;
+        // Only assign if matchToShow is still null
+        if (matchToShow == null) { 
+            matchToShow = _nationalTeamNextMatch;
+            isNationalTeam = true; 
+        }
+        hasNationalMatch = true; // Mark that a national match exists
       } 
       // Or inside a 'match' property
       else if (_nationalTeamNextMatch!.containsKey('match') && _nationalTeamNextMatch!['match'] != null) {
-        matchToShow = _nationalTeamNextMatch!['match'];
-        hasNationalMatch = true;
-        isNationalTeam = true;
+         // Only assign if matchToShow is still null
+        if (matchToShow == null) { 
+            matchToShow = _nationalTeamNextMatch!['match'];
+            isNationalTeam = true;
+        }
+        hasNationalMatch = true; // Mark that a national match exists
       }
     }
     
@@ -1869,39 +2078,31 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
       // Parse dates for both matches
       DateTime? clubMatchDateTime;
       DateTime? nationalMatchDateTime;
-      
+      Map<String, dynamic>? clubMatchData = _nextMatch?.containsKey('match') ?? false 
+                                          ? _nextMatch!['match'] 
+                                          : _nextMatch;
+      Map<String, dynamic>? nationalMatchData = _nationalTeamNextMatch?.containsKey('match') ?? false
+                                              ? _nationalTeamNextMatch!['match']
+                                              : _nationalTeamNextMatch;
+
       try {
         // Try to parse date for club match
-        if (matchToShow!.containsKey('utcDate')) {
-          clubMatchDateTime = DateTime.parse(matchToShow['utcDate']);
-        } else if (matchToShow!.containsKey('fixture') && 
-                  matchToShow['fixture'] != null &&
-                  matchToShow['fixture'].containsKey('date')) {
-          clubMatchDateTime = DateTime.parse(matchToShow['fixture']['date']);
-        }
+        if (clubMatchData != null && clubMatchData.containsKey('utcDate')) {
+          clubMatchDateTime = DateTime.parse(clubMatchData['utcDate']);
+        } // Add other potential date fields if necessary
         
         // Try to parse date for national team match
-        if (_nationalTeamNextMatch!.containsKey('utcDate')) {
-          nationalMatchDateTime = DateTime.parse(_nationalTeamNextMatch!['utcDate']);
-        } else if (_nationalTeamNextMatch!.containsKey('match') && 
-                  _nationalTeamNextMatch!['match'] != null &&
-                  _nationalTeamNextMatch!['match'].containsKey('utcDate')) {
-          nationalMatchDateTime = DateTime.parse(_nationalTeamNextMatch!['match']['utcDate']);
-        } else if (_nationalTeamNextMatch!.containsKey('fixture') && 
-                  _nationalTeamNextMatch!['fixture'] != null &&
-                  _nationalTeamNextMatch!['fixture'].containsKey('date')) {
-          nationalMatchDateTime = DateTime.parse(_nationalTeamNextMatch!['fixture']['date']);
-        }
+        if (nationalMatchData != null && nationalMatchData.containsKey('utcDate')) {
+          nationalMatchDateTime = DateTime.parse(nationalMatchData['utcDate']);
+        } // Add other potential date fields if necessary
         
         // Choose the closest upcoming match
         if (clubMatchDateTime != null && nationalMatchDateTime != null) {
           if (clubMatchDateTime.isBefore(nationalMatchDateTime)) {
-            // Keep club match (already selected)
+            matchToShow = clubMatchData;
             isNationalTeam = false;
           } else {
-            // Use national team match
-            matchToShow = _nationalTeamNextMatch!.containsKey('match') ? 
-                          _nationalTeamNextMatch!['match'] : _nationalTeamNextMatch;
+            matchToShow = nationalMatchData;
             isNationalTeam = true;
           }
         }
@@ -1910,8 +2111,9 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
         // Keep the default selection if date parsing fails
       }
     }
-    
-    // If we found a match to display, show it
+    */
+
+    // If we found a match to display (either live or scheduled), show it
     if (matchToShow != null) {
       debugPrint('Found match to show: ${matchToShow.keys.join(', ')}');
       return _buildMatchCard(matchToShow, isNationalTeam: isNationalTeam);
@@ -2011,8 +2213,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     
     // Extract data with appropriate null checks
     final Map<String, dynamic> competition = matchData['competition'] ?? {'name': 'Unknown'};
-    final Map<String, dynamic> homeTeam = matchData['homeTeam'] ?? {'name': 'Home'};
-    final Map<String, dynamic> awayTeam = matchData['awayTeam'] ?? {'name': 'Away'};
+    final Map<String, dynamic> homeTeam = matchData['homeTeam'] ?? {'name': 'Home', 'shortName': 'Home'};
+    final Map<String, dynamic> awayTeam = matchData['awayTeam'] ?? {'name': 'Away', 'shortName': 'Away'};
     
     // Extract logos with null checks
     final String? competitionLogo = competition['emblem'];
@@ -2150,7 +2352,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                     SizedBox(
                       width: 100,
                       child: Text(
-                        homeTeam['name'] ?? 'Home Team',
+                        _getShortTeamName(homeTeam), // Use helper
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
@@ -2160,40 +2362,16 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    const SizedBox(height: 8), // <-- Add padding here
                   ],
                 ),
                 Column(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        scoreText,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20,
-                        ),
-                      ),
-                    ),
+                    // ---> NEW Status/Score/Time display <--- 
+                    _buildMatchCardStatus(matchData),
                     const SizedBox(height: 8),
-                    Text(
-                      formattedDate,
-                      style: TextStyle(
-                        color: isDarkMode ? Colors.white70 : Colors.black54,
-                        fontSize: 12,
-                      ),
-                    ),
-                    Text(
-                      formattedTime,
-                      style: TextStyle(
-                        color: isDarkMode ? Colors.white70 : Colors.black54,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    // Helper for Match Card: Date/Time Display
+                    _buildMatchCardDateTime(matchData, isDarkMode),
                   ],
                 ),
                 Column(
@@ -2232,7 +2410,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                     SizedBox(
                       width: 100,
                       child: Text(
-                        awayTeam['name'] ?? 'Away Team',
+                        _getShortTeamName(awayTeam), // Use helper
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
@@ -2242,31 +2420,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    const SizedBox(height: 8), // <-- Add padding here
                   ],
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.location_on,
-                  size: 16,
-                  color: isDarkMode ? Colors.white70 : Colors.black54,
-                ),
-                const SizedBox(width: 4),
-                Flexible(
-                  child: Text(
-                    matchData['venue'] ?? 'Venue not available',
-                    style: TextStyle(
-                      color: isDarkMode ? Colors.white70 : Colors.black54,
-                      fontSize: 14,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
                 ),
               ],
             ),
@@ -2274,6 +2429,128 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
         ],
       ),
     );
+  }
+
+  // Helper for Match Card: Status/Score Display
+  Widget _buildMatchCardStatus(Map<String, dynamic> matchData) {
+    final matchStatus = matchData['status']?.toString().toUpperCase();
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    // Score
+    var homeScore, awayScore;
+    if (matchData.containsKey('score') && matchData['score'] != null &&
+        matchData['score'].containsKey('fullTime') && matchData['score']['fullTime'] != null) {
+      homeScore = matchData['score']['fullTime']['home'];
+      awayScore = matchData['score']['fullTime']['away'];
+    }
+    final bool hasScore = homeScore != null && awayScore != null;
+
+    switch (matchStatus) {
+      case 'IN_PLAY':
+      case 'LIVE':
+        // --- REVERTED: Use BlinkingLiveIndicator --- 
+        return Column(
+          children: [
+            // --- REVERTED: Use BlinkingLiveIndicator --- 
+            const _BlinkingLiveIndicator(), 
+            const SizedBox(height: 4),
+            Text(
+                hasScore ? '$homeScore - $awayScore' : '- : -', 
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+             ),
+          ],
+        );
+      case 'PAUSED':
+      case 'HALF_TIME':
+        return Column(
+          children: [
+             Text(
+                AppLocalizations.of(context)?.halfTimeStatus ?? 'HT',
+                style: TextStyle(color: isDarkMode ? Colors.yellow : Colors.orange, fontWeight: FontWeight.bold, fontSize: 12),
+             ),
+             const SizedBox(height: 4),
+             Text(
+                hasScore ? '$homeScore - $awayScore' : '- : -', 
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+             ),
+          ],
+        );
+      case 'FINISHED':
+      case 'FT':
+         return Column(
+          children: [
+             Text(
+                AppLocalizations.of(context)?.fullTimeStatus ?? 'FT',
+                style: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[600], fontWeight: FontWeight.bold, fontSize: 12),
+             ),
+             const SizedBox(height: 4),
+             Text(
+                hasScore ? '$homeScore - $awayScore' : '- : -', 
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+             ),
+          ],
+        );
+      default: // SCHEDULED, TIMED, POSTPONED, etc.
+        return Container(
+           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+              borderRadius: BorderRadius.circular(8),
+            ),
+          child: Text(
+            AppLocalizations.of(context)?.versus ?? 'vs',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+          ),
+        );
+    }
+  }
+
+  // Helper for Match Card: Date/Time Display
+  Widget _buildMatchCardDateTime(Map<String, dynamic> matchData, bool isDarkMode) {
+     final matchStatus = matchData['status']?.toString().toUpperCase();
+     DateTime matchDate;
+     try {
+        matchDate = DateTime.parse(matchData['utcDate'] ?? '');
+      } catch (e) {
+        return const SizedBox.shrink(); // Don't show if date invalid
+      }
+      final formattedDate = DateFormat('MMM d, yyyy').format(matchDate);
+      final formattedTime = DateFormat('HH:mm').format(matchDate);
+
+      TextStyle defaultStyle = TextStyle(
+        color: isDarkMode ? Colors.white70 : Colors.black54,
+        fontSize: 12,
+      );
+      TextStyle boldStyle = defaultStyle.copyWith(fontWeight: FontWeight.bold);
+
+      // Show date/time only for scheduled/default cases
+      switch(matchStatus) {
+        case 'TIMED':
+        case 'SCHEDULED':
+          return Column(
+             children: [
+               Text(formattedDate, style: defaultStyle),
+               Text(formattedTime, style: boldStyle),
+             ],
+          );
+        case 'POSTPONED':
+           return Text(
+              AppLocalizations.of(context)?.postponedStatus ?? 'PST',
+              style: TextStyle(color: Colors.grey, fontSize: 12)
+           );
+        case 'SUSPENDED':
+           return Text(
+              AppLocalizations.of(context)?.suspendedStatus ?? 'SUS',
+              style: TextStyle(color: Colors.orange, fontSize: 12)
+           );
+        case 'CANCELLED':
+           return Text(
+              AppLocalizations.of(context)?.cancelledStatus ?? 'CAN',
+              style: TextStyle(color: Colors.red, fontSize: 12)
+           );
+        default: // Hide date/time for ongoing/finished matches
+          return const SizedBox.shrink();
+      }
   }
 
   Widget _buildDateSelector() {
@@ -2466,6 +2743,10 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
           
           return StatefulBuilder(
             builder: (context, setState) {
+              // Ensure a default value if the key doesn't exist yet
+              _expandedCompetitions.putIfAbsent(competitionName, () => true);
+              final bool isExpanded = _expandedCompetitions[competitionName]!;
+
               return Card(
                 margin: const EdgeInsets.only(bottom: 20, left: 8, right: 8),
                 elevation: 4,
@@ -2477,7 +2758,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                     InkWell(
                       onTap: () {
                         setState(() {
-                          _expandedCompetitions[competitionName] = !(_expandedCompetitions[competitionName] ?? true);
+                          _expandedCompetitions[competitionName] = !isExpanded;
                         });
                       },
                       borderRadius: BorderRadius.circular(12),
@@ -2489,25 +2770,25 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                           borderRadius: BorderRadius.only(
                             topLeft: const Radius.circular(12),
                             topRight: const Radius.circular(12),
-                            bottomLeft: (_expandedCompetitions[competitionName] ?? true) ? Radius.zero : const Radius.circular(12),
-                            bottomRight: (_expandedCompetitions[competitionName] ?? true) ? Radius.zero : const Radius.circular(12),
+                            bottomLeft: isExpanded ? Radius.zero : const Radius.circular(12),
+                            bottomRight: isExpanded ? Radius.zero : const Radius.circular(12),
                           ),
                         ),
                         child: Row(
                           children: [
-                            if (competitionEmblem != null && competitionEmblem.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(right: 8.0),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(4),
-                                  child: _buildLogoImage(
-                                    competitionId ?? 0,
-                                    competitionEmblem,
-                                    Theme.of(context).brightness == Brightness.dark,
-                                    kIsWeb,
-                                  ),
-                                ),
-                              ),
+                             if (competitionEmblem != null && competitionEmblem.isNotEmpty)
+                               Padding(
+                                 padding: const EdgeInsets.only(right: 8.0),
+                                 child: ClipRRect(
+                                   borderRadius: BorderRadius.circular(4),
+                                   child: _buildLogoImage(
+                                     competitionId ?? 0,
+                                     competitionEmblem,
+                                     Theme.of(context).brightness == Brightness.dark,
+                                     kIsWeb,
+                                   ),
+                                 ),
+                               ),
                             Expanded(
                               child: Text(
                                 competitionName,
@@ -2519,7 +2800,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                               ),
                             ),
                             AnimatedRotation(
-                              turns: (_expandedCompetitions[competitionName] ?? true) ? 0.5 : 0.0,
+                              turns: isExpanded ? 0.5 : 0.0,
                               duration: const Duration(milliseconds: 300),
                               child: const Icon(Icons.keyboard_arrow_down, color: Colors.white),
                             ),
@@ -2527,20 +2808,30 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                         ),
                       ),
                     ),
-                    // Use AnimatedSize for smoother transitions
+                    // Use AnimatedSize for smoother transitions of the container height
                     AnimatedSize(
                       duration: const Duration(milliseconds: 300),
                       curve: Curves.easeInOut,
-                      child: _expandedCompetitions[competitionName] ?? true
-                          ? AnimatedSlide(
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.easeInOut,
-                              offset: const Offset(0, 0),
-                              child: Column(
-                                children: matches.map((match) => _buildMatchItem(match)).toList(),
-                              ),
-                            )
-                          : const SizedBox.shrink(),
+                      // Use ClipRect to prevent children overflowing during animation
+                      child: ClipRect(
+                        child: isExpanded
+                            ? Column( // Keep the Column
+                                children: matches.asMap().entries.map((entry) { // Use asMap().entries to get index
+                                  int index = entry.key;
+                                  var match = entry.value;
+                                  // Wrap each item with the animation wrapper
+                                  return _AnimatedListItemWrapper(
+                                    // Use a unique and stable key for each item
+                                    key: ValueKey(match['id'] ?? 'match_$index'),
+                                    index: index,
+                                    isVisible: isExpanded, // Pass the expansion state
+                                    delayDuration: const Duration(milliseconds: 50), // Stagger delay
+                                    child: _buildMatchItem(match),
+                                  );
+                                }).toList(),
+                              )
+                            : const SizedBox.shrink(), // Collapse the content when not expanded
+                      ),
                     ),
                   ],
                 ),
@@ -2572,7 +2863,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     final String? homeTeamLogo = homeTeam['crest'];
     final String? awayTeamLogo = awayTeam['crest'];
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+    final matchStatus = match['status']?.toString().toUpperCase();
+
     // Parse match date
     DateTime matchDate;
     try {
@@ -2580,9 +2872,113 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     } catch (e) {
       matchDate = DateTime.now();
     }
-    
     final formattedTime = DateFormat('HH:mm').format(matchDate);
-    
+
+    // Get score information if available
+    var homeScore, awayScore;
+    if (match.containsKey('score') && match['score'] != null &&
+        match['score'].containsKey('fullTime') && match['score']['fullTime'] != null) {
+      homeScore = match['score']['fullTime']['home'];
+      awayScore = match['score']['fullTime']['away'];
+    }
+    final bool hasScore = homeScore != null && awayScore != null;
+
+    Widget statusOrTimeWidget;
+    Widget scoreOrVsWidget;
+
+    switch (matchStatus) {
+      case 'IN_PLAY':
+      case 'LIVE': // Some APIs might use LIVE
+        // --- REVERTED: Use BlinkingLiveIndicator --- 
+        statusOrTimeWidget = const _BlinkingLiveIndicator(); 
+        scoreOrVsWidget = Text(
+          hasScore ? '$homeScore - $awayScore' : '- : -', // Show placeholder if score not yet available
+          style: TextStyle(
+            color: const Color(0xFFFFE6AC),
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
+        );
+        break;
+      case 'PAUSED': // Half Time often uses PAUSED
+      case 'HALF_TIME':
+        statusOrTimeWidget = Text(
+          AppLocalizations.of(context)?.halfTimeStatus ?? 'HT', // Use default string
+          style: TextStyle(
+            color: isDarkMode ? Colors.yellow : Colors.orange,
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+          ),
+        );
+        scoreOrVsWidget = Text(
+          hasScore ? '$homeScore - $awayScore' : '- : -',
+          style: TextStyle(
+            color: const Color(0xFFFFE6AC),
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
+        );
+        break;
+      case 'FINISHED':
+      case 'FT': // Some APIs might use FT explicitly
+        statusOrTimeWidget = Text(
+          AppLocalizations.of(context)?.fullTimeStatus ?? 'FT', // Use default string
+          style: TextStyle(
+            color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+          ),
+        );
+         scoreOrVsWidget = Text(
+          hasScore ? '$homeScore - $awayScore' : '- : -', // Should always have score at FT
+          style: TextStyle(
+            color: const Color(0xFFFFE6AC),
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
+        );
+        break;
+      case 'TIMED':
+      case 'SCHEDULED':
+      case 'POSTPONED':
+      case 'SUSPENDED':
+      case 'CANCELLED':
+      default: // Includes TIMED, SCHEDULED, POSTPONED etc.
+        statusOrTimeWidget = Text(
+          formattedTime,
+          style: TextStyle(
+            color: isDarkMode ? Colors.white : Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
+        );
+        scoreOrVsWidget = Text(
+          AppLocalizations.of(context)?.versus ?? 'vs',
+          style: TextStyle(
+            color: const Color(0xFFFFE6AC),
+            fontWeight: FontWeight.bold,
+          ),
+        );
+        break;
+    }
+
+    // Handle POSTPONED, SUSPENDED, CANCELLED specifically in time/status display
+    if (matchStatus == 'POSTPONED') {
+       statusOrTimeWidget = Text(
+        AppLocalizations.of(context)?.postponedStatus ?? 'PST', // Use default string
+        style: TextStyle(color: Colors.grey, fontSize: 12),
+      );
+    } else if (matchStatus == 'SUSPENDED') {
+        statusOrTimeWidget = Text(
+        AppLocalizations.of(context)?.suspendedStatus ?? 'SUS', // Use default string
+        style: TextStyle(color: Colors.orange, fontSize: 12),
+      );
+    } else if (matchStatus == 'CANCELLED') {
+       statusOrTimeWidget = Text(
+        AppLocalizations.of(context)?.cancelledStatus ?? 'CAN', // Use default string
+        style: TextStyle(color: Colors.red, fontSize: 12),
+      );
+    }
+
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 16.0),
       color: isDarkMode ? const Color(0xFF292929) : Colors.white,
@@ -2593,18 +2989,12 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
         padding: const EdgeInsets.all(12.0),
         child: Row(
           children: [
-            // Match time
+            // Match time or status indicator
             SizedBox(
               width: 50,
-              child: Text(
-                formattedTime,
-                style: TextStyle(
-                  color: isDarkMode ? Colors.white : Colors.black,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              child: Center(child: statusOrTimeWidget), // Center the status/time
             ),
-            
+
             // Home team
             Expanded(
               child: Row(
@@ -2613,11 +3003,11 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                   Flexible(
                     child: InkWell(
                       onTap: () => _navigateToTeamDetails(
-                        homeTeam['id'].toString(), 
-                        homeTeam['name']
+                        homeTeam['id'].toString(),
+                        homeTeam['name'] // Keep full name for navigation context if needed
                       ),
                       child: Text(
-                        homeTeam['name'],
+                        _getResponsiveTeamName(homeTeam, context), // Use responsive helper
                         style: TextStyle(
                           color: isDarkMode ? Colors.white : Colors.black,
                         ),
@@ -2636,7 +3026,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                           width: 20,
                           height: 20,
                           fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) => 
+                          errorBuilder: (context, error, stackTrace) =>
                             const SizedBox(width: 20),
                         ),
                       ),
@@ -2644,19 +3034,13 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                 ],
               ),
             ),
-            
-            // Score separator
+
+            // Score or vs separator
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Text(
-                AppLocalizations.of(context)?.versus ?? 'vs',
-                style: TextStyle(
-                  color: const Color(0xFFFFE6AC),
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              child: scoreOrVsWidget, // Use the dynamic widget here
             ),
-            
+
             // Away team
             Expanded(
               child: Row(
@@ -2671,7 +3055,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                           width: 20,
                           height: 20,
                           fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) => 
+                          errorBuilder: (context, error, stackTrace) =>
                             const SizedBox(width: 20),
                         ),
                       ),
@@ -2679,11 +3063,11 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                   Flexible(
                     child: InkWell(
                       onTap: () => _navigateToTeamDetails(
-                        awayTeam['id'].toString(), 
-                        awayTeam['name']
+                        awayTeam['id'].toString(),
+                        awayTeam['name'] // Keep full name for navigation context if needed
                       ),
                       child: Text(
-                        awayTeam['name'],
+                        _getResponsiveTeamName(awayTeam, context), // Use responsive helper
                         style: TextStyle(
                           color: isDarkMode ? Colors.white : Colors.black,
                         ),
@@ -3039,6 +3423,118 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
           color: isDarkMode ? Colors.white70 : Colors.black54,
         );
       },
+    );
+  }
+}
+
+// Simple widget for just the blinking dot - NO LONGER USED FOR LIVE, but kept for potential future use
+class _BlinkingDot extends StatefulWidget {
+  const _BlinkingDot({Key? key}) : super(key: key);
+
+  @override
+  __BlinkingDotState createState() => __BlinkingDotState();
+}
+
+class __BlinkingDotState extends State<_BlinkingDot> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _controller,
+      child: Container(
+        width: 8,
+        height: 8,
+        decoration: const BoxDecoration(
+          color: Colors.red,
+          shape: BoxShape.circle,
+        ),
+      ),
+    );
+  }
+}
+
+class _BlinkingLiveIndicator extends StatefulWidget {
+  const _BlinkingLiveIndicator({Key? key}) : super(key: key);
+
+  @override
+  __BlinkingLiveIndicatorState createState() => __BlinkingLiveIndicatorState();
+}
+
+class __BlinkingLiveIndicatorState extends State<_BlinkingLiveIndicator>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _opacityAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
+    _opacityAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+    _controller.repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Fetch localization safely
+    final localizations = AppLocalizations.of(context);
+    final liveText = localizations?.liveStatus ?? 'LIVE'; // Default to 'LIVE'
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AnimatedBuilder(
+          animation: _opacityAnimation,
+          builder: (context, child) {
+            return Opacity(
+              opacity: _opacityAnimation.value,
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            );
+          },
+        ),
+        const SizedBox(width: 4),
+        Text(
+          liveText, // Use the fetched or default string
+          style: const TextStyle(
+            color: Colors.red,
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+          ),
+        ),
+      ],
     );
   }
 } 
