@@ -33,6 +33,8 @@ import 'dart:math';
 import 'services/football_api_service.dart' as football_api;
 import 'dashboard.dart';
 import 'popup_demo.dart';
+import 'package:footify/team_details.dart';
+import 'dart:async'; // Import Timer
 
 // A simple in-memory image cache
 class ImageCache {
@@ -1267,11 +1269,14 @@ class Header extends StatelessWidget {
 }
 
 class CustomSearchDelegate extends SearchDelegate {
+  Timer? _debounce;
+
   @override
   ThemeData appBarTheme(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return ThemeData(
       fontFamily: 'Lexend',
+      scaffoldBackgroundColor: isDarkMode ? const Color(0xFF1D1D1D) : Colors.white,
       appBarTheme: AppBarTheme(
         backgroundColor: isDarkMode ? const Color(0xFF1D1D1D) : Colors.white,
         iconTheme: IconThemeData(color: isDarkMode ? Colors.white : Colors.black),
@@ -1286,6 +1291,33 @@ class CustomSearchDelegate extends SearchDelegate {
         focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFffe6ac), width: 3.0)),
         enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFffe6ac), width: 1.7)),
         labelStyle: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+      ),
+      textTheme: TextTheme(
+        titleLarge: TextStyle(
+          color: isDarkMode ? Colors.white : Colors.black,
+          fontFamily: 'Lexend',
+        ),
+        bodyLarge: TextStyle(
+          color: isDarkMode ? Colors.white : Colors.black,
+          fontFamily: 'Lexend',
+        ),
+      ),
+      searchBarTheme: SearchBarThemeData(
+        backgroundColor: MaterialStateProperty.all(
+          isDarkMode ? const Color(0xFF1D1D1D) : Colors.white,
+        ),
+        textStyle: MaterialStateProperty.all(
+          TextStyle(
+            color: isDarkMode ? Colors.white : Colors.black,
+            fontFamily: 'Lexend',
+          ),
+        ),
+        hintStyle: MaterialStateProperty.all(
+          TextStyle(
+            color: isDarkMode ? const Color.fromARGB(170, 240, 240, 240) : Colors.black54,
+            fontFamily: 'Lexend',
+          ),
+        ),
       ),
     );
   }
@@ -1312,44 +1344,273 @@ class CustomSearchDelegate extends SearchDelegate {
 
   @override
   Widget buildResults(BuildContext context) {
+    // buildResults should show results immediately based on the final query
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    // Cancel any existing debounce timer when showing results
+    _debounce?.cancel();
+    
     return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isDarkMode ? [const Color(0xFF1D1D1D), const Color(0xFF292929)] : [Colors.white, Colors.white],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
+      color: isDarkMode ? const Color(0xFF1D1D1D) : Colors.white,
+      child: FutureBuilder<List<Map<String, dynamic>>>(
+        // Use the current query directly
+        future: _searchData(query),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(
+              child: CircularProgressIndicator(
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            );
+          }
+
+          if (snapshot.hasError) {
+            return Center(
+              child: Text(
+                'Error: ${snapshot.error}',
+                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+              ),
+            );
+          }
+
+          final results = snapshot.data ?? [];
+          if (results.isEmpty) {
+            return Center(
+              child: Text(
+                'No results found for "$query"',
+                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+              ),
+            );
+          }
+
+          return ListView.builder(
+            itemCount: results.length,
+            itemBuilder: (context, index) {
+              final item = results[index];
+              return ListTile(
+                tileColor: isDarkMode ? const Color(0xFF1D1D1D) : Colors.white,
+                leading: item['type'] == 'team' || item['type'] == 'competition'
+                  ? item['emblem'] != null && item['emblem'].isNotEmpty
+                    ? Image.network(
+                        item['emblem'],
+                        width: 40,
+                        height: 40,
+                        errorBuilder: (context, error, stackTrace) => 
+                          Icon(Icons.sports_soccer, color: isDarkMode ? Colors.white : Colors.black),
+                      )
+                    : Icon(Icons.sports_soccer, color: isDarkMode ? Colors.white : Colors.black)
+                  : null,
+                title: Text(
+                  item['name'],
+                  style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                ),
+                subtitle: item['type'] == 'match'
+                  ? Text(
+                      '${item['homeTeam']} vs ${item['awayTeam']}',
+                      style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black54),
+                    )
+                  : null,
+                onTap: () {
+                  // Use showResults directly as buildResults handles the search
+                  // query = item['name']; 
+                  showResults(context);
+                },
+              );
+            },
+          );
+        },
       ),
-      child: Center(child: Text(query, style: TextStyle(color: isDarkMode ? Colors.white : Colors.black))),
     );
   }
 
   @override
   Widget buildSuggestions(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final suggestions = query.isEmpty ? [] : ['Suggestion 1', 'Suggestion 2', 'Suggestion 3'];
+
+    // Debounce logic
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      // Trigger rebuild only after debounce duration
+      // Note: SearchDelegate rebuilds automatically on query change,
+      // so we don't strictly need setState here, but FutureBuilder will refetch.
+    });
+
     return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isDarkMode ? [const Color(0xFF1D1D1D), const Color(0xFF292929)] : [Colors.white, Colors.white],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-      ),
-      child: ListView.builder(
-        itemCount: suggestions.length,
-        itemBuilder: (context, index) {
-          return ListTile(
-            title: Text(suggestions[index], style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
-            onTap: () {
-              query = suggestions[index];
-              showResults(context);
-            },
-          );
-        },
-      ),
+      color: isDarkMode ? const Color(0xFF1D1D1D) : Colors.white,
+      child: query.isEmpty
+          ? Center(
+              child: Text(
+                'Start typing to search matches, teams, and players',
+                style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black54),
+              ),
+            )
+          : FutureBuilder<List<Map<String, dynamic>>>(
+              // Pass the current query to the future
+              future: _searchData(query),
+              builder: (context, snapshot) {
+                 if (snapshot.connectionState == ConnectionState.waiting) {
+                    // Show suggestions based on the *current* query while waiting
+                    // Or simply show a loading indicator
+                   return Center(
+                      child: CircularProgressIndicator(
+                        color: isDarkMode ? Colors.white : Colors.black,
+                      ),
+                    );
+                  }
+
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text(
+                      'Error: ${snapshot.error}',
+                      style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                    ),
+                  );
+                }
+
+                final suggestions = snapshot.data ?? [];
+                 if (suggestions.isEmpty && query.isNotEmpty) {
+                    // Handle case where search yields no suggestions
+                    return Center(
+                      child: Text(
+                        'No suggestions found for "$query"',
+                        style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                      ),
+                    );
+                  }
+                  
+                return ListView.builder(
+                  itemCount: suggestions.length,
+                  itemBuilder: (context, index) {
+                    final item = suggestions[index];
+                    return ListTile(
+                      tileColor: isDarkMode ? const Color(0xFF1D1D1D) : Colors.white,
+                       leading: item['type'] == 'team' || item['type'] == 'competition'
+                        ? item['emblem'] != null && item['emblem'].isNotEmpty
+                          ? Image.network(
+                              item['emblem'],
+                              width: 40,
+                              height: 40,
+                              errorBuilder: (context, error, stackTrace) => 
+                                Icon(Icons.sports_soccer, color: isDarkMode ? Colors.white : Colors.black),
+                            )
+                          : Icon(Icons.sports_soccer, color: isDarkMode ? Colors.white : Colors.black)
+                        : null,
+                      title: Text(
+                        item['name'],
+                        style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                      ),
+                       subtitle: item['type'] == 'match'
+                        ? Text(
+                            '${item['homeTeam']} vs ${item['awayTeam']}',
+                            style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black54),
+                          )
+                        : null,
+                      onTap: () {
+                        // When suggestion is tapped, update query and show results
+                        query = item['name'];
+                        showResults(context);
+                      },
+                    );
+                  },
+                );
+              },
+            ),
     );
+  }
+
+  Future<List<Map<String, dynamic>>> _searchData(String query) async {
+    // Log the query received by _searchData
+    print("[_searchData] Received query: '$query'");
+
+    if (query.isEmpty) {
+      print("[_searchData] Query is empty, returning empty list.");
+      return [];
+    }
+
+    print("[_searchData] Starting search for: '$query'");
+
+    try {
+      // Search matches
+      print("[_searchData] Calling searchMatches for '$query'...");
+      final matches = await football_api.FootballApiService.searchMatches(query);
+      print("[_searchData] Found ${matches.length} matches for '$query'.");
+      
+      // Search teams
+      print("[_searchData] Calling searchTeams for '$query'...");
+      final teams = await football_api.FootballApiService.searchTeams(query);
+      print("[_searchData] Found ${teams.length} teams for '$query'.");
+      
+      // Search competitions
+      print("[_searchData] Calling searchCompetitions for '$query'...");
+      final competitions = await football_api.FootballApiService.searchCompetitions(query);
+      print("[_searchData] Found ${competitions.length} competitions for '$query'.");
+
+      // Combine and sort results
+      final results = [
+        ...matches.map((m) => {
+          // Ensure necessary fields are present and have defaults
+          'id': m['id'],
+          'name': m['name'] ?? 'Unknown Match',
+          'homeTeam': m['homeTeam'] ?? 'N/A',
+          'awayTeam': m['awayTeam'] ?? 'N/A',
+          'homeTeamId': m['homeTeamId'], // Ensure these are passed if needed
+          'awayTeamId': m['awayTeamId'], // Ensure these are passed if needed
+          'competition': m['competition'] ?? 'N/A',
+          'date': m['date'],
+          'status': m['status'],
+          'score': m['score'],
+          'type': 'match',
+        }),
+        ...teams.map((t) => {
+          'id': t['id'],
+          'name': t['name'] ?? 'Unknown Team',
+          'emblem': t['emblem'] ?? '',
+          'type': 'team',
+        }),
+        ...competitions.map((c) => {
+          'id': c['id'],
+          'name': c['name'] ?? 'Unknown Competition',
+          'emblem': c['emblem'] ?? '',
+          'type': 'competition',
+        }),
+      ];
+
+      print("[_searchData] Combined ${results.length} results before sorting for '$query'.");
+
+      // Sort by relevance (exact matches first, then partial matches)
+      results.sort((a, b) {
+        final aName = a['name']?.toString().toLowerCase() ?? '';
+        final bName = b['name']?.toString().toLowerCase() ?? '';
+        final queryLower = query.toLowerCase();
+
+        // Prioritize exact matches
+        if (aName == queryLower && bName != queryLower) return -1;
+        if (aName != queryLower && bName == queryLower) return 1;
+        
+        // Prioritize items starting with the query
+        final aStartsWith = aName.startsWith(queryLower);
+        final bStartsWith = bName.startsWith(queryLower);
+        if (aStartsWith && !bStartsWith) return -1;
+        if (!aStartsWith && bStartsWith) return 1;
+
+        // Finally, sort alphabetically
+        return aName.compareTo(bName);
+      });
+
+      print("[_searchData] Returning ${results.length} sorted results for '$query'.");
+      return results;
+      
+    } catch (e, stacktrace) { // Added stacktrace
+      print('[_searchData] Search error for query "$query": $e');
+      print('[_searchData] Stacktrace: $stacktrace'); // Log stacktrace
+      return []; // Return empty list on error
+    }
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel(); // Important: cancel timer on dispose
+    super.dispose();
   }
 }
 

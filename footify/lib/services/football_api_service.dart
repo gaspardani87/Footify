@@ -780,4 +780,96 @@ class FootballApiService {
       // További országokat a második tömbben tartjuk meg egyszerűsítés céljából
     ];
   }
+
+  // Search matches by query
+  static Future<List<Map<String, dynamic>>> searchMatches(String query) async {
+    _checkInitialized();
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/searchMatches').replace(
+          queryParameters: {'query': query}
+        )
+      ).timeout(const Duration(seconds: 10));
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data is List) {
+          return data.map((match) => {
+            'id': match['id'],
+            'name': '${match['homeTeam']['name']} vs ${match['awayTeam']['name']}',
+            'homeTeam': match['homeTeam']['name'],
+            'awayTeam': match['awayTeam']['name'],
+            'competition': match['competition']['name'],
+            'date': match['utcDate'],
+            'status': match['status'],
+            'score': match['score'],
+            'type': 'match',
+          }).toList();
+        }
+        return [];
+      }
+      return [];
+    } catch (e) {
+      print('Error in searchMatches: $e');
+      return [];
+    }
+  }
+
+  // Search teams by query
+  static Future<List<Map<String, dynamic>>> searchTeams(String query) async {
+    _checkInitialized();
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/searchTeams').replace(
+          queryParameters: {'query': query}
+        )
+      ).timeout(const Duration(seconds: 10));
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data is List) {
+          return data.map((team) => {
+            'id': team['id'],
+            'name': team['name'],
+            'emblem': team['crest'],
+            'type': 'team',
+          }).toList();
+        }
+        return [];
+      }
+      return [];
+    } catch (e) {
+      print('Error in searchTeams: $e');
+      return [];
+    }
+  }
+
+  // Search competitions by query
+  static Future<List<Map<String, dynamic>>> searchCompetitions(String query) async {
+    _checkInitialized();
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/searchCompetitions').replace(
+          queryParameters: {'query': query}
+        )
+      ).timeout(const Duration(seconds: 10));
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data is List) {
+          return data.map((competition) => {
+            'id': competition['id'],
+            'name': competition['name'],
+            'emblem': competition['emblem'],
+            'type': 'competition',
+          }).toList();
+        }
+        return [];
+      }
+      return [];
+    } catch (e) {
+      print('Error in searchCompetitions: $e');
+      return [];
+    }
+  }
 } 

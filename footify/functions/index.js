@@ -1580,3 +1580,236 @@ exports.getMatchesForDateRange = functions.https.onRequest(async (req, res) => {
     });
   }
 });
+
+// Search matches by query
+exports.searchMatches = functions.https.onRequest(async (req, res) => {
+  setCorsHeaders(res);
+  
+  if (handleOptions(req, res)) return;
+
+  const { query } = req.query;
+  if (!query) {
+    console.log("[searchMatches] Error: Query parameter is missing.");
+    return res.status(400).json({ error: 'Query parameter is required' });
+  }
+  console.log(`[searchMatches] Received query: "${query}"`);
+
+  try {
+    // Get matches from top competitions
+    const topCompetitionIds = [2021, 2014, 2019, 2002, 2015]; // Premier League, La Liga, Serie A, Bundesliga, Ligue 1
+    console.log(`[searchMatches] Fetching matches for competitions: ${topCompetitionIds.join(', ')} for query "${query}"`);
+    
+    const matchesPromises = topCompetitionIds.map(async (competitionId) => {
+      try {
+        const url = `${BASE_URL}/competitions/${competitionId}/matches`;
+        console.log(`[searchMatches] Fetching from URL: ${url}`);
+        const response = await axios.get(url, {
+          headers: {
+            'X-Auth-Token': API_KEY,
+          },
+          timeout: 10000, // 10 second timeout
+        });
+        console.log(`[searchMatches] API response status for competition ${competitionId}: ${response.status}`);
+        return response.data.matches || [];
+      } catch (error) {
+        console.error(`[searchMatches] Error fetching matches for competition ${competitionId}:`, error.message);
+        if (error.response) {
+          console.error(`[searchMatches] API Error Status: ${error.response.status}`);
+          console.error(`[searchMatches] API Error Data:`, error.response.data);
+          if (error.response.status === 429) {
+            console.warn(`[searchMatches] Rate limit hit for competition ${competitionId}.`);
+          }
+        } else if (error.request) {
+          console.error("[searchMatches] API No response received for competition", competitionId);
+        } else {
+          console.error("[searchMatches] API Request setup error for competition", competitionId, error.message);
+        }
+        return []; // Return empty on error for this specific competition
+      }
+    });
+
+    const matchesSets = await Promise.all(matchesPromises);
+    let allMatches = matchesSets.flat(); // Combine results from all competitions
+    console.log(`[searchMatches] Total matches fetched before filtering: ${allMatches.length}`);
+
+    // Filter matches based on query
+    const searchQuery = query.toLowerCase();
+    const filteredMatches = allMatches.filter(match => {
+      const homeTeam = match?.homeTeam?.name?.toLowerCase() || '';
+      const awayTeam = match?.awayTeam?.name?.toLowerCase() || '';
+      const competitionName = match?.competition?.name?.toLowerCase() || '';
+      
+      return homeTeam.includes(searchQuery) || 
+             awayTeam.includes(searchQuery) || 
+             competitionName.includes(searchQuery);
+    });
+    console.log(`[searchMatches] Total matches after filtering for "${query}": ${filteredMatches.length}`);
+
+    // Sort matches by date (most recent first)
+    filteredMatches.sort((a, b) => {
+      try {
+        return new Date(b.utcDate) - new Date(a.utcDate);
+      } catch (e) {
+        return 0; // Avoid crash if date is invalid
+      }
+    });
+
+    res.status(200).json(filteredMatches);
+  } catch (error) {
+    console.error(`[searchMatches] Unexpected error searching matches for "${query}":`, error.message);
+    res.status(500).json({
+      error: 'Failed to search matches',
+      details: error.message || 'Unknown error',
+    });
+  }
+});
+
+// Search teams by query
+exports.searchTeams = functions.https.onRequest(async (req, res) => {
+  setCorsHeaders(res);
+  
+  if (handleOptions(req, res)) return;
+
+  const { query } = req.query;
+  if (!query) {
+    console.log("[searchTeams] Error: Query parameter is missing.");
+    return res.status(400).json({ error: 'Query parameter is required' });
+  }
+  console.log(`[searchTeams] Received query: "${query}"`);
+
+  try {
+    // Get teams from top competitions
+    const topCompetitionIds = [2021, 2014, 2019, 2002, 2015];
+    console.log(`[searchTeams] Fetching teams for competitions: ${topCompetitionIds.join(', ')} for query "${query}"`);
+
+    const teamsPromises = topCompetitionIds.map(async (competitionId) => {
+      try {
+        const url = `${BASE_URL}/competitions/${competitionId}/teams`;
+        console.log(`[searchTeams] Fetching from URL: ${url}`);
+        const response = await axios.get(url, {
+          headers: {
+            'X-Auth-Token': API_KEY,
+          },
+           timeout: 10000, // 10 second timeout
+        });
+        console.log(`[searchTeams] API response status for competition ${competitionId}: ${response.status}`);
+        return response.data.teams || [];
+      } catch (error) {
+        console.error(`[searchTeams] Error fetching teams for competition ${competitionId}:`, error.message);
+         if (error.response) {
+          console.error(`[searchTeams] API Error Status: ${error.response.status}`);
+          console.error(`[searchTeams] API Error Data:`, error.response.data);
+           if (error.response.status === 429) {
+            console.warn(`[searchTeams] Rate limit hit for competition ${competitionId}.`);
+          }
+        } else if (error.request) {
+          console.error("[searchTeams] API No response received for competition", competitionId);
+        } else {
+          console.error("[searchTeams] API Request setup error for competition", competitionId, error.message);
+        }
+        return [];
+      }
+    });
+
+    const teamsSets = await Promise.all(teamsPromises);
+    let allTeams = teamsSets.flat();
+    console.log(`[searchTeams] Total teams fetched before filtering: ${allTeams.length}`);
+
+    // Remove duplicates
+    const uniqueTeams = [];
+    const teamIds = new Set();
+    allTeams.forEach(team => {
+      if (team && team.id && !teamIds.has(team.id)) { // Added check for team and team.id
+        teamIds.add(team.id);
+        uniqueTeams.push(team);
+      }
+    });
+    console.log(`[searchTeams] Total unique teams: ${uniqueTeams.length}`);
+
+    // Filter teams based on query
+    const searchQuery = query.toLowerCase();
+    const filteredTeams = uniqueTeams.filter(team => {
+      const teamName = team?.name?.toLowerCase() || '';
+      const shortName = team?.shortName?.toLowerCase() || '';
+      const tla = team?.tla?.toLowerCase() || '';
+      
+      return teamName.includes(searchQuery) || 
+             shortName.includes(searchQuery) || 
+             tla.includes(searchQuery);
+    });
+    console.log(`[searchTeams] Total teams after filtering for "${query}": ${filteredTeams.length}`);
+
+    // Sort teams alphabetically
+    filteredTeams.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+    res.status(200).json(filteredTeams);
+  } catch (error) {
+    console.error(`[searchTeams] Unexpected error searching teams for "${query}":`, error.message);
+    res.status(500).json({
+      error: 'Failed to search teams',
+      details: error.message || 'Unknown error',
+    });
+  }
+});
+
+// Search competitions by query
+exports.searchCompetitions = functions.https.onRequest(async (req, res) => {
+  setCorsHeaders(res);
+  
+  if (handleOptions(req, res)) return;
+
+  const { query } = req.query;
+  if (!query) {
+    console.log("[searchCompetitions] Error: Query parameter is missing.");
+    return res.status(400).json({ error: 'Query parameter is required' });
+  }
+  console.log(`[searchCompetitions] Received query: "${query}"`);
+
+  try {
+    const url = `${BASE_URL}/competitions`;
+    console.log(`[searchCompetitions] Fetching from URL: ${url}`);
+    const response = await axios.get(url, {
+      headers: {
+        'X-Auth-Token': API_KEY,
+      },
+      timeout: 10000, // 10 second timeout
+    });
+    console.log(`[searchCompetitions] API response status: ${response.status}`);
+
+    const competitions = response.data.competitions || [];
+    console.log(`[searchCompetitions] Total competitions fetched: ${competitions.length}`);
+    const searchQuery = query.toLowerCase();
+
+    // Filter competitions based on query
+    const filteredCompetitions = competitions.filter(competition => {
+      const name = competition?.name?.toLowerCase() || '';
+      const code = competition?.code?.toLowerCase() || '';
+      
+      return name.includes(searchQuery) || 
+             code.includes(searchQuery);
+    });
+    console.log(`[searchCompetitions] Total competitions after filtering for "${query}": ${filteredCompetitions.length}`);
+
+    // Sort competitions alphabetically
+    filteredCompetitions.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+    res.status(200).json(filteredCompetitions);
+  } catch (error) {
+    console.error(`[searchCompetitions] Error searching competitions for "${query}":`, error.message);
+    if (error.response) {
+      console.error(`[searchCompetitions] API Error Status: ${error.response.status}`);
+      console.error(`[searchCompetitions] API Error Data:`, error.response.data);
+      if (error.response.status === 429) {
+        console.warn(`[searchCompetitions] Rate limit hit.`);
+      }
+    } else if (error.request) {
+      console.error("[searchCompetitions] API No response received.");
+    } else {
+      console.error("[searchCompetitions] API Request setup error.", error.message);
+    }
+    res.status(500).json({
+      error: 'Failed to search competitions',
+      details: error.message || 'Unknown error',
+    });
+  }
+});

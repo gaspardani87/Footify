@@ -2167,7 +2167,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
       // Return a fallback UI if matchData is null
       return Container(
         margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-        height: 250,
+        height: 270, // Reduced from 300, original was 250
         decoration: BoxDecoration(
           color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(12.0),
@@ -2183,7 +2183,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.all(12.0),
+              padding: const EdgeInsets.all(14.0), // Reduced from 16.0
               child: Text(
                 'Next Match',
                 style: const TextStyle(
@@ -2195,7 +2195,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
             Expanded(
               child: Center(
                 child: Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.all(20.0), // Reduced from 24.0
                   child: Text(
                     'Match data not available',
                     textAlign: TextAlign.center,
@@ -2274,7 +2274,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.all(12.0),
+            padding: const EdgeInsets.all(16.0), // Reduced from 20.0
             child: Row(
               children: [
                 Expanded(
@@ -2300,7 +2300,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                       ),
                     ),
                   ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 10), // Reduced from 12
                 Text(
                   competition['name'] ?? 'Unknown Competition',
                   style: TextStyle(
@@ -2312,7 +2312,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0), // Reduced from 24.0, 16.0
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -2323,54 +2323,52 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                             borderRadius: BorderRadius.circular(8),
                             child: Image.network(
                               _getProxiedImageUrl(homeTeamLogo),
-                              width: 64,
-                              height: 64,
+                              width: 70, // Reduced from 80, original was 64
+                              height: 70, // Reduced from 80, original was 64
                               fit: BoxFit.contain,
                               errorBuilder: (context, error, stackTrace) => Container(
-                                width: 64,
-                                height: 64,
+                                width: 70,
+                                height: 70,
                                 alignment: Alignment.center,
                                 decoration: BoxDecoration(
                                   color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: const Icon(Icons.sports_soccer, size: 32),
+                                child: const Icon(Icons.sports_soccer, size: 35), // Reduced from 40
                               ),
                             ),
                           )
                         : Container(
-                            width: 64,
-                            height: 64,
+                            width: 70,
+                            height: 70,
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
                               color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Icon(Icons.sports_soccer, size: 32),
+                            child: const Icon(Icons.sports_soccer, size: 35),
                           ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12), // Reduced from 16
                     SizedBox(
-                      width: 100,
+                      width: 110, // Reduced from 120
                       child: Text(
-                        _getShortTeamName(homeTeam), // Use helper
+                        _getShortTeamName(homeTeam),
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: 14,
+                          fontSize: 15, // Reduced from 16
                         ),
                         textAlign: TextAlign.center,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const SizedBox(height: 8), // <-- Add padding here
+                    const SizedBox(height: 12), // Reduced from 16
                   ],
                 ),
                 Column(
                   children: [
-                    // ---> NEW Status/Score/Time display <--- 
                     _buildMatchCardStatus(matchData),
-                    const SizedBox(height: 8),
-                    // Helper for Match Card: Date/Time Display
+                    const SizedBox(height: 12), // Reduced from 16
                     _buildMatchCardDateTime(matchData, isDarkMode),
                   ],
                 ),
@@ -2381,51 +2379,52 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                             borderRadius: BorderRadius.circular(8),
                             child: Image.network(
                               _getProxiedImageUrl(awayTeamLogo),
-                              width: 64,
-                              height: 64,
+                              width: 70,
+                              height: 70,
                               fit: BoxFit.contain,
                               errorBuilder: (context, error, stackTrace) => Container(
-                                width: 64,
-                                height: 64,
+                                width: 70,
+                                height: 70,
                                 alignment: Alignment.center,
                                 decoration: BoxDecoration(
                                   color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: const Icon(Icons.sports_soccer, size: 32),
+                                child: const Icon(Icons.sports_soccer, size: 35),
                               ),
                             ),
                           )
                         : Container(
-                            width: 64,
-                            height: 64,
+                            width: 70,
+                            height: 70,
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
                               color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Icon(Icons.sports_soccer, size: 32),
+                            child: const Icon(Icons.sports_soccer, size: 35),
                           ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     SizedBox(
-                      width: 100,
+                      width: 110,
                       child: Text(
-                        _getShortTeamName(awayTeam), // Use helper
+                        _getShortTeamName(awayTeam),
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: 14,
+                          fontSize: 15,
                         ),
                         textAlign: TextAlign.center,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const SizedBox(height: 8), // <-- Add padding here
+                    const SizedBox(height: 12),
                   ],
                 ),
               ],
             ),
           ),
+          const SizedBox(height: 12), // Reduced from 16
         ],
       ),
     );
