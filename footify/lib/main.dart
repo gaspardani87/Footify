@@ -1270,6 +1270,30 @@ class Header extends StatelessWidget {
 
 class CustomSearchDelegate extends SearchDelegate {
   Timer? _debounce;
+  // Add a static cache for search results
+  static final Map<String, List<Map<String, dynamic>>> _searchCache = {};
+  // Store the last query to preserve search state
+  static String _lastQuery = '';
+  
+  // Override query setter to update our internal state
+  @override
+  set query(String value) {
+    super.query = value;
+  }
+  
+  // Initialize with the last query when opened
+  CustomSearchDelegate() {
+    if (_lastQuery.isNotEmpty) {
+      super.query = _lastQuery;
+    }
+  }
+
+  @override
+  void close(BuildContext context, result) {
+    // Remember the query before closing
+    _lastQuery = super.query;
+    super.close(context, result);
+  }
 
   @override
   ThemeData appBarTheme(BuildContext context) {
@@ -1323,12 +1347,22 @@ class CustomSearchDelegate extends SearchDelegate {
   }
 
   @override
+  void showResults(BuildContext context) {
+    // Save the current query before showing results
+    _lastQuery = super.query;
+    super.showResults(context);
+  }
+
+  @override
   List<Widget>? buildActions(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return [
       IconButton(
         icon: Icon(Icons.clear, color: isDarkMode ? Colors.white : Colors.black),
-        onPressed: () { query = ''; },
+        onPressed: () { 
+          query = ''; 
+          _lastQuery = '';
+        },
       ),
     ];
   }
@@ -1338,28 +1372,37 @@ class CustomSearchDelegate extends SearchDelegate {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return IconButton(
       icon: Icon(Icons.arrow_back, color: isDarkMode ? Colors.white : Colors.black),
-      onPressed: () { close(context, null); },
+      onPressed: () { 
+        // Remember the query before closing
+        _lastQuery = super.query;
+        close(context, null); 
+      },
     );
   }
 
   @override
   Widget buildResults(BuildContext context) {
-    // buildResults should show results immediately based on the final query
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
     
     // Cancel any existing debounce timer when showing results
     _debounce?.cancel();
+    
+    // Check if query is too short
+    if (super.query.length < 3) {
+      return _buildMinimumCharactersMessage(context, isDarkMode, colorScheme);
+    }
     
     return Container(
       color: isDarkMode ? const Color(0xFF1D1D1D) : Colors.white,
       child: FutureBuilder<List<Map<String, dynamic>>>(
         // Use the current query directly
-        future: _searchData(query),
+        future: _getSearchResults(super.query),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(
               child: CircularProgressIndicator(
-                color: isDarkMode ? Colors.white : Colors.black,
+                color: colorScheme.primary,
               ),
             );
           }
@@ -1376,9 +1419,25 @@ class CustomSearchDelegate extends SearchDelegate {
           final results = snapshot.data ?? [];
           if (results.isEmpty) {
             return Center(
-              child: Text(
-                'No results found for "$query"',
-                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.search_off,
+                    size: 48,
+                    color: colorScheme.primary.withOpacity(0.7),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No results found for "${super.query}"',
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
             );
           }
@@ -1387,35 +1446,7 @@ class CustomSearchDelegate extends SearchDelegate {
             itemCount: results.length,
             itemBuilder: (context, index) {
               final item = results[index];
-              return ListTile(
-                tileColor: isDarkMode ? const Color(0xFF1D1D1D) : Colors.white,
-                leading: item['type'] == 'team' || item['type'] == 'competition'
-                  ? item['emblem'] != null && item['emblem'].isNotEmpty
-                    ? Image.network(
-                        item['emblem'],
-                        width: 40,
-                        height: 40,
-                        errorBuilder: (context, error, stackTrace) => 
-                          Icon(Icons.sports_soccer, color: isDarkMode ? Colors.white : Colors.black),
-                      )
-                    : Icon(Icons.sports_soccer, color: isDarkMode ? Colors.white : Colors.black)
-                  : null,
-                title: Text(
-                  item['name'],
-                  style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-                ),
-                subtitle: item['type'] == 'match'
-                  ? Text(
-                      '${item['homeTeam']} vs ${item['awayTeam']}',
-                      style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black54),
-                    )
-                  : null,
-                onTap: () {
-                  // Use showResults directly as buildResults handles the search
-                  // query = item['name']; 
-                  showResults(context);
-                },
-              );
+              return _buildSearchResultItem(context, item, isDarkMode, colorScheme);
             },
           );
         },
@@ -1426,96 +1457,594 @@ class CustomSearchDelegate extends SearchDelegate {
   @override
   Widget buildSuggestions(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
 
-    // Debounce logic
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(milliseconds: 500), () {
-      // Trigger rebuild only after debounce duration
-      // Note: SearchDelegate rebuilds automatically on query change,
-      // so we don't strictly need setState here, but FutureBuilder will refetch.
-    });
+    // Debounce logic - only apply when query changes
+    if (super.query != _lastQuery) {
+      if (_debounce?.isActive ?? false) _debounce!.cancel();
+      _debounce = Timer(const Duration(milliseconds: 500), () {
+        // Remember query for state preservation
+        _lastQuery = super.query;
+      });
+    }
 
     return Container(
       color: isDarkMode ? const Color(0xFF1D1D1D) : Colors.white,
-      child: query.isEmpty
-          ? Center(
-              child: Text(
-                'Start typing to search matches, teams, and players',
-                style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black54),
-              ),
-            )
-          : FutureBuilder<List<Map<String, dynamic>>>(
-              // Pass the current query to the future
-              future: _searchData(query),
-              builder: (context, snapshot) {
-                 if (snapshot.connectionState == ConnectionState.waiting) {
-                    // Show suggestions based on the *current* query while waiting
-                    // Or simply show a loading indicator
-                   return Center(
-                      child: CircularProgressIndicator(
-                        color: isDarkMode ? Colors.white : Colors.black,
-                      ),
-                    );
-                  }
+      child: super.query.isEmpty
+          ? _buildInitialSearchScreen(context, isDarkMode, colorScheme)
+          : super.query.length < 3
+              ? _buildMinimumCharactersMessage(context, isDarkMode, colorScheme)
+              : FutureBuilder<List<Map<String, dynamic>>>(
+                  future: _getSearchResults(super.query),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return Center(
+                        child: CircularProgressIndicator(
+                          color: colorScheme.primary,
+                        ),
+                      );
+                    }
 
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Text(
-                      'Error: ${snapshot.error}',
-                      style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-                    ),
-                  );
-                }
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Text(
+                          'Error: ${snapshot.error}',
+                          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                        ),
+                      );
+                    }
 
-                final suggestions = snapshot.data ?? [];
-                 if (suggestions.isEmpty && query.isNotEmpty) {
-                    // Handle case where search yields no suggestions
-                    return Center(
-                      child: Text(
-                        'No suggestions found for "$query"',
-                        style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-                      ),
-                    );
-                  }
-                  
-                return ListView.builder(
-                  itemCount: suggestions.length,
-                  itemBuilder: (context, index) {
-                    final item = suggestions[index];
-                    return ListTile(
-                      tileColor: isDarkMode ? const Color(0xFF1D1D1D) : Colors.white,
-                       leading: item['type'] == 'team' || item['type'] == 'competition'
-                        ? item['emblem'] != null && item['emblem'].isNotEmpty
-                          ? Image.network(
-                              item['emblem'],
-                              width: 40,
-                              height: 40,
-                              errorBuilder: (context, error, stackTrace) => 
-                                Icon(Icons.sports_soccer, color: isDarkMode ? Colors.white : Colors.black),
-                            )
-                          : Icon(Icons.sports_soccer, color: isDarkMode ? Colors.white : Colors.black)
-                        : null,
-                      title: Text(
-                        item['name'],
-                        style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-                      ),
-                       subtitle: item['type'] == 'match'
-                        ? Text(
-                            '${item['homeTeam']} vs ${item['awayTeam']}',
-                            style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black54),
-                          )
-                        : null,
-                      onTap: () {
-                        // When suggestion is tapped, update query and show results
-                        query = item['name'];
-                        showResults(context);
+                    final suggestions = snapshot.data ?? [];
+                    if (suggestions.isEmpty && super.query.isNotEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.search_off,
+                              size: 48,
+                              color: colorScheme.primary.withOpacity(0.7),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No suggestions found for "${super.query}"',
+                              style: TextStyle(
+                                color: isDarkMode ? Colors.white : Colors.black,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                      
+                    return ListView.builder(
+                      itemCount: suggestions.length,
+                      itemBuilder: (context, index) {
+                        final item = suggestions[index];
+                        return _buildSearchResultItem(context, item, isDarkMode, colorScheme);
                       },
                     );
                   },
-                );
+                ),
+    );
+  }
+
+  // Helper method to show initial search screen
+  Widget _buildInitialSearchScreen(BuildContext context, bool isDarkMode, ColorScheme colorScheme) {
+    // If we have a previous search, show cached results
+    if (_lastQuery.isNotEmpty && _searchCache.containsKey(_lastQuery)) {
+      final previousResults = _searchCache[_lastQuery]!;
+      
+      return Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.history,
+                  size: 20,
+                  color: colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Previous search: "${_lastQuery}"',
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                InkWell(
+                  onTap: () {
+                    query = _lastQuery;
+                    showResults(context);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      'Search again',
+                      style: TextStyle(
+                        color: colorScheme.primary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              itemCount: previousResults.length,
+              itemBuilder: (context, index) {
+                final item = previousResults[index];
+                return _buildSearchResultItem(context, item, isDarkMode, colorScheme);
               },
             ),
+          ),
+        ],
+      );
+    }
+    
+    // Default initial screen if no previous search
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.search,
+            size: 48,
+            color: colorScheme.primary.withOpacity(0.7),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Start typing to search teams, matches, and competitions',
+            style: TextStyle(
+              color: isDarkMode ? Colors.white70 : Colors.black54,
+              fontSize: 16,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
+  }
+
+  // Helper method to show minimum characters message
+  Widget _buildMinimumCharactersMessage(BuildContext context, bool isDarkMode, ColorScheme colorScheme) {
+    final currentQuery = super.query;
+    
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.search,
+            size: 48,
+            color: colorScheme.primary.withOpacity(0.7),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Please enter at least 3 characters',
+            style: TextStyle(
+              color: isDarkMode ? Colors.white : Colors.black,
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Current query: "${currentQuery}" (${currentQuery.length}/3)',
+            style: TextStyle(
+              color: isDarkMode ? Colors.white70 : Colors.black54,
+              fontSize: 14,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Helper method that handles caching for search results
+  Future<List<Map<String, dynamic>>> _getSearchResults(String query) async {
+    // Use cached results if available
+    if (_searchCache.containsKey(query)) {
+      print("[_getSearchResults] Using cached results for '$query'");
+      return _searchCache[query]!;
+    }
+    
+    // Otherwise perform new search
+    final results = await _searchData(query);
+    
+    // Cache the results
+    _searchCache[query] = results;
+    
+    return results;
+  }
+
+  // Helper method to build a search result item with an improved UI
+  Widget _buildSearchResultItem(BuildContext context, Map<String, dynamic> item, bool isDarkMode, ColorScheme colorScheme) {
+    final itemType = item['type'] as String;
+    
+    // Navigate based on item type
+    void onTap() {
+      // Remember query before navigating
+      _lastQuery = query; 
+      
+      switch (itemType) {
+        case 'team':
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => TeamDetailsPage(
+                teamId: item['id'].toString(),
+                teamName: item['name'],
+              ),
+            ),
+          );
+          break;
+        case 'match':
+          // For matches, we need the full match data
+          // Use a placeholder implementation that will be filled in later
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MatchDetailsPage(matchData: {
+                'id': item['id'],
+                'homeTeam': {'name': item['homeTeam']},
+                'awayTeam': {'name': item['awayTeam']},
+                'status': item['status'],
+                'score': item['score'],
+                'competition': {'name': item['competition']},
+                'utcDate': item['date'],
+              }),
+            ),
+          );
+          break;
+        case 'competition':
+          // For future implementation - navigate to competition page
+          // For now just update the query
+          query = item['name'];
+          showResults(context);
+          break;
+        default:
+          query = item['name'];
+          showResults(context);
+      }
+    }
+
+    // Get proper image URL
+    String getProxiedImageUrl(String? originalUrl) {
+      if (originalUrl == null || originalUrl.isEmpty) return '';
+      if (kIsWeb) {
+        return 'https://us-central1-footify-13da4.cloudfunctions.net/proxyImage?url=${Uri.encodeComponent(originalUrl)}';
+      }
+      return originalUrl;
+    }
+
+    // Get appropriate icon based on item type
+    IconData getItemTypeIcon() {
+      switch (itemType) {
+        case 'team':
+          return Icons.group;
+        case 'match':
+          return Icons.sports_soccer;
+        case 'competition':
+          return Icons.emoji_events;
+        default:
+          return Icons.search;
+      }
+    }
+
+    // Get the item's emblem or logo
+    Widget getItemLogo() {
+      final String? emblem = item['emblem'];
+      if (emblem != null && emblem.isNotEmpty) {
+        return CachedNetworkImage(
+          imageUrl: getProxiedImageUrl(emblem),
+          width: 40,
+          height: 40,
+          fit: BoxFit.contain,
+          placeholder: (context, url) => Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceVariant,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              getItemTypeIcon(),
+              color: colorScheme.onSurfaceVariant,
+              size: 20,
+            ),
+          ),
+          errorWidget: (context, url, error) => Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceVariant,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              getItemTypeIcon(),
+              color: colorScheme.onSurfaceVariant,
+              size: 20,
+            ),
+          ),
+        );
+      } else {
+        // Fallback icon inside a colored container
+        return Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceVariant,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            getItemTypeIcon(),
+            color: colorScheme.onSurfaceVariant,
+            size: 20,
+          ),
+        );
+      }
+    }
+
+    // For match items, show additional team logos
+    Widget? getTeamLogos() {
+      if (itemType != 'match') return null;
+      
+      return Row(
+        children: [
+          const SizedBox(width: 40), // Offset to align with content
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: item['homeTeamLogo'] != null && item['homeTeamLogo'].isNotEmpty
+                ? CachedNetworkImage(
+                    imageUrl: getProxiedImageUrl(item['homeTeamLogo']),
+                    width: 24,
+                    height: 24,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceVariant,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Icon(Icons.sports_soccer, size: 12, color: colorScheme.onSurfaceVariant),
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceVariant,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Icon(Icons.sports_soccer, size: 12, color: colorScheme.onSurfaceVariant),
+                    ),
+                  )
+                : Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceVariant,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Icon(Icons.sports_soccer, size: 12, color: colorScheme.onSurfaceVariant),
+                  ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'vs',
+            style: TextStyle(
+              color: isDarkMode ? Colors.white70 : Colors.black54,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(width: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: item['awayTeamLogo'] != null && item['awayTeamLogo'].isNotEmpty
+                ? CachedNetworkImage(
+                    imageUrl: getProxiedImageUrl(item['awayTeamLogo']),
+                    width: 24,
+                    height: 24,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceVariant,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Icon(Icons.sports_soccer, size: 12, color: colorScheme.onSurfaceVariant),
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceVariant,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Icon(Icons.sports_soccer, size: 12, color: colorScheme.onSurfaceVariant),
+                    ),
+                  )
+                : Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceVariant,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Icon(Icons.sports_soccer, size: 12, color: colorScheme.onSurfaceVariant),
+                  ),
+          ),
+        ],
+      );
+    }
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      elevation: 1,
+      color: isDarkMode ? const Color(0xFF292929) : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: colorScheme.surfaceVariant.withOpacity(0.2),
+          width: 0.5,
+        ),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  getItemLogo(),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: colorScheme.primary.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                itemType.toUpperCase(),
+                                style: TextStyle(
+                                  color: colorScheme.primary,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            if (itemType == 'match' && item['status'] != null)
+                              Container(
+                                margin: const EdgeInsets.only(left: 6),
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: _getStatusColor(item['status'], isDarkMode),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  _getStatusText(item['status']),
+                                  style: TextStyle(
+                                    color: isDarkMode ? Colors.black : Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          item['name'],
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white : Colors.black,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (itemType == 'match')
+                          Text(
+                            '${item['homeTeam']} vs ${item['awayTeam']}',
+                            style: TextStyle(
+                              color: isDarkMode ? Colors.white70 : Colors.black54,
+                              fontSize: 14,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        if (itemType == 'match' && item['competition'] != null)
+                          Text(
+                            item['competition'],
+                            style: TextStyle(
+                              color: isDarkMode ? Colors.white60 : Colors.black45,
+                              fontSize: 12,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (itemType == 'match')
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: getTeamLogos() ?? const SizedBox.shrink(),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Helper method to get status color
+  Color _getStatusColor(String status, bool isDarkMode) {
+    switch (status) {
+      case 'FINISHED':
+        return Colors.green;
+      case 'IN_PLAY':
+      case 'PAUSED':
+        return Colors.red;
+      case 'TIMED':
+      case 'SCHEDULED':
+        return isDarkMode ? Colors.blue : Colors.blue;
+      case 'POSTPONED':
+      case 'CANCELLED':
+        return Colors.orange;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  // Helper method to get readable status text
+  String _getStatusText(String status) {
+    switch (status) {
+      case 'FINISHED':
+        return 'FINISHED';
+      case 'IN_PLAY':
+        return 'LIVE';
+      case 'PAUSED':
+        return 'PAUSED';
+      case 'TIMED':
+      case 'SCHEDULED':
+        return 'UPCOMING';
+      case 'POSTPONED':
+        return 'POSTPONED';
+      case 'CANCELLED':
+        return 'CANCELLED';
+      default:
+        return status;
+    }
   }
 
   Future<List<Map<String, dynamic>>> _searchData(String query) async {
@@ -1530,12 +2059,7 @@ class CustomSearchDelegate extends SearchDelegate {
     print("[_searchData] Starting search for: '$query'");
 
     try {
-      // Search matches
-      print("[_searchData] Calling searchMatches for '$query'...");
-      final matches = await football_api.FootballApiService.searchMatches(query);
-      print("[_searchData] Found ${matches.length} matches for '$query'.");
-      
-      // Search teams
+      // First, search for teams since we want to prioritize them
       print("[_searchData] Calling searchTeams for '$query'...");
       final teams = await football_api.FootballApiService.searchTeams(query);
       print("[_searchData] Found ${teams.length} teams for '$query'.");
@@ -1544,67 +2068,175 @@ class CustomSearchDelegate extends SearchDelegate {
       print("[_searchData] Calling searchCompetitions for '$query'...");
       final competitions = await football_api.FootballApiService.searchCompetitions(query);
       print("[_searchData] Found ${competitions.length} competitions for '$query'.");
+      
+      // Search matches last
+      print("[_searchData] Calling searchMatches for '$query'...");
+      final matches = await football_api.FootballApiService.searchMatches(query);
+      print("[_searchData] Found ${matches.length} matches for '$query'.");
 
-      // Combine and sort results
-      final results = [
-        ...matches.map((m) => {
-          // Ensure necessary fields are present and have defaults
-          'id': m['id'],
-          'name': m['name'] ?? 'Unknown Match',
-          'homeTeam': m['homeTeam'] ?? 'N/A',
-          'awayTeam': m['awayTeam'] ?? 'N/A',
-          'homeTeamId': m['homeTeamId'], // Ensure these are passed if needed
-          'awayTeamId': m['awayTeamId'], // Ensure these are passed if needed
-          'competition': m['competition'] ?? 'N/A',
-          'date': m['date'],
-          'status': m['status'],
-          'score': m['score'],
-          'type': 'match',
-        }),
-        ...teams.map((t) => {
-          'id': t['id'],
-          'name': t['name'] ?? 'Unknown Team',
-          'emblem': t['emblem'] ?? '',
-          'type': 'team',
-        }),
-        ...competitions.map((c) => {
-          'id': c['id'],
-          'name': c['name'] ?? 'Unknown Competition',
-          'emblem': c['emblem'] ?? '',
-          'type': 'competition',
-        }),
-      ];
+      // Create the results lists separately to apply different sorting logic
+      final teamResults = teams.map((t) => {
+        'id': t['id'],
+        'name': t['name'] ?? 'Unknown Team',
+        'emblem': t['emblem'] ?? '',
+        'type': 'team',
+        // Add a relevance score
+        '_relevance': _calculateRelevance(t['name'] ?? '', query),
+      }).toList();
+      
+      final competitionResults = competitions.map((c) => {
+        'id': c['id'],
+        'name': c['name'] ?? 'Unknown Competition',
+        'emblem': c['emblem'] ?? '',
+        'type': 'competition',
+        // Add a relevance score
+        '_relevance': _calculateRelevance(c['name'] ?? '', query),
+      }).toList();
+      
+      final matchResults = matches.map((m) => {
+        'id': m['id'],
+        'name': m['status'] == 'FINISHED' 
+          ? '${m['homeTeam']} ${m['score']['fullTime']['home'] ?? 0} - ${m['score']['fullTime']['away'] ?? 0} ${m['awayTeam']}'
+          : '${m['homeTeam']} vs ${m['awayTeam']}',
+        'homeTeam': m['homeTeam'] ?? 'N/A',
+        'awayTeam': m['awayTeam'] ?? 'N/A',
+        'homeTeamId': m['homeTeamId'],
+        'awayTeamId': m['awayTeamId'],
+        'homeTeamLogo': m['homeTeamLogo'],
+        'awayTeamLogo': m['awayTeamLogo'],
+        'competition': m['competition'] ?? 'N/A',
+        'date': m['date'],
+        'status': m['status'],
+        'score': m['score'],
+        'type': 'match',
+        // Add a relevance score for matches (lower priority than exact team matches)
+        '_relevance': _calculateRelevance(m['homeTeam'] ?? '', query) * 0.8 + 
+                      _calculateRelevance(m['awayTeam'] ?? '', query) * 0.8,
+      }).toList();
 
-      print("[_searchData] Combined ${results.length} results before sorting for '$query'.");
+      // Sort each list by relevance
+      teamResults.sort((a, b) => (b['_relevance'] as num).compareTo(a['_relevance'] as num));
+      competitionResults.sort((a, b) => (b['_relevance'] as num).compareTo(a['_relevance'] as num));
+      matchResults.sort((a, b) => (b['_relevance'] as num).compareTo(a['_relevance'] as num));
 
-      // Sort by relevance (exact matches first, then partial matches)
-      results.sort((a, b) {
-        final aName = a['name']?.toString().toLowerCase() ?? '';
-        final bName = b['name']?.toString().toLowerCase() ?? '';
-        final queryLower = query.toLowerCase();
-
-        // Prioritize exact matches
-        if (aName == queryLower && bName != queryLower) return -1;
-        if (aName != queryLower && bName == queryLower) return 1;
+      // Check if we have exact team matches to prioritize
+      final exactTeamMatches = teamResults.where((team) => 
+        team['name'].toString().toLowerCase() == query.toLowerCase()
+      ).toList();
+      
+      // If we have exact team matches and also found matches, 
+      // prioritize the team first, then filter matches for that team
+      if (exactTeamMatches.isNotEmpty && matchResults.isNotEmpty) {
+        final exactTeam = exactTeamMatches.first;
+        final exactTeamId = exactTeam['id'];
         
-        // Prioritize items starting with the query
-        final aStartsWith = aName.startsWith(queryLower);
-        final bStartsWith = bName.startsWith(queryLower);
-        if (aStartsWith && !bStartsWith) return -1;
-        if (!aStartsWith && bStartsWith) return 1;
+        // Find matches for this exact team
+        final teamMatches = matchResults.where((match) => 
+          match['homeTeamId'] == exactTeamId || match['awayTeamId'] == exactTeamId
+        ).toList();
+        
+        // Sort team matches - make sure most recent/upcoming are first
+        teamMatches.sort((a, b) {
+          // First by status (live, upcoming, finished)
+          final statusA = a['status'] as String;
+          final statusB = b['status'] as String;
+          
+          // Live matches first
+          if (statusA == 'IN_PLAY' && statusB != 'IN_PLAY') return -1;
+          if (statusA != 'IN_PLAY' && statusB == 'IN_PLAY') return 1;
+          
+          // Then upcoming matches
+          if (statusA == 'TIMED' && statusB != 'TIMED') return -1;
+          if (statusA != 'TIMED' && statusB == 'TIMED') return 1;
+          
+          // Sort by date
+          if (a['date'] != null && b['date'] != null) {
+            return DateTime.parse(b['date'] as String)
+                .compareTo(DateTime.parse(a['date'] as String));
+          }
+          
+          return 0;
+        });
+        
+        // Filter out the team matches from the main match results
+        final otherMatches = matchResults.where((match) => 
+          match['homeTeamId'] != exactTeamId && match['awayTeamId'] != exactTeamId
+        ).toList();
+        
+        // Combine results: exact team first, then its matches, then other results
+        final results = [
+          exactTeam,
+          ...teamMatches,
+          ...teamResults.where((team) => team['id'] != exactTeamId).toList(),
+          ...competitionResults,
+          ...otherMatches,
+        ];
+        
+        print("[_searchData] Returning ${results.length} results with prioritized team first for '$query'.");
+        return results;
+      }
 
-        // Finally, sort alphabetically
-        return aName.compareTo(bName);
-      });
+      // Normal case - combine all results 
+      final results = [
+        ...teamResults,
+        ...competitionResults,
+        ...matchResults,
+      ];
 
       print("[_searchData] Returning ${results.length} sorted results for '$query'.");
       return results;
       
-    } catch (e, stacktrace) { // Added stacktrace
+    } catch (e, stacktrace) {
       print('[_searchData] Search error for query "$query": $e');
-      print('[_searchData] Stacktrace: $stacktrace'); // Log stacktrace
-      return []; // Return empty list on error
+      print('[_searchData] Stacktrace: $stacktrace');
+      return [];
     }
+  }
+  
+  // Helper method to calculate relevance score for sorting
+  double _calculateRelevance(String text, String query) {
+    final textLower = text.toLowerCase();
+    final queryLower = query.toLowerCase();
+    
+    // Exact match gets highest score
+    if (textLower == queryLower) {
+      return 100.0;
+    }
+    
+    // Contains exact query as a whole word
+    if (textLower.contains(' $queryLower ') || 
+        textLower.startsWith('$queryLower ') || 
+        textLower.endsWith(' $queryLower')) {
+      return 80.0;
+    }
+    
+    // Starts with query
+    if (textLower.startsWith(queryLower)) {
+      return 60.0;
+    }
+    
+    // Contains query
+    if (textLower.contains(queryLower)) {
+      return 40.0;
+    }
+    
+    // Calculate word match count
+    final textWords = textLower.split(' ');
+    final queryWords = queryLower.split(' ');
+    int matchCount = 0;
+    
+    for (final queryWord in queryWords) {
+      if (queryWord.length > 2) { // Only consider words longer than 2 chars
+        for (final textWord in textWords) {
+          if (textWord.contains(queryWord)) {
+            matchCount++;
+            break;
+          }
+        }
+      }
+    }
+    
+    return matchCount * 5.0;
   }
 
   @override
