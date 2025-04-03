@@ -1274,6 +1274,12 @@ class CustomSearchDelegate extends SearchDelegate {
   static final Map<String, List<Map<String, dynamic>>> _searchCache = {};
   // Store the last query to preserve search state
   static String _lastQuery = '';
+  // Store search history - switching from strings to objects
+  static List<Map<String, dynamic>> _searchHistoryItems = [];
+  // Maximum number of history items to keep
+  static const int _maxHistoryItems = 15;
+  // Flag to check if history is initialized
+  static bool _isHistoryInitialized = false;
   
   // Override query setter to update our internal state
   @override
@@ -1286,6 +1292,83 @@ class CustomSearchDelegate extends SearchDelegate {
     if (_lastQuery.isNotEmpty) {
       super.query = _lastQuery;
     }
+    
+    // Initialize history from storage if not done already
+    if (!_isHistoryInitialized) {
+      _initializeHistory();
+    }
+  }
+  
+  // Initialize search history from SharedPreferences
+  Future<void> _initializeHistory() async {
+    _isHistoryInitialized = true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final historyJson = prefs.getString('search_history');
+      
+      if (historyJson != null && historyJson.isNotEmpty) {
+        // Convert from JSON
+        final List<dynamic> decoded = jsonDecode(historyJson);
+        _searchHistoryItems = decoded.map((item) => Map<String, dynamic>.from(item)).toList();
+        print("[CustomSearchDelegate] Loaded ${_searchHistoryItems.length} history items from storage");
+      }
+    } catch (e) {
+      print("[CustomSearchDelegate] Error loading search history: $e");
+    }
+  }
+  
+  // Save search history to SharedPreferences
+  static Future<void> _saveHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final historyJson = jsonEncode(_searchHistoryItems);
+      await prefs.setString('search_history', historyJson);
+      print("[CustomSearchDelegate] Saved ${_searchHistoryItems.length} history items to storage");
+    } catch (e) {
+      print("[CustomSearchDelegate] Error saving search history: $e");
+    }
+  }
+
+  // Add a team or league to search history
+  static void addToHistory(Map<String, dynamic> item) {
+    if (item.isEmpty) return;
+    
+    // Make sure we have all required fields
+    final String type = item['type'] as String? ?? '';
+    if (type != 'team' && type != 'competition') {
+      return; // Only save teams and competitions/leagues
+    }
+    
+    // Create a simplified version to store in history
+    final Map<String, dynamic> historyItem = {
+      'id': item['id'],
+      'name': item['name'],
+      'emblem': item['emblem'],
+      'type': type,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    };
+    
+    // Remove if exists (to reorder)
+    _searchHistoryItems.removeWhere((existing) => 
+      existing['id'] == historyItem['id'] && existing['type'] == historyItem['type']
+    );
+    
+    // Add to beginning of list
+    _searchHistoryItems.insert(0, historyItem);
+    
+    // Limit size
+    if (_searchHistoryItems.length > _maxHistoryItems) {
+      _searchHistoryItems.removeLast();
+    }
+    
+    // Save to persistent storage
+    _saveHistory();
+  }
+  
+  // Clear search history
+  static Future<void> clearHistory() async {
+    _searchHistoryItems.clear();
+    await _saveHistory();
   }
 
   @override
@@ -1350,6 +1433,7 @@ class CustomSearchDelegate extends SearchDelegate {
   void showResults(BuildContext context) {
     // Save the current query before showing results
     _lastQuery = super.query;
+    // Add to search history - we'll now use addToHistory for items, not queries
     super.showResults(context);
   }
 
@@ -1461,11 +1545,11 @@ class CustomSearchDelegate extends SearchDelegate {
 
     // Debounce logic - only apply when query changes
     if (super.query != _lastQuery) {
-      if (_debounce?.isActive ?? false) _debounce!.cancel();
-      _debounce = Timer(const Duration(milliseconds: 500), () {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
         // Remember query for state preservation
         _lastQuery = super.query;
-      });
+    });
     }
 
     return Container(
@@ -1474,29 +1558,29 @@ class CustomSearchDelegate extends SearchDelegate {
           ? _buildInitialSearchScreen(context, isDarkMode, colorScheme)
           : super.query.length < 3
               ? _buildMinimumCharactersMessage(context, isDarkMode, colorScheme)
-              : FutureBuilder<List<Map<String, dynamic>>>(
+          : FutureBuilder<List<Map<String, dynamic>>>(
                   future: _getSearchResults(super.query),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return Center(
-                        child: CircularProgressIndicator(
+              builder: (context, snapshot) {
+                 if (snapshot.connectionState == ConnectionState.waiting) {
+                   return Center(
+                      child: CircularProgressIndicator(
                           color: colorScheme.primary,
-                        ),
-                      );
-                    }
+                      ),
+                    );
+                  }
 
-                    if (snapshot.hasError) {
-                      return Center(
-                        child: Text(
-                          'Error: ${snapshot.error}',
-                          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-                        ),
-                      );
-                    }
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text(
+                      'Error: ${snapshot.error}',
+                      style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                    ),
+                  );
+                }
 
-                    final suggestions = snapshot.data ?? [];
+                final suggestions = snapshot.data ?? [];
                     if (suggestions.isEmpty && super.query.isNotEmpty) {
-                      return Center(
+                    return Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -1516,14 +1600,14 @@ class CustomSearchDelegate extends SearchDelegate {
                               textAlign: TextAlign.center,
                             ),
                           ],
-                        ),
-                      );
-                    }
-                      
-                    return ListView.builder(
-                      itemCount: suggestions.length,
-                      itemBuilder: (context, index) {
-                        final item = suggestions[index];
+                      ),
+                    );
+                  }
+                  
+                return ListView.builder(
+                  itemCount: suggestions.length,
+                  itemBuilder: (context, index) {
+                    final item = suggestions[index];
                         return _buildSearchResultItem(context, item, isDarkMode, colorScheme);
                       },
                     );
@@ -1534,11 +1618,10 @@ class CustomSearchDelegate extends SearchDelegate {
 
   // Helper method to show initial search screen
   Widget _buildInitialSearchScreen(BuildContext context, bool isDarkMode, ColorScheme colorScheme) {
-    // If we have a previous search, show cached results
-    if (_lastQuery.isNotEmpty && _searchCache.containsKey(_lastQuery)) {
-      final previousResults = _searchCache[_lastQuery]!;
-      
+    // Show search history if we have any
+    if (_searchHistoryItems.isNotEmpty) {
       return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
             padding: const EdgeInsets.all(16.0),
@@ -1551,52 +1634,158 @@ class CustomSearchDelegate extends SearchDelegate {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'Previous search: "${_lastQuery}"',
+                  'Recently Viewed',
                   style: TextStyle(
                     color: isDarkMode ? Colors.white : Colors.black,
-                    fontSize: 14,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const Spacer(),
                 InkWell(
-                  onTap: () {
-                    query = _lastQuery;
-                    showResults(context);
+                  onTap: () async {
+                    await clearHistory();
+                    // Force rebuild
+                    query = '';
                   },
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: colorScheme.primary.withOpacity(0.2),
+                      color: colorScheme.surfaceVariant.withOpacity(0.5),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text(
-                      'Search again',
-                      style: TextStyle(
-                        color: colorScheme.primary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.delete_outline,
+                          size: 14,
+                          color: isDarkMode ? Colors.white70 : Colors.black54,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Clear',
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white70 : Colors.black54,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ],
             ),
           ),
+          
+          // Build the history grid
           Expanded(
-            child: ListView.builder(
-              itemCount: previousResults.length,
-              itemBuilder: (context, index) {
-                final item = previousResults[index];
-                return _buildSearchResultItem(context, item, isDarkMode, colorScheme);
-              },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+              child: GridView.builder(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 2.0,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                ),
+                itemCount: _searchHistoryItems.length,
+                itemBuilder: (context, index) {
+                  final historyItem = _searchHistoryItems[index];
+                  final bool isTeam = historyItem['type'] == 'team';
+                  
+                  return Card(
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(
+                        color: colorScheme.surfaceVariant.withOpacity(0.2),
+                        width: 0.5,
+                      ),
+                    ),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () {
+                        _navigateToHistoryItem(context, historyItem);
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Row(
+                          children: [
+                            // Team/League logo
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: colorScheme.surfaceVariant.withOpacity(0.3),
+                                shape: BoxShape.circle,
+                              ),
+                              child: historyItem['emblem'] != null && historyItem['emblem'].isNotEmpty
+                                ? ClipOval(
+                                    child: CachedNetworkImage(
+                                      imageUrl: getProxiedImageUrl(historyItem['emblem']),
+                                      fit: BoxFit.cover,
+                                      width: 40,
+                                      height: 40,
+                                      placeholder: (context, url) => Icon(
+                                        isTeam ? Icons.group : Icons.emoji_events,
+                                        size: 20,
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                      errorWidget: (context, url, error) => Icon(
+                                        isTeam ? Icons.group : Icons.emoji_events,
+                                        size: 20,
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  )
+                                : Icon(
+                                    isTeam ? Icons.group : Icons.emoji_events,
+                                    size: 20,
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    historyItem['name'],
+                                    style: TextStyle(
+                                      color: isDarkMode ? Colors.white : Colors.black,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    isTeam ? 'Team' : 'League',
+                                    style: TextStyle(
+                                      color: isTeam ? Colors.blue : Colors.green,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
             ),
           ),
         ],
       );
     }
     
-    // Default initial screen if no previous search
+    // Default initial screen if no history
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -1608,7 +1797,7 @@ class CustomSearchDelegate extends SearchDelegate {
           ),
           const SizedBox(height: 16),
           Text(
-            'Start typing to search teams, matches, and competitions',
+            'Start typing to search for teams and leagues',
             style: TextStyle(
               color: isDarkMode ? Colors.white70 : Colors.black54,
               fontSize: 16,
@@ -1618,6 +1807,41 @@ class CustomSearchDelegate extends SearchDelegate {
         ],
       ),
     );
+  }
+
+  // Helper method to navigate based on history item type
+  void _navigateToHistoryItem(BuildContext context, Map<String, dynamic> historyItem) {
+    final String type = historyItem['type'];
+    final String id = historyItem['id'].toString();
+    final String name = historyItem['name'];
+    
+    switch (type) {
+      case 'team':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TeamDetailsPage(
+              teamId: id,
+              teamName: name,
+            ),
+          ),
+        );
+        break;
+      case 'competition':
+        // For now, set this as search query and show results
+        query = name;
+        showResults(context);
+        break;
+    }
+  }
+
+  // Helper method to get proxied image URL for logos
+  String getProxiedImageUrl(String? originalUrl) {
+    if (originalUrl == null || originalUrl.isEmpty) return '';
+    if (kIsWeb) {
+      return 'https://us-central1-footify-13da4.cloudfunctions.net/proxyImage?url=${Uri.encodeComponent(originalUrl)}';
+    }
+    return originalUrl;
   }
 
   // Helper method to show minimum characters message
@@ -1681,10 +1905,13 @@ class CustomSearchDelegate extends SearchDelegate {
     // Navigate based on item type
     void onTap() {
       // Remember query before navigating
-      _lastQuery = query; 
+      _lastQuery = super.query;
       
       switch (itemType) {
         case 'team':
+          // Add to search history
+          addToHistory(item);
+          
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -1714,9 +1941,13 @@ class CustomSearchDelegate extends SearchDelegate {
           );
           break;
         case 'competition':
-          // For future implementation - navigate to competition page
-          // For now just update the query
-          query = item['name'];
+          // Add to search history
+          addToHistory(item);
+          
+          // For competitions (leagues), just update the query to see related data
+          // We could also navigate to a competition page in the future
+          final competitionName = item['name'];
+          query = competitionName;
           showResults(context);
           break;
         default:
@@ -2068,7 +2299,7 @@ class CustomSearchDelegate extends SearchDelegate {
       print("[_searchData] Calling searchCompetitions for '$query'...");
       final competitions = await football_api.FootballApiService.searchCompetitions(query);
       print("[_searchData] Found ${competitions.length} competitions for '$query'.");
-      
+
       // Search matches last
       print("[_searchData] Calling searchMatches for '$query'...");
       final matches = await football_api.FootballApiService.searchMatches(query);
@@ -2076,21 +2307,21 @@ class CustomSearchDelegate extends SearchDelegate {
 
       // Create the results lists separately to apply different sorting logic
       final teamResults = teams.map((t) => {
-        'id': t['id'],
-        'name': t['name'] ?? 'Unknown Team',
-        'emblem': t['emblem'] ?? '',
-        'type': 'team',
+          'id': t['id'],
+          'name': t['name'] ?? 'Unknown Team',
+          'emblem': t['emblem'] ?? '',
+          'type': 'team',
         // Add a relevance score
         '_relevance': _calculateRelevance(t['name'] ?? '', query),
       }).toList();
       
       final competitionResults = competitions.map((c) => {
-        'id': c['id'],
-        'name': c['name'] ?? 'Unknown Competition',
-        'emblem': c['emblem'] ?? '',
-        'type': 'competition',
-        // Add a relevance score
-        '_relevance': _calculateRelevance(c['name'] ?? '', query),
+          'id': c['id'],
+          'name': c['name'] ?? 'Unknown Competition',
+          'emblem': c['emblem'] ?? '',
+          'type': 'competition',
+        // Add a relevance score with a slight boost for competitions
+        '_relevance': _calculateRelevance(c['name'] ?? '', query) * 1.1,
       }).toList();
       
       final matchResults = matches.map((m) => {
@@ -2109,7 +2340,7 @@ class CustomSearchDelegate extends SearchDelegate {
         'status': m['status'],
         'score': m['score'],
         'type': 'match',
-        // Add a relevance score for matches (lower priority than exact team matches)
+        // Add a relevance score for matches
         '_relevance': _calculateRelevance(m['homeTeam'] ?? '', query) * 0.8 + 
                       _calculateRelevance(m['awayTeam'] ?? '', query) * 0.8,
       }).toList();
@@ -2118,6 +2349,26 @@ class CustomSearchDelegate extends SearchDelegate {
       teamResults.sort((a, b) => (b['_relevance'] as num).compareTo(a['_relevance'] as num));
       competitionResults.sort((a, b) => (b['_relevance'] as num).compareTo(a['_relevance'] as num));
       matchResults.sort((a, b) => (b['_relevance'] as num).compareTo(a['_relevance'] as num));
+
+      // Check if we have exact competition (league) matches to prioritize
+      final exactCompetitionMatches = competitionResults.where((comp) => 
+        comp['name'].toString().toLowerCase() == query.toLowerCase()
+      ).toList();
+      
+      if (exactCompetitionMatches.isNotEmpty) {
+        final exactCompetition = exactCompetitionMatches.first;
+        
+        // Create combined results with the competition first
+        final results = [
+          exactCompetition,
+          ...competitionResults.where((comp) => comp['id'] != exactCompetition['id']).toList(),
+          ...teamResults,
+          ...matchResults,
+        ];
+        
+        print("[_searchData] Returning ${results.length} results with prioritized competition for '$query'.");
+        return results;
+      }
 
       // Check if we have exact team matches to prioritize
       final exactTeamMatches = teamResults.where((team) => 
@@ -2173,18 +2424,21 @@ class CustomSearchDelegate extends SearchDelegate {
         ];
         
         print("[_searchData] Returning ${results.length} results with prioritized team first for '$query'.");
-        return results;
+      return results;
       }
 
-      // Normal case - combine all results 
-      final results = [
+      // Normal case - combine and sort all results by relevance
+      List<Map<String, dynamic>> allResults = [
         ...teamResults,
         ...competitionResults,
         ...matchResults,
       ];
+      
+      // Final sort by relevance score
+      allResults.sort((a, b) => (b['_relevance'] as num).compareTo(a['_relevance'] as num));
 
-      print("[_searchData] Returning ${results.length} sorted results for '$query'.");
-      return results;
+      print("[_searchData] Returning ${allResults.length} sorted results for '$query'.");
+      return allResults;
       
     } catch (e, stacktrace) {
       print('[_searchData] Search error for query "$query": $e');
