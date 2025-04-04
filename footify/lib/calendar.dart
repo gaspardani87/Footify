@@ -757,13 +757,10 @@ class _CalendarPageState extends State<CalendarPage> {
                   onEnter: (_) => _updateHoveredDay(day),
                   onExit: (_) => _updateHoveredDay(null),
                   child: SizedBox(
-                    height: 28,
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
                         Container(
-                          width: 24,
-                          height: 24,
                           margin: const EdgeInsets.all(2.0),
                           decoration: BoxDecoration(
                             color: backgroundColor,
@@ -804,19 +801,16 @@ class _CalendarPageState extends State<CalendarPage> {
                   onEnter: (_) => _updateHoveredDay(day),
                   onExit: (_) => _updateHoveredDay(null),
                   child: SizedBox(
-                    height: 28,
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
                         Container(
                           margin: const EdgeInsets.all(2.0),
-                          width: 24,
-                          height: 24,
-                          alignment: Alignment.center,
                           decoration: BoxDecoration(
                             color: isHovered ? (isDarkMode ? Colors.grey[800] : Colors.grey[300]) : null,
                             shape: BoxShape.circle,
                           ),
+                          alignment: Alignment.center,
                           child: Text(
                             '${day.day}',
                             style: TextStyle(
@@ -853,13 +847,10 @@ class _CalendarPageState extends State<CalendarPage> {
                   onEnter: (_) => _updateHoveredDay(day),
                   onExit: (_) => _updateHoveredDay(null),
                   child: SizedBox(
-                    height: 28,
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
                         Container(
-                          width: 24,
-                          height: 24,
                           margin: const EdgeInsets.all(2.0),
                           decoration: BoxDecoration(
                             color: backgroundColor,
@@ -908,13 +899,10 @@ class _CalendarPageState extends State<CalendarPage> {
                   onEnter: (_) => _updateHoveredDay(day),
                   onExit: (_) => _updateHoveredDay(null),
                   child: SizedBox(
-                    height: 28,
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
                         Container(
-                          width: 24,
-                          height: 24,
                           margin: const EdgeInsets.all(2.0),
                           decoration: BoxDecoration(
                             color: backgroundColor,

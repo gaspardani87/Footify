@@ -1116,7 +1116,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  AppLocalizations.of(context)?.upcomingMatches ?? 'Upcoming Matches',
+                  AppLocalizations.of(context)?.upcomingMatches ?? 'Matches',
                   style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 // Today button
@@ -1176,6 +1176,14 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
       decoration: BoxDecoration(
         color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF292929) : Colors.white,
         borderRadius: BorderRadius.circular(16),
+        // ADD SHADOW
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 4.0,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: InkWell(
         onTap: favoriteTeamId.isNotEmpty 
@@ -1337,6 +1345,14 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
       decoration: BoxDecoration(
         color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF292929) : Colors.white,
         borderRadius: BorderRadius.circular(16),
+        // ADD SHADOW
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 4.0,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: InkWell(
         onTap: favoriteNationId.isNotEmpty 
@@ -1611,6 +1627,14 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
       decoration: BoxDecoration(
         color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1D1D1D) : Colors.white,
         borderRadius: BorderRadius.circular(16),
+        // ADD SHADOW
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 4.0,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -2139,7 +2163,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
           Padding(
             padding: const EdgeInsets.all(12.0),
             child: Text(
-              'Next Match',
+              AppLocalizations.of(context)?.nextMatch ?? 'Next Match',
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -2185,7 +2209,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
             Padding(
               padding: const EdgeInsets.all(14.0), // Reduced from 16.0
               child: Text(
-                'Next Match',
+                AppLocalizations.of(context)?.nextMatch ?? 'Next Match',
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -2279,7 +2303,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
               children: [
                 Expanded(
                   child: Text(
-                    'Next Match',
+                    AppLocalizations.of(context)?.nextMatch ?? 'Next Match',
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -2306,6 +2330,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                   style: TextStyle(
                     color: const Color(0xFFFFE6AC),
                     fontSize: 14,
+                    fontWeight: FontWeight.bold, // Add this line
                   ),
                 ),
               ],
@@ -2555,6 +2580,8 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
   Widget _buildDateSelector() {
     // Create a ScrollController
     final ScrollController scrollController = ScrollController();
+    // ADD: Get dark mode status
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     
     // Calculate screen width to center selected date
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -2622,8 +2649,29 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                     width: buttonWidth,
                     margin: const EdgeInsets.symmetric(horizontal: 4.0),
                     decoration: BoxDecoration(
-                      color: isSelected ? const Color(0xFFFFE6AC) : Colors.grey[800],
+                      // UPDATE COLOR LOGIC FOR BETTER DARK MODE VISIBILITY
+                      color: isSelected
+                        ? const Color(0xFFFFE6AC) // Selected color is gold
+                        : isDarkMode
+                          ? Colors.grey[850] // Unselected dark: Slightly lighter grey
+                          : Colors.white,   // Unselected light: White
                       borderRadius: BorderRadius.circular(16),
+                      // APPLY BORDER TO UNSELECTED CARDS IN BOTH MODES
+                      border: !isSelected 
+                        ? Border.all(
+                            color: isDarkMode 
+                                ? Colors.white.withOpacity(0.15) // Dark mode border
+                                : Colors.black.withOpacity(0.1), // Light mode border
+                            width: 1,
+                          )
+                        : null, // No border for selected card
+                      boxShadow: [ // Keep consistent shadow for all cards
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 4.0,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: Center(
                       child: Column(
@@ -2641,9 +2689,14 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                                           ? AppLocalizations.of(context)?.yesterday ?? 'Yesterday'
                                           : DateFormat('MMM').format(date),
                               style: TextStyle(
-                                color: isSelected ? Colors.black : isToday ? const Color(0xFFFFE6AC) : Colors.white,
+                                // UPDATE TEXT COLOR LOGIC FOR LIGHT MODE VISIBILITY
+                                color: isSelected
+                                    ? Colors.black // Selected card text is always black
+                                    : isDarkMode
+                                        ? (isToday ? const Color(0xFFFFE6AC) : Colors.white) // Dark mode: Today is gold, others are white
+                                        : Colors.black, // Light mode: Unselected text is black
                                 fontWeight: FontWeight.bold,
-                                fontSize: 14,
+                                fontSize: 14, // Correct font size for month/day name
                               ),
                               textAlign: TextAlign.center,
                             ),
@@ -2653,9 +2706,14 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
                             child: Text(
                               DateFormat('d').format(date),
                               style: TextStyle(
-                                color: isSelected ? Colors.black : Colors.white,
+                                // CORRECTED TEXT COLOR LOGIC
+                                color: isSelected
+                                    ? Colors.black // Selected card text is always black
+                                    : isDarkMode
+                                        ? Colors.white // Dark mode: Unselected day number is white
+                                        : Colors.black, // Light mode: Unselected day number is black
                                 fontWeight: FontWeight.bold,
-                                fontSize: 20,
+                                fontSize: 20, // Correct font size for day number
                               ),
                               textAlign: TextAlign.center,
                             ),
@@ -2749,6 +2807,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
               return Card(
                 margin: const EdgeInsets.only(bottom: 20, left: 8, right: 8),
                 elevation: 4,
+                shadowColor: Colors.black.withOpacity(0.2), // ADD SHADOW COLOR
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1D1D1D) : Colors.white,
                 child: Column(
@@ -2981,6 +3040,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 16.0),
       color: isDarkMode ? const Color(0xFF292929) : Colors.white,
+      elevation: 2, // ADD ELEVATION
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16.0),
       ),
@@ -3097,7 +3157,7 @@ class _DashboardPageState extends State<DashboardPage> with SingleTickerProvider
             children: [
               Expanded(
                 child: Text(
-                  'Next Match',
+                  AppLocalizations.of(context)?.nextMatch ?? 'Next Match',
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,

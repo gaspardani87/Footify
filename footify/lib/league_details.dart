@@ -118,8 +118,9 @@ class TeamStanding {
 class LeagueDetailsPage extends StatefulWidget {
   final int leagueId;
   final String leagueName;
+  final String? leagueLogo;
 
-  const LeagueDetailsPage({super.key, required this.leagueId, required this.leagueName});
+  const LeagueDetailsPage({super.key, required this.leagueId, required this.leagueName, this.leagueLogo});
 
   @override
   State<LeagueDetailsPage> createState() => _LeagueDetailsPageState();
@@ -387,6 +388,204 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTicker
     return logoUrl;
   }
 
+  // Frissített segédfüggvény az online logók megjelenítéséhez
+  Widget _buildLogoImage(int leagueId, String? logoUrl, bool isDarkMode, bool isWeb) {
+    // Jobb minőségű helyettesítő logók a bajnokságokhoz
+    Map<int, String> replacementLogos = {
+      2013: 'https://upload.wikimedia.org/wikipedia/en/0/04/Campeonato_Brasileiro_S%C3%A9rie_A.png', // Brasileiro Série A
+      2018: 'https://static.wikia.nocookie.net/future/images/8/84/Euro_2028_Logo_Concept_v2.png/revision/latest?cb=20231020120018', // European Championship
+      2003: 'https://upload.wikimedia.org/wikipedia/commons/4/46/Eredivisie_nuovo_logo.png', // Eredivisie
+      2000: 'https://upload.wikimedia.org/wikipedia/en/thumb/1/17/2026_FIFA_World_Cup_emblem.svg/1200px-2026_FIFA_World_Cup_emblem.svg.png', // FIFA World Cup
+      2015: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/49/Ligue1_Uber_Eats_logo.png/1200px-Ligue1_Uber_Eats_logo.png', // Ligue 1 (nagyobb felbontás)
+      2019: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e9/Serie_A_logo_2022.svg/1200px-Serie_A_logo_2022.svg.png', // Serie A
+      2014: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/LaLiga_logo_2023.svg/2560px-LaLiga_logo_2023.svg.png', // LaLiga
+      2021: 'https://www.sportmonks.com/wp-content/uploads/2024/08/Premier_League_Logo-1.png', // Premier League 
+      2152: 'https://upload.wikimedia.org/wikipedia/en/thumb/a/a1/Copa_Libertadores_logo.svg/1200px-Copa_Libertadores_logo.svg.png', // Copa Libertadores
+      2001: 'https://assets-us-01.kc-usercontent.com/31dbcbc6-da4c-0033-328a-d7621d0fa726/8e5c2681-8c90-4c64-a79d-2a4fa17834c7/UEFA_Champions_League_Logo.png', // Champions League
+      2002: 'https://upload.wikimedia.org/wikipedia/en/thumb/d/df/Bundesliga_logo_%282017%29.svg/1200px-Bundesliga_logo_%282017%29.svg.png', // Bundesliga
+      2017: 'https://news.22bet.com/wp-content/uploads/2023/11/liga-portugal-logo-white.png', // Primeira Liga
+    };
+    
+    // Sötét témájú verziók a világos módban nem jól látható logókhoz
+    Map<int, String> darkVersionLogos = {
+      2021: 'https://upload.wikimedia.org/wikipedia/en/thumb/f/f2/Premier_League_Logo.svg/1200px-Premier_League_Logo.svg.png', // Premier League (sötét verzió)
+      2001: 'https://upload.wikimedia.org/wikipedia/en/thumb/f/f5/UEFA_Champions_League.svg/1200px-UEFA_Champions_League.svg.png', // Champions League (sötét verzió)
+      2017: 'https://cdn.freelogovectors.net/wp-content/uploads/2021/08/primeira-logo-liga-portugal-freelogovectors.net_.png', // Primeira Liga (sötét verzió)
+    };
+    
+    // Világos témájú verziók a sötét módhoz
+    Map<int, String> lightVersionLogos = {
+      2021: 'https://www.sportmonks.com/wp-content/uploads/2024/08/Premier_League_Logo-1.png', // Premier League (fehér verzió)
+      2017: 'https://news.22bet.com/wp-content/uploads/2023/11/liga-portugal-logo-white.png', // Primeira Liga (fehér verzió)
+    };
+    
+    // Proxy használata a webes verzióban, minőségi paraméterrel
+    String getProxiedUrl(String url) {
+      if (kIsWeb) {
+        // Ha SVG formátumú a kép, közvetlenül használjuk
+        if (url.toLowerCase().endsWith('.svg') || url.toLowerCase().contains('.svg')) {
+          return url;
+        }
+        return 'https://us-central1-footify-13da4.cloudfunctions.net/proxyImage?url=${Uri.encodeComponent(url)}';
+      }
+      return url;
+    }
+
+    // A problémás ligák világos módban sötét verziójú képet használnak
+    if (!isDarkMode && darkVersionLogos.containsKey(leagueId)) {
+      return Image.network(
+        getProxiedUrl(darkVersionLogos[leagueId]!),
+        fit: BoxFit.contain,
+        // Webes felületen kisebb képek
+        width: isWeb ? 50 : 70,
+        height: isWeb ? 50 : 70,
+        headers: kIsWeb ? {'Origin': 'null'} : null,
+        errorBuilder: (context, error, stackTrace) {
+          print("Sötét verzió betöltési hiba (ID: $leagueId): $error");
+          return Icon(
+            Icons.sports_soccer, 
+            size: isWeb ? 30 : 40,
+            color: Colors.black54,
+          );
+        },
+      );
+    }
+    
+    // A problémás ligák sötét módban világos/fehér verziójú képet használnak
+    if (isDarkMode && lightVersionLogos.containsKey(leagueId)) {
+      return Image.network(
+        getProxiedUrl(lightVersionLogos[leagueId]!),
+        fit: BoxFit.contain,
+        // Webes felületen kisebb képek
+        width: isWeb ? 50 : 70,
+        height: isWeb ? 50 : 70,
+        headers: kIsWeb ? {'Origin': 'null'} : null,
+        errorBuilder: (context, error, stackTrace) {
+          print("Világos verzió betöltési hiba (ID: $leagueId): $error");
+          return Icon(
+            Icons.sports_soccer, 
+            size: isWeb ? 30 : 40,
+            color: Colors.white70,
+          );
+        },
+      );
+    }
+    
+    // Eredivisie esetén fehérre színezzük sötét módban
+    if (leagueId == 2003 && isDarkMode && replacementLogos.containsKey(leagueId)) {
+      return ColorFiltered(
+        colorFilter: const ColorFilter.mode(
+          Colors.white,
+          BlendMode.srcIn,
+        ),
+        child: Image.network(
+          getProxiedUrl(replacementLogos[leagueId]!),
+          fit: BoxFit.contain,
+          // Webes felületen kisebb képek
+          width: isWeb ? 50 : 70,
+          height: isWeb ? 50 : 70,
+          headers: kIsWeb ? {'Origin': 'null'} : null,
+          errorBuilder: (context, error, stackTrace) {
+            print("Helyettesítő kép betöltési hiba (ID: $leagueId): $error");
+            return Icon(
+              Icons.sports_soccer, 
+              size: isWeb ? 30 : 40,
+              color: Colors.white70,
+            );
+          },
+        ),
+      );
+    }
+    
+    // Premier League és Bajnokok Ligája esetén fehér szín sötét módban - csak a Champions League esetén használjuk
+    if (leagueId == 2001 && isDarkMode) {
+      return ColorFiltered(
+        colorFilter: const ColorFilter.mode(
+          Colors.white,
+          BlendMode.srcIn,
+        ),
+        child: Image.network(
+          getProxiedUrl(logoUrl ?? replacementLogos[leagueId]!),
+          fit: BoxFit.contain,
+          // Webes felületen kisebb képek
+          width: isWeb ? 50 : 70,
+          height: isWeb ? 50 : 70,
+          headers: kIsWeb ? {'Origin': 'null'} : null,
+          errorBuilder: (context, error, stackTrace) {
+            print("Fehérre színezett logó betöltési hiba (ID: $leagueId): $error");
+            return Icon(
+              Icons.sports_soccer, 
+              size: isWeb ? 30 : 40,
+              color: Colors.white70,
+            );
+          },
+        ),
+      );
+    }
+    
+    // Ellenőrizzük, hogy van-e helyettesítő online kép
+    if (replacementLogos.containsKey(leagueId)) {
+      return Image.network(
+        getProxiedUrl(replacementLogos[leagueId]!),
+        fit: BoxFit.contain,
+        // Webes felületen kisebb képek
+        width: isWeb ? 50 : 70,
+        height: isWeb ? 50 : 70,
+        headers: kIsWeb ? {'Origin': 'null'} : null,
+        errorBuilder: (context, error, stackTrace) {
+          print("Helyettesítő kép betöltési hiba (ID: $leagueId): $error");
+          return Icon(
+            Icons.sports_soccer, 
+            size: isWeb ? 30 : 40,
+            color: isDarkMode ? Colors.white70 : Colors.black54,
+          );
+        },
+      );
+    }
+    
+    // Minden más esetben az eredeti logót használjuk
+    return _getNetworkImage(logoUrl, isDarkMode, isWeb);
+  }
+  
+  // Segédfüggvény a hálózati kép megjelenítéséhez
+  Widget _getNetworkImage(String? logoUrl, bool isDarkMode, bool isWeb) {
+    if (logoUrl == null || logoUrl.isEmpty) {
+      return Icon(
+        Icons.sports_soccer, 
+        size: isWeb ? 30 : 40,
+        color: isDarkMode ? Colors.white70 : Colors.black54,
+      );
+    }
+    
+    // Proxy használata a webes verzióban
+    String proxyUrl = logoUrl;
+    if (kIsWeb) {
+      // Ha SVG formátumú a kép, közvetlenül használjuk
+      if (logoUrl.toLowerCase().endsWith('.svg') || logoUrl.toLowerCase().contains('.svg')) {
+        proxyUrl = logoUrl;
+      } else {
+        proxyUrl = 'https://us-central1-footify-13da4.cloudfunctions.net/proxyImage?url=${Uri.encodeComponent(logoUrl)}';
+      }
+    }
+    
+    return Image.network(
+      proxyUrl,
+      fit: BoxFit.contain,
+      // Webes felületen kisebb képek
+      width: isWeb ? 50 : 70,
+      height: isWeb ? 50 : 70,
+      headers: kIsWeb ? {'Origin': 'null'} : null,
+      errorBuilder: (context, error, stackTrace) {
+        print("Eredeti logó betöltési hiba: $error");
+        return Icon(
+          Icons.sports_soccer, 
+          size: isWeb ? 30 : 40,
+          color: isDarkMode ? Colors.white70 : Colors.black54,
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -395,8 +594,26 @@ class _LeagueDetailsPageState extends State<LeagueDetailsPage> with SingleTicker
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.leagueName),
-        backgroundColor: isDarkMode ? Colors.black : Colors.white,
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (widget.leagueLogo != null)
+              SizedBox(
+                width: 30,
+                height: 30,
+                child: _buildLogoImage(widget.leagueId, widget.leagueLogo, isDarkMode, kIsWeb),
+              ),
+            if (widget.leagueLogo != null)
+              const SizedBox(width: 10),
+            Flexible(
+              child: Text(
+                widget.leagueName,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: isDarkMode ? const Color(0xFF1D1D1D) : Colors.white,
         foregroundColor: isDarkMode ? Colors.white : Colors.black,
         bottom: !isWideScreen ? TabBar(
           controller: _tabController,

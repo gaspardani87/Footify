@@ -225,7 +225,11 @@ class LeagueTile extends StatelessWidget {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => LeagueDetailsPage(leagueId: league.id, leagueName: league.name),
+              builder: (context) => LeagueDetailsPage(
+                leagueId: league.id, 
+                leagueName: league.name,
+                leagueLogo: league.logo,
+              ),
             ),
           );
         },
