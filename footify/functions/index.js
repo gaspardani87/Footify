@@ -480,7 +480,7 @@ exports.fetchLastMatches = functions.https.onRequest(async (req, res) => {
       headers: {
         'X-Auth-Token': API_KEY,
       },
-      params: {
+        params: {
         status: 'FINISHED',
         limit: 10
       }
@@ -505,9 +505,9 @@ exports.fetchLastRoundMatches = functions.https.onRequest(async (req, res) => {
   const competitionId = req.query.id;
   if (!competitionId) {
     res.status(400).json({ error: 'Missing competition ID parameter' });
-    return;
-  }
-
+      return;
+    }
+    
   try {
     // First, get the current matchday
     const standingsResponse = await axios.get(`${BASE_URL}/competitions/${competitionId}/standings`, {
@@ -523,7 +523,7 @@ exports.fetchLastRoundMatches = functions.https.onRequest(async (req, res) => {
       headers: {
         'X-Auth-Token': API_KEY,
       },
-      params: {
+        params: {
         matchday: currentMatchday - 1, // Get the previous matchday
         status: 'FINISHED'
       }
@@ -537,8 +537,8 @@ exports.fetchLastRoundMatches = functions.https.onRequest(async (req, res) => {
         (m.homeTeam.id === match.awayTeam.id && m.awayTeam.id === match.homeTeam.id)
       )
     );
-
-    res.status(200).json({
+      
+      res.status(200).json({
       matches: uniqueMatches,
       currentMatchday: currentMatchday
     });
@@ -973,7 +973,7 @@ exports.fetchCalendarTeamMatches = functions.https.onRequest(async (req, res) =>
 // offset is the number of days from today (negative for past, positive for future)
 function getDateString(offset = 0) {
   const date = new Date();
-  date.setDate(date.getDate() + offset);
+    date.setDate(date.getDate() + offset);
   return date.toISOString().split('T')[0];
 }
 
@@ -1097,9 +1097,9 @@ exports.getNationalTeamLeague = functions.https.onRequest(async (req, res) => {
   const teamId = req.query.id;
   if (!teamId) {
     res.status(400).json({ error: 'Missing team ID parameter' });
-    return;
-  }
-
+      return;
+    }
+    
   try {
     console.log(`Fetching competition information for national team ${teamId}`);
     
@@ -1305,9 +1305,9 @@ exports.getNextMatch = functions.https.onRequest(async (req, res) => {
   const teamId = req.query.id;
   if (!teamId) {
     res.status(400).json({ error: 'Missing team ID parameter' });
-    return;
-  }
-
+      return;
+    }
+    
   try {
     console.log(`Fetching next match for team ${teamId}`);
     
@@ -1380,7 +1380,7 @@ exports.getNationalTeamNextMatch = functions.https.onRequest(async (req, res) =>
     console.log(`Fetching next match for national team ${teamId}`);
     
     // Get future matches for this national team
-    const today = new Date();
+      const today = new Date();
     const dateFrom = today.toISOString().split('T')[0]; // Today in YYYY-MM-DD
     
     // Get date 1 year from now (national teams play less often)
@@ -1455,7 +1455,7 @@ exports.getUpcomingMatches = functions.https.onRequest(async (req, res) => {
       headers: {
         'X-Auth-Token': API_KEY,
       },
-      params: {
+            params: {
         dateFrom: dateFrom,
         dateTo: dateToString,
         status: 'SCHEDULED'
@@ -1487,8 +1487,8 @@ exports.getUpcomingMatches = functions.https.onRequest(async (req, res) => {
       
       // Sort by date (ascending)
       matchesArray.sort((a, b) => new Date(a.date) - new Date(b.date));
-      
-      res.status(200).json({
+    
+    res.status(200).json({
         success: true,
         dateFrom: dateFrom,
         dateTo: dateToString,
@@ -1542,13 +1542,13 @@ exports.getMatchesForDateRange = functions.https.onRequest(async (req, res) => {
         dateFrom: dateFrom,
         dateTo: dateTo,
       }
-    });
-    
-    if (response.status === 200) {
+        });
+        
+        if (response.status === 200) {
       const matches = response.data.matches || [];
       
       // Organize matches by date for easier lookup
-      const matchesByDate = {};
+    const matchesByDate = {};
       
       matches.forEach(match => {
         // Extract date from match.utcDate (format: YYYY-MM-DD)
@@ -1563,8 +1563,8 @@ exports.getMatchesForDateRange = functions.https.onRequest(async (req, res) => {
       
       res.status(200).json({
         success: true,
-        dateFrom: dateFrom,
-        dateTo: dateTo,
+      dateFrom: dateFrom,
+      dateTo: dateTo,
         totalMatchCount: matches.length,
         matchesByDate: matchesByDate
       });
@@ -1603,7 +1603,7 @@ exports.searchMatches = functions.https.onRequest(async (req, res) => {
       try {
         const url = `${BASE_URL}/competitions/${competitionId}/matches`;
         console.log(`[searchMatches] Fetching from URL: ${url}`);
-        const response = await axios.get(url, {
+    const response = await axios.get(url, {
           headers: {
             'X-Auth-Token': API_KEY,
           },
@@ -1710,7 +1710,7 @@ exports.searchTeams = functions.https.onRequest(async (req, res) => {
         return [];
       }
     });
-
+    
     const teamsSets = await Promise.all(teamsPromises);
     let allTeams = teamsSets.flat();
     console.log(`[searchTeams] Total teams fetched before filtering: ${allTeams.length}`);
@@ -1732,7 +1732,7 @@ exports.searchTeams = functions.https.onRequest(async (req, res) => {
       const teamName = team?.name?.toLowerCase() || '';
       const shortName = team?.shortName?.toLowerCase() || '';
       const tla = team?.tla?.toLowerCase() || '';
-      
+    
       return teamName.includes(searchQuery) || 
              shortName.includes(searchQuery) || 
              tla.includes(searchQuery);

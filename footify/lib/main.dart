@@ -35,6 +35,7 @@ import 'dashboard.dart';
 import 'popup_demo.dart';
 import 'package:footify/team_details.dart';
 import 'dart:async'; // Import Timer
+import 'package:intl/intl.dart';
 
 // A simple in-memory image cache
 class ImageCache {
@@ -399,11 +400,15 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
   // Update getProxiedImageUrl to manage the caching mechanism
   String getProxiedImageUrl(String? originalUrl) {
     if (originalUrl == null || originalUrl.isEmpty) return '';
+    
+    // Handle the case where the URL is already a proxy URL
+    if (originalUrl.contains('proxyImage?url=')) return originalUrl;
+    
+    // For web, use proxy for all images to avoid CORS issues
     if (kIsWeb) {
-      // Proxy through Firebase function for web
       return 'https://us-central1-footify-13da4.cloudfunctions.net/proxyImage?url=${Uri.encodeComponent(originalUrl)}';
     }
-    // Use direct URL for mobile
+    
     return originalUrl;
   }
 
@@ -826,10 +831,16 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
         return StatefulBuilder(
           builder: (context, setState) {
             return Card(
-              margin: const EdgeInsets.only(bottom: 20),
-              elevation: 4,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1D1D1D) : Colors.white,
+              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              elevation: 3,
+              color: isDarkMode ? const Color(0xFF292929) : Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(
+                  color: isDarkMode ? Colors.black26 : Colors.grey.withOpacity(0.2),
+                  width: 0.5,
+                ),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -981,7 +992,19 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => MatchDetailsPage(matchData: match),
+                builder: (context) => MatchDetailsPage(matchData: {
+                  'id': match['id'],
+                  'homeTeam': {'name': match['homeTeam'], 'id': match['homeTeamId']},
+                  'awayTeam': {'name': match['awayTeam'], 'id': match['awayTeamId']},
+                  'status': match['status'],
+                  'score': match['score'],
+                  'competition': {
+                    'name': match['competition'],
+                    'id': match['competitionId'],
+                    'emblem': match['competitionEmblem'],
+                  },
+                  'utcDate': match['date'],
+                }),
               ),
             );
           },
@@ -1335,18 +1358,75 @@ class CustomSearchDelegate extends SearchDelegate {
     
     // Make sure we have all required fields
     final String type = item['type'] as String? ?? '';
-    if (type != 'team' && type != 'competition') {
-      return; // Only save teams and competitions/leagues
+    if (type != 'team' && type != 'competition' && type != 'match') {
+      return; // Only save teams, competitions/leagues and matches
     }
     
     // Create a simplified version to store in history
-    final Map<String, dynamic> historyItem = {
+    final Map<String, dynamic> historyItem;
+    
+    if (type == 'match') {
+      // Process match data - handle the structure properly
+      // The method is called from two places: _navigateToHistoryItem and onTap, with different data structures
+      // So we need to handle both cases
+      
+      final String homeTeamName = item['homeTeam'] is Map ? 
+        item['homeTeam']['name'] : 
+        item['homeTeam'];
+        
+      final String awayTeamName = item['awayTeam'] is Map ? 
+        item['awayTeam']['name'] : 
+        item['awayTeam'];
+        
+      final homeTeamId = item['homeTeam'] is Map ? 
+        item['homeTeam']['id'] : 
+        item['homeTeamId'];
+        
+      final awayTeamId = item['awayTeam'] is Map ? 
+        item['awayTeam']['id'] : 
+        item['awayTeamId'];
+        
+      final homeTeamEmblem = item['homeTeam'] is Map ? 
+        item['homeTeam']['emblem'] ?? item['homeTeam']['crest'] : 
+        item['homeTeamLogo'];
+        
+      final awayTeamEmblem = item['awayTeam'] is Map ? 
+        item['awayTeam']['emblem'] ?? item['awayTeam']['crest'] : 
+        item['awayTeamLogo'];
+        
+      final competitionName = item['competition'] is Map ? 
+        item['competition']['name'] : 
+        item['competition'];
+        
+      historyItem = {
+        'id': item['id'],
+        'type': 'match',
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+        'homeTeam': homeTeamName,
+        'awayTeam': awayTeamName,
+        'homeTeamId': homeTeamId,
+        'awayTeamId': awayTeamId,
+        'homeTeamLogo': homeTeamEmblem ?? '',
+        'awayTeamLogo': awayTeamEmblem ?? '',
+        'homeTeamShortName': item['homeTeamShortName'] ?? homeTeamName,
+        'awayTeamShortName': item['awayTeamShortName'] ?? awayTeamName,
+        'competition': competitionName ?? 'Unknown Competition',
+        'competitionId': item['competition'] is Map ? item['competition']['id'] : item['competitionId'],
+        'competitionEmblem': item['competition'] is Map ? item['competition']['emblem'] : item['competitionEmblem'],
+        'status': item['status'] ?? 'SCHEDULED',
+        'date': item['utcDate'] ?? item['date'],
+        'score': item['score'],
+      };
+    } else {
+      // Process team or competition data
+      historyItem = {
       'id': item['id'],
       'name': item['name'],
       'emblem': item['emblem'],
       'type': type,
       'timestamp': DateTime.now().millisecondsSinceEpoch,
     };
+    }
     
     // Remove if exists (to reorder)
     _searchHistoryItems.removeWhere((existing) => 
@@ -1630,7 +1710,7 @@ class CustomSearchDelegate extends SearchDelegate {
                 Icon(
                   Icons.history,
                   size: 20,
-                  color: colorScheme.primary,
+                  color: const Color(0xFFFFE6AC), // Use the app's yellow accent color
                 ),
                 const SizedBox(width: 8),
                 Text(
@@ -1638,7 +1718,8 @@ class CustomSearchDelegate extends SearchDelegate {
                   style: TextStyle(
                     color: isDarkMode ? Colors.white : Colors.black,
                     fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Lexend',
                   ),
                 ),
                 const Spacer(),
@@ -1651,7 +1732,7 @@ class CustomSearchDelegate extends SearchDelegate {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: colorScheme.surfaceVariant.withOpacity(0.5),
+                      color: isDarkMode ? const Color(0xFF292929) : Colors.grey[200],
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
@@ -1668,6 +1749,7 @@ class CustomSearchDelegate extends SearchDelegate {
                           style: TextStyle(
                             color: isDarkMode ? Colors.white70 : Colors.black54,
                             fontSize: 12,
+                            fontFamily: 'Lexend',
                           ),
                         ),
                       ],
@@ -1678,107 +1760,319 @@ class CustomSearchDelegate extends SearchDelegate {
             ),
           ),
           
-          // Build the history grid
+          // Build the history grid with improved UI
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12.0),
-              child: GridView.builder(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  childAspectRatio: 2.0,
-                  crossAxisSpacing: 10,
-                  mainAxisSpacing: 10,
-                ),
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
                 itemCount: _searchHistoryItems.length,
                 itemBuilder: (context, index) {
                   final historyItem = _searchHistoryItems[index];
-                  final bool isTeam = historyItem['type'] == 'team';
+                final String type = historyItem['type'];
+                
+                // If it's a match, use a match card design
+                if (type == 'match') {
+                  // Get status and date from history item
+                  final matchStatus = historyItem['status'] ?? 'SCHEDULED';
+                  DateTime matchDate;
+                  try {
+                    matchDate = DateTime.parse(historyItem['date'] ?? '');
+                  } catch (e) {
+                    matchDate = DateTime.now().add(const Duration(days: 1));
+                  }
+                  
+                  // Format date
+                  final formattedDate = DateFormat('MMM d, yyyy').format(matchDate);
+                  final formattedTime = DateFormat('HH:mm').format(matchDate);
+                  
+                  // Get score information
+                  var homeScore, awayScore;
+                  if (historyItem.containsKey('score') && historyItem['score'] != null) {
+                    if (historyItem['score'].containsKey('fullTime') && historyItem['score']['fullTime'] != null) {
+                      homeScore = historyItem['score']['fullTime']['home'];
+                      awayScore = historyItem['score']['fullTime']['away'];
+                    }
+                  }
+                  
+                  final hasScore = homeScore != null && awayScore != null;
+                  final scoreText = hasScore ? '$homeScore - $awayScore' : 'vs';
                   
                   return Card(
-                    elevation: 2,
+                    elevation: 3,
+                    margin: const EdgeInsets.only(bottom: 8), // Reduced from 12
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
-                      side: BorderSide(
-                        color: colorScheme.surfaceVariant.withOpacity(0.2),
-                        width: 0.5,
                       ),
-                    ),
+                    color: isDarkMode ? const Color(0xFF292929) : Colors.white,
                     child: InkWell(
                       borderRadius: BorderRadius.circular(16),
-                      onTap: () {
-                        _navigateToHistoryItem(context, historyItem);
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.all(8.0),
+                      onTap: () => _navigateToHistoryItem(context, historyItem),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(12.0), // Reduced from 16.0
                         child: Row(
                           children: [
-                            // Team/League logo
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: colorScheme.surfaceVariant.withOpacity(0.3),
-                                shape: BoxShape.circle,
-                              ),
-                              child: historyItem['emblem'] != null && historyItem['emblem'].isNotEmpty
-                                ? ClipOval(
-                                    child: CachedNetworkImage(
-                                      imageUrl: getProxiedImageUrl(historyItem['emblem']),
-                                      fit: BoxFit.cover,
-                                      width: 40,
-                                      height: 40,
-                                      placeholder: (context, url) => Icon(
-                                        isTeam ? Icons.group : Icons.emoji_events,
-                                        size: 20,
-                                        color: colorScheme.onSurfaceVariant,
+                                Expanded(
+                                  child: Text(
+                                    'Match',
+                                    style: const TextStyle(
+                                      fontSize: 16, // Reduced from 18
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                if (historyItem['competitionEmblem'] != null && historyItem['competitionEmblem'].isNotEmpty)
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: Image.network(
+                                      football_api.FootballApiService.getProxyImageUrl(historyItem['competitionEmblem']),
+                                      width: 20, // Reduced from 24
+                                      height: 20, // Reduced from 24
+                                      fit: BoxFit.contain,
+                                      errorBuilder: (context, error, stackTrace) => Icon(
+                                        Icons.emoji_events,
+                                        size: 20, // Reduced from 24
                                       ),
-                                      errorWidget: (context, url, error) => Icon(
-                                        isTeam ? Icons.group : Icons.emoji_events,
-                                        size: 20,
-                                        color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                const SizedBox(width: 8), // Reduced from 10
+                                Text(
+                                  historyItem['competition'] ?? 'Unknown Competition',
+                                  style: TextStyle(
+                                    color: const Color(0xFFFFE6AC),
+                                    fontSize: 12, // Reduced from 14
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0), // Reduced from 20.0, 12.0
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                // Home team column
+                                Column(
+                                  children: [
+                                    historyItem['homeTeam']['emblem'] != null && historyItem['homeTeam']['emblem'].isNotEmpty
+                                      ? ClipRRect(
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: Image.network(
+                                            football_api.FootballApiService.getProxyImageUrl(historyItem['homeTeam']['emblem']),
+                                            width: 60, // Reduced from 70
+                                            height: 60, // Reduced from 70
+                                            fit: BoxFit.contain,
+                                            errorBuilder: (context, error, stackTrace) => Container(
+                                              width: 60, // Reduced from 70
+                                              height: 60, // Reduced from 70
+                                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                                color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: const Icon(Icons.sports_soccer, size: 30), // Reduced from 35
+                                            ),
+                                          ),
+                                        )
+                                      : Container(
+                                          width: 60, // Reduced from 70
+                                          height: 60, // Reduced from 70
+                                          alignment: Alignment.center,
+                                          decoration: BoxDecoration(
+                                            color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: const Icon(Icons.sports_soccer, size: 30), // Reduced from 35
+                                        ),
+                                    const SizedBox(height: 8), // Reduced from 12
+                                    SizedBox(
+                                      width: 100, // Reduced from 110
+                                      child: Text(
+                                        historyItem['homeTeamShortName'] ?? (historyItem['homeTeam'] is Map ? 
+                                            historyItem['homeTeam']['name'] : historyItem['homeTeam']) ?? '',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14, // Reduced from 15
+                                        ),
+                                        textAlign: TextAlign.center,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                // Score/status column
+                                Column(
+                                  children: [
+                                    // Status/Score display
+                                    _buildMatchHistoryStatus(context, matchStatus, hasScore, homeScore, awayScore),
+                                    const SizedBox(height: 8), // Reduced from 12
+                                    // Date/Time display
+                                    _buildMatchHistoryDateTime(context, matchStatus, formattedDate, formattedTime, isDarkMode),
+                                  ],
+                                ),
+                                // Away team column
+                                Column(
+                                  children: [
+                                    historyItem['awayTeam']['emblem'] != null && historyItem['awayTeam']['emblem'].isNotEmpty
+                                      ? ClipRRect(
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: Image.network(
+                                            football_api.FootballApiService.getProxyImageUrl(historyItem['awayTeam']['emblem']),
+                                            width: 60, // Reduced from 70
+                                            height: 60, // Reduced from 70
+                                            fit: BoxFit.contain,
+                                            errorBuilder: (context, error, stackTrace) => Container(
+                                              width: 60, // Reduced from 70
+                                              height: 60, // Reduced from 70
+                                              alignment: Alignment.center,
+                                              decoration: BoxDecoration(
+                                                color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: const Icon(Icons.sports_soccer, size: 30), // Reduced from 35
                                       ),
                                     ),
                                   )
-                                : Icon(
-                                    isTeam ? Icons.group : Icons.emoji_events,
-                                    size: 20,
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
+                                      : Container(
+                                          width: 60, // Reduced from 70
+                                          height: 60, // Reduced from 70
+                                          alignment: Alignment.center,
+                                          decoration: BoxDecoration(
+                                            color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: const Icon(Icons.sports_soccer, size: 30), // Reduced from 35
+                                        ),
+                                    const SizedBox(height: 8), // Reduced from 12
+                                    SizedBox(
+                                      width: 100, // Reduced from 110
+                                      child: Text(
+                                        historyItem['awayTeamShortName'] ?? (historyItem['awayTeam'] is Map ? 
+                                            historyItem['awayTeam']['name'] : historyItem['awayTeam']) ?? '',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14, // Reduced from 15
+                                        ),
+                                        textAlign: TextAlign.center,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 8),
+                          ),
+                          const SizedBox(height: 8), // Reduced from 12
+                        ],
+                      ),
+                    ),
+                  );
+                }
+                
+                // For teams and competitions, use a simpler card
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  elevation: 3,
+                  color: isDarkMode ? const Color(0xFF292929) : Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () => _navigateToHistoryItem(context, historyItem),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(12.0),
+                          child: Row(
+                            children: [
+                              // Team/League logo without circle background
+                              if (historyItem['emblem'] != null && historyItem['emblem'].isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 16.0),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: Image.network(
+                                      kIsWeb
+                                        ? 'https://us-central1-footify-13da4.cloudfunctions.net/proxyImage?url=${Uri.encodeComponent(historyItem['emblem'])}'
+                                        : historyItem['emblem'],
+                                      fit: BoxFit.contain,
+                                      width: 36,
+                                      height: 36,
+                                      errorBuilder: (context, error, stackTrace) => Icon(
+                                        type == 'team' ? Icons.group : Icons.emoji_events,
+                                        size: 36,
+                                        color: isDarkMode ? Colors.white60 : Colors.black45,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              else
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 16.0),
+                                  child: Icon(
+                                    type == 'team' ? Icons.group : Icons.emoji_events,
+                                    size: 36,
+                                    color: isDarkMode ? Colors.white60 : Colors.black45,
+                                  ),
+                                ),
+                              
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Text(
                                     historyItem['name'],
                                     style: TextStyle(
                                       color: isDarkMode ? Colors.white : Colors.black,
-                                      fontSize: 13,
+                                        fontSize: 16,
                                       fontWeight: FontWeight.bold,
+                                        fontFamily: 'Lexend',
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
-                                  Text(
-                                    isTeam ? 'Team' : 'League',
+                                    const SizedBox(height: 4),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: type == 'team' 
+                                          ? const Color(0xFFFFE6AC).withOpacity(0.2)
+                                          : Colors.green.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        type == 'team' ? 'Team' : 'League',
                                     style: TextStyle(
-                                      color: isTeam ? Colors.blue : Colors.green,
-                                      fontSize: 11,
+                                          color: type == 'team' ? const Color(0xFFFFE6AC) : Colors.green,
+                                          fontSize: 12,
                                       fontWeight: FontWeight.w500,
+                                          fontFamily: 'Lexend',
+                                        ),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                          ],
+                              
+                              Icon(
+                                Icons.arrow_forward_ios,
+                                size: 14,
+                                color: isDarkMode ? Colors.white60 : Colors.black45,
+                              ),
+                            ],
+                          ),
                         ),
+                      ],
                       ),
                     ),
                   );
                 },
-              ),
             ),
           ),
         ],
@@ -1793,7 +2087,7 @@ class CustomSearchDelegate extends SearchDelegate {
           Icon(
             Icons.search,
             size: 48,
-            color: colorScheme.primary.withOpacity(0.7),
+            color: const Color(0xFFFFE6AC),
           ),
           const SizedBox(height: 16),
           Text(
@@ -1801,6 +2095,7 @@ class CustomSearchDelegate extends SearchDelegate {
             style: TextStyle(
               color: isDarkMode ? Colors.white70 : Colors.black54,
               fontSize: 16,
+              fontFamily: 'Lexend',
             ),
             textAlign: TextAlign.center,
           ),
@@ -1812,11 +2107,12 @@ class CustomSearchDelegate extends SearchDelegate {
   // Helper method to navigate based on history item type
   void _navigateToHistoryItem(BuildContext context, Map<String, dynamic> historyItem) {
     final String type = historyItem['type'];
-    final String id = historyItem['id'].toString();
-    final String name = historyItem['name'];
     
     switch (type) {
       case 'team':
+        final String id = historyItem['id'].toString();
+        final String name = historyItem['name'];
+        
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -1829,19 +2125,45 @@ class CustomSearchDelegate extends SearchDelegate {
         break;
       case 'competition':
         // For now, set this as search query and show results
-        query = name;
+        query = historyItem['name'];
         showResults(context);
+        break;
+      case 'match':
+        // Navigate to match details
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MatchDetailsPage(matchData: {
+              'id': int.tryParse(historyItem['id'].toString()) ?? 0,
+              'homeTeam': {
+                'name': historyItem['homeTeam'],
+                'id': historyItem['homeTeamId'] != null ? int.tryParse(historyItem['homeTeamId'].toString()) ?? 0 : 0,
+                'crest': historyItem['homeTeamLogo'] ?? '',
+              },
+              'awayTeam': {
+                'name': historyItem['awayTeam'],
+                'id': historyItem['awayTeamId'] != null ? int.tryParse(historyItem['awayTeamId'].toString()) ?? 0 : 0,
+                'crest': historyItem['awayTeamLogo'] ?? '',
+              },
+              'status': historyItem['status'],
+              'score': historyItem['score'],
+              'competition': {
+                'name': historyItem['competition'],
+                'id': historyItem['competitionId'] != null ? int.tryParse(historyItem['competitionId'].toString()) ?? 0 : 0,
+                'emblem': historyItem['competitionEmblem'],
+              },
+              'utcDate': historyItem['date'] ?? historyItem['utcDate'],
+            }),
+          ),
+        );
         break;
     }
   }
 
   // Helper method to get proxied image URL for logos
   String getProxiedImageUrl(String? originalUrl) {
-    if (originalUrl == null || originalUrl.isEmpty) return '';
-    if (kIsWeb) {
-      return 'https://us-central1-footify-13da4.cloudfunctions.net/proxyImage?url=${Uri.encodeComponent(originalUrl)}';
-    }
-    return originalUrl;
+    // Use the centralized method from the FootballApiService
+    return football_api.FootballApiService.getProxyImageUrl(originalUrl);
   }
 
   // Helper method to show minimum characters message
@@ -1901,6 +2223,345 @@ class CustomSearchDelegate extends SearchDelegate {
   // Helper method to build a search result item with an improved UI
   Widget _buildSearchResultItem(BuildContext context, Map<String, dynamic> item, bool isDarkMode, ColorScheme colorScheme) {
     final itemType = item['type'] as String;
+
+    // Get appropriate icon based on item type
+    IconData getItemTypeIcon() {
+      switch (itemType) {
+        case 'team':
+          return Icons.group;
+        case 'match':
+          return Icons.sports_soccer;
+        case 'competition':
+          return Icons.emoji_events;
+        default:
+          return Icons.search;
+      }
+    }
+
+    // Get the item's emblem or logo
+    Widget getItemLogo() {
+      // Choose the right logo based on item type
+      String? logoUrl;
+      
+      if (itemType == 'match') {
+        // For matches, use the competition emblem if available
+        logoUrl = item['competitionEmblem'];
+      } else {
+        // For teams and competitions, use the emblem
+        logoUrl = item['emblem'];
+      }
+      
+      if (logoUrl != null && logoUrl.isNotEmpty) {
+        final String proxyUrl = football_api.FootballApiService.getProxyImageUrl(logoUrl);
+        print('Loading logo: $logoUrl via $proxyUrl');
+          
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.network(
+            proxyUrl,
+          width: 40,
+          height: 40,
+          fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) {
+              print('Error loading logo: $error for URL: $proxyUrl');
+              return Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+                  color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              getItemTypeIcon(),
+              color: colorScheme.onSurfaceVariant,
+              size: 20,
+            ),
+              );
+            },
+          ),
+        );
+      } else {
+        // Fallback icon inside a colored container
+        return Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            getItemTypeIcon(),
+            color: colorScheme.onSurfaceVariant,
+            size: 20,
+          ),
+        );
+      }
+    }
+
+    // For match items, show additional team logos
+    Widget? getTeamLogos() {
+      if (itemType != 'match') return null;
+      
+      // Debug print item structure
+      print('Match Item: ${jsonEncode(item)}');
+      
+      // Home team logo processing
+      final String? homeTeamLogo = item['homeTeamLogo'];
+      final String homeProxyUrl = football_api.FootballApiService.getProxyImageUrl(homeTeamLogo);
+      print('Home Team Logo: $homeTeamLogo, Proxy URL: $homeProxyUrl');
+        
+      // Away team logo processing
+      final String? awayTeamLogo = item['awayTeamLogo'];
+      final String awayProxyUrl = football_api.FootballApiService.getProxyImageUrl(awayTeamLogo);
+      print('Away Team Logo: $awayTeamLogo, Proxy URL: $awayProxyUrl');
+      
+      // Get score information if available
+      var homeScore, awayScore;
+      if (item.containsKey('score') && item['score'] != null) {
+        if (item['score'].containsKey('fullTime') && item['score']['fullTime'] != null) {
+          homeScore = item['score']['fullTime']['home'];
+          awayScore = item['score']['fullTime']['away'];
+        }
+      }
+      final hasScore = homeScore != null && awayScore != null;
+      final matchStatus = item['status']?.toString().toUpperCase() ?? '';
+      final scoreText = hasScore ? '$homeScore - $awayScore' : 'vs';
+      
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+            // Home Team
+            Column(
+              children: [
+                homeTeamLogo != null && homeTeamLogo.isNotEmpty
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: Image.network(
+                        homeProxyUrl,
+                        width: 48,
+                        height: 48,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) {
+                          print('Error loading home team logo: $error, URL: $homeTeamLogo, Proxy: $homeProxyUrl');
+                          return Container(
+                            width: 48,
+                            height: 48,
+                            alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                              color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Icon(Icons.sports_soccer, size: 24, color: colorScheme.onSurfaceVariant),
+                          );
+                        },
+                      ),
+                    )
+                  : Container(
+                      width: 48,
+                      height: 48,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Icon(Icons.sports_soccer, size: 24, color: colorScheme.onSurfaceVariant),
+                    ),
+                const SizedBox(height: 6),
+                SizedBox(
+                  width: 70,
+                  child: Text(
+                    item['homeTeamShortName'] ?? item['homeTeam'] ?? '',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      fontFamily: 'Lexend',
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            
+            // Match Status/Score
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (['IN_PLAY', 'LIVE'].contains(matchStatus))
+                  Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                          color: Colors.red,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                        child: const Text(
+                          'LIVE',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Lexend',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+          Text(
+                        scoreText,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                          fontFamily: 'Lexend',
+                          color: Color(0xFFFFE6AC),
+                        ),
+                      ),
+                    ],
+                  )
+                else if (['PAUSED', 'HALF_TIME'].contains(matchStatus))
+                  Column(
+                    children: [
+                      Text(
+                        'HT',
+            style: TextStyle(
+                          color: isDarkMode ? Colors.yellow : Colors.orange,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10,
+                          fontFamily: 'Lexend',
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        scoreText,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                          fontFamily: 'Lexend',
+                          color: Color(0xFFFFE6AC),
+                        ),
+                      ),
+                    ],
+                  )
+                else if (['FINISHED', 'FT'].contains(matchStatus))
+                  Column(
+                    children: [
+                      Text(
+                        'FT',
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10,
+                          fontFamily: 'Lexend',
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        scoreText,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                          fontFamily: 'Lexend',
+                          color: Color(0xFFFFE6AC),
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                      color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'vs',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        fontFamily: 'Lexend',
+                        color: Color(0xFFFFE6AC),
+                      ),
+                    ),
+                  ),
+                
+                const SizedBox(height: 6),
+                
+                // Date/Time
+                if (item['date'] != null)
+                  Text(
+                    _formatMatchDateTime(item['date']),
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white70 : Colors.black54,
+                      fontSize: 10,
+                      fontFamily: 'Lexend',
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+              ],
+            ),
+            
+            // Away Team
+            Column(
+              children: [
+                awayTeamLogo != null && awayTeamLogo.isNotEmpty
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: Image.network(
+                        awayProxyUrl,
+                        width: 48,
+                        height: 48,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) {
+                          print('Error loading away team logo: $error, URL: $awayTeamLogo, Proxy: $awayProxyUrl');
+                          return Container(
+                            width: 48,
+                            height: 48,
+                            alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                              color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                              borderRadius: BorderRadius.circular(6),
+                      ),
+                            child: Icon(Icons.sports_soccer, size: 24, color: colorScheme.onSurfaceVariant),
+                          );
+                        },
+                    ),
+                  )
+                : Container(
+                      width: 48,
+                      height: 48,
+                      alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                        color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Icon(Icons.sports_soccer, size: 24, color: colorScheme.onSurfaceVariant),
+                    ),
+                const SizedBox(height: 6),
+                SizedBox(
+                  width: 70,
+                  child: Text(
+                    item['awayTeamShortName'] ?? item['awayTeam'] ?? '',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      fontFamily: 'Lexend',
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+          ),
+        ],
+            ),
+          ],
+        ),
+      );
+    }
     
     // Navigate based on item type
     void onTap() {
@@ -1923,19 +2584,32 @@ class CustomSearchDelegate extends SearchDelegate {
           );
           break;
         case 'match':
-          // For matches, we need the full match data
-          // Use a placeholder implementation that will be filled in later
+          // Add to search history - call directly with the current item
+          addToHistory(item);
+          
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => MatchDetailsPage(matchData: {
-                'id': item['id'],
-                'homeTeam': {'name': item['homeTeam']},
-                'awayTeam': {'name': item['awayTeam']},
+                'id': int.tryParse(item['id'].toString()) ?? 0,
+                'homeTeam': {
+                  'name': item['homeTeam'],
+                  'id': item['homeTeamId'] != null ? int.tryParse(item['homeTeamId'].toString()) ?? 0 : 0,
+                  'crest': item['homeTeamLogo'] ?? '',
+                },
+                'awayTeam': {
+                  'name': item['awayTeam'],
+                  'id': item['awayTeamId'] != null ? int.tryParse(item['awayTeamId'].toString()) ?? 0 : 0,
+                  'crest': item['awayTeamLogo'] ?? '',
+                },
                 'status': item['status'],
                 'score': item['score'],
-                'competition': {'name': item['competition']},
-                'utcDate': item['date'],
+                'competition': {
+                  'name': item['competition'],
+                  'id': item['competitionId'] != null ? int.tryParse(item['competitionId'].toString()) ?? 0 : 0,
+                  'emblem': item['competitionEmblem'],
+                },
+                'utcDate': item['date'] ?? item['utcDate'],
               }),
             ),
           );
@@ -1956,286 +2630,193 @@ class CustomSearchDelegate extends SearchDelegate {
       }
     }
 
-    // Get proper image URL
-    String getProxiedImageUrl(String? originalUrl) {
-      if (originalUrl == null || originalUrl.isEmpty) return '';
-      if (kIsWeb) {
-        return 'https://us-central1-footify-13da4.cloudfunctions.net/proxyImage?url=${Uri.encodeComponent(originalUrl)}';
-      }
-      return originalUrl;
-    }
-
-    // Get appropriate icon based on item type
-    IconData getItemTypeIcon() {
-      switch (itemType) {
-        case 'team':
-          return Icons.group;
-        case 'match':
-          return Icons.sports_soccer;
-        case 'competition':
-          return Icons.emoji_events;
-        default:
-          return Icons.search;
-      }
-    }
-
-    // Get the item's emblem or logo
-    Widget getItemLogo() {
-      final String? emblem = item['emblem'];
-      if (emblem != null && emblem.isNotEmpty) {
-        return CachedNetworkImage(
-          imageUrl: getProxiedImageUrl(emblem),
-          width: 40,
-          height: 40,
-          fit: BoxFit.contain,
-          placeholder: (context, url) => Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceVariant,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              getItemTypeIcon(),
-              color: colorScheme.onSurfaceVariant,
-              size: 20,
-            ),
-          ),
-          errorWidget: (context, url, error) => Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceVariant,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              getItemTypeIcon(),
-              color: colorScheme.onSurfaceVariant,
-              size: 20,
-            ),
-          ),
-        );
-      } else {
-        // Fallback icon inside a colored container
-        return Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceVariant,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            getItemTypeIcon(),
-            color: colorScheme.onSurfaceVariant,
-            size: 20,
-          ),
-        );
-      }
-    }
-
-    // For match items, show additional team logos
-    Widget? getTeamLogos() {
-      if (itemType != 'match') return null;
-      
-      return Row(
-        children: [
-          const SizedBox(width: 40), // Offset to align with content
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: item['homeTeamLogo'] != null && item['homeTeamLogo'].isNotEmpty
-                ? CachedNetworkImage(
-                    imageUrl: getProxiedImageUrl(item['homeTeamLogo']),
-                    width: 24,
-                    height: 24,
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceVariant,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Icon(Icons.sports_soccer, size: 12, color: colorScheme.onSurfaceVariant),
-                    ),
-                    errorWidget: (context, url, error) => Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceVariant,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Icon(Icons.sports_soccer, size: 12, color: colorScheme.onSurfaceVariant),
-                    ),
-                  )
-                : Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceVariant,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Icon(Icons.sports_soccer, size: 12, color: colorScheme.onSurfaceVariant),
-                  ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            'vs',
-            style: TextStyle(
-              color: isDarkMode ? Colors.white70 : Colors.black54,
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(width: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: item['awayTeamLogo'] != null && item['awayTeamLogo'].isNotEmpty
-                ? CachedNetworkImage(
-                    imageUrl: getProxiedImageUrl(item['awayTeamLogo']),
-                    width: 24,
-                    height: 24,
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceVariant,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Icon(Icons.sports_soccer, size: 12, color: colorScheme.onSurfaceVariant),
-                    ),
-                    errorWidget: (context, url, error) => Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceVariant,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Icon(Icons.sports_soccer, size: 12, color: colorScheme.onSurfaceVariant),
-                    ),
-                  )
-                : Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceVariant,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Icon(Icons.sports_soccer, size: 12, color: colorScheme.onSurfaceVariant),
-                  ),
-          ),
-        ],
-      );
-    }
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      elevation: 1,
-      color: isDarkMode ? const Color(0xFF292929) : Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: colorScheme.surfaceVariant.withOpacity(0.2),
-          width: 0.5,
+    return itemType != 'match' ? 
+      // For teams and competitions, use the exact same card structure as in search history
+      Card(
+        margin: const EdgeInsets.only(bottom: 12, left: 16, right: 16),
+        elevation: 3,
+        color: isDarkMode ? const Color(0xFF292929) : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
         ),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  getItemLogo(),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: colorScheme.primary.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                itemType.toUpperCase(),
-                                style: TextStyle(
-                                  color: colorScheme.primary,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            if (itemType == 'match' && item['status'] != null)
-                              Container(
-                                margin: const EdgeInsets.only(left: 6),
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: _getStatusColor(item['status'], isDarkMode),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  _getStatusText(item['status']),
-                                  style: TextStyle(
-                                    color: isDarkMode ? Colors.black : Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          item['name'],
-                          style: TextStyle(
-                            color: isDarkMode ? Colors.white : Colors.black,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Row(
+              children: [
+                // Team or competition logo
+                Padding(
+                  padding: const EdgeInsets.only(right: 16.0),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: Image.network(
+                      football_api.FootballApiService.getProxyImageUrl(item['emblem'] ?? ''),
+                      width: 36, 
+                      height: 36,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          width: 36,
+                          height: 36,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                            borderRadius: BorderRadius.circular(4),
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        if (itemType == 'match')
-                          Text(
-                            '${item['homeTeam']} vs ${item['awayTeam']}',
-                            style: TextStyle(
-                              color: isDarkMode ? Colors.white70 : Colors.black54,
-                              fontSize: 14,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          child: Icon(
+                            itemType == 'team' ? Icons.group : Icons.emoji_events,
+                            size: 24,
+                            color: colorScheme.onSurfaceVariant,
                           ),
-                        if (itemType == 'match' && item['competition'] != null)
-                          Text(
-                            item['competition'],
-                            style: TextStyle(
-                              color: isDarkMode ? Colors.white60 : Colors.black45,
-                              fontSize: 12,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                      ],
+                        );
+                      },
                     ),
                   ),
-                ],
-              ),
-              if (itemType == 'match')
-                Padding(
-                  padding: const EdgeInsets.only(top: 8.0),
-                  child: getTeamLogos() ?? const SizedBox.shrink(),
                 ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        item['name'] ?? '',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          fontFamily: 'Lexend',
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: itemType == 'team' 
+                            ? const Color(0xFFFFE6AC).withOpacity(0.2)
+                            : Colors.green.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          itemType == 'team' ? 'Team' : 'League',
+                          style: TextStyle(
+                            color: itemType == 'team' ? const Color(0xFFFFE6AC) : Colors.green,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            fontFamily: 'Lexend',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  size: 14,
+                  color: isDarkMode ? Colors.white60 : Colors.black45,
+                ),
+              ],
+            ),
+          ),
+        ),
+      )
+      : Card(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        elevation: 3,
+        color: isDarkMode ? const Color(0xFF292929) : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: isDarkMode ? Colors.black26 : Colors.grey.withOpacity(0.2),
+            width: 0.5,
+          ),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header with competition info
+              Padding(
+                padding: const EdgeInsets.all(10.0),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFE6AC).withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'MATCH',
+                        style: const TextStyle(
+                          color: Color(0xFFFFE6AC),
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    if (item['status'] != null)
+                      Container(
+                        margin: const EdgeInsets.only(left: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: _getStatusColor(item['status'], isDarkMode),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          _getStatusText(item['status']),
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.black : Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Lexend',
+                          ),
+                        ),
+                      ),
+                    const Spacer(),
+                    if (item['competitionEmblem'] != null && item['competitionEmblem'].isNotEmpty)
+                      Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: Image.network(
+                              football_api.FootballApiService.getProxyImageUrl(item['competitionEmblem']),
+                              width: 24,
+                              height: 24,
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) {
+                                print('Error loading competition emblem: $error');
+                                return const Icon(Icons.emoji_events, size: 24);
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            item['competition'] ?? 'Unknown',
+                            style: const TextStyle(
+                              color: Color(0xFFFFE6AC),
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Lexend',
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+              
+              // Match content
+              getTeamLogos() ?? const SizedBox.shrink()
             ],
           ),
         ),
-      ),
-    );
+      );
   }
 
   // Helper method to get status color
@@ -2304,6 +2885,11 @@ class CustomSearchDelegate extends SearchDelegate {
       print("[_searchData] Calling searchMatches for '$query'...");
       final matches = await football_api.FootballApiService.searchMatches(query);
       print("[_searchData] Found ${matches.length} matches for '$query'.");
+      
+      // Debug print for match data structure to troubleshoot logo issue
+      if (matches.isNotEmpty) {
+        print('Match structure from API: ${jsonEncode(matches[0])}');
+      }
 
       // Create the results lists separately to apply different sorting logic
       final teamResults = teams.map((t) => {
@@ -2331,11 +2917,15 @@ class CustomSearchDelegate extends SearchDelegate {
           : '${m['homeTeam']} vs ${m['awayTeam']}',
         'homeTeam': m['homeTeam'] ?? 'N/A',
         'awayTeam': m['awayTeam'] ?? 'N/A',
+        'homeTeamShortName': m['homeTeamShortName'] ?? m['homeTeam'] ?? 'N/A',
+        'awayTeamShortName': m['awayTeamShortName'] ?? m['awayTeam'] ?? 'N/A',
         'homeTeamId': m['homeTeamId'],
         'awayTeamId': m['awayTeamId'],
         'homeTeamLogo': m['homeTeamLogo'],
         'awayTeamLogo': m['awayTeamLogo'],
         'competition': m['competition'] ?? 'N/A',
+        'competitionId': m['competitionId'],
+        'competitionEmblem': m['competitionEmblem'],
         'date': m['date'],
         'status': m['status'],
         'score': m['score'],
@@ -2498,6 +3088,175 @@ class CustomSearchDelegate extends SearchDelegate {
     _debounce?.cancel(); // Important: cancel timer on dispose
     super.dispose();
   }
+
+  // Add a helper method to format match date/time
+  String _formatMatchDateTime(String? utcDate) {
+    if (utcDate == null) return 'Date unknown';
+    
+    try {
+      final date = DateTime.parse(utcDate);
+      final now = DateTime.now();
+      final difference = date.difference(now).inDays;
+      
+      // Format the date part
+      String datePart;
+      if (difference == 0) {
+        datePart = 'Today';
+      } else if (difference == 1) {
+        datePart = 'Tomorrow';
+      } else if (difference == -1) {
+        datePart = 'Yesterday';
+      } else {
+        // Format as day name + date
+        final formatter = DateFormat('EEE, MMM d');
+        datePart = formatter.format(date);
+      }
+      
+      // Format the time part
+      final timeFormatter = DateFormat('HH:mm');
+      final timePart = timeFormatter.format(date.toLocal());
+      
+      return '$datePart at $timePart';
+    } catch (e) {
+      return 'Date unknown';
+    }
+  }
+
+  // Helper for Match History Card: Status/Score Display
+  Widget _buildMatchHistoryStatus(BuildContext context, String matchStatus, bool hasScore, dynamic homeScore, dynamic awayScore) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    switch (matchStatus.toUpperCase()) {
+      case 'IN_PLAY':
+      case 'LIVE':
+        return Column(
+          children: [
+            Text(
+              'LIVE',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 10),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              hasScore ? '$homeScore - $awayScore' : '- : -', 
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+          ],
+        );
+      case 'PAUSED':
+      case 'HALF_TIME':
+        return Column(
+          children: [
+            Text(
+              'HT',
+              style: TextStyle(color: isDarkMode ? Colors.yellow : Colors.orange, fontWeight: FontWeight.bold, fontSize: 10),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              hasScore ? '$homeScore - $awayScore' : '- : -', 
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+          ],
+        );
+      case 'FINISHED':
+      case 'FT':
+        return Column(
+          children: [
+            Text(
+              'FT',
+              style: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[600], fontWeight: FontWeight.bold, fontSize: 10),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              hasScore ? '$homeScore - $awayScore' : '- : -', 
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+          ],
+        );
+      default: // SCHEDULED, TIMED, POSTPONED, etc.
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            'vs',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+        );
+    }
+  }
+
+  // Helper for Match History Card: Date/Time Display
+  Widget _buildMatchHistoryDateTime(BuildContext context, String matchStatus, String formattedDate, String formattedTime, bool isDarkMode) {
+    TextStyle defaultStyle = TextStyle(
+      color: isDarkMode ? Colors.white70 : Colors.black54,
+      fontSize: 10,
+    );
+    TextStyle boldStyle = defaultStyle.copyWith(fontWeight: FontWeight.bold);
+
+    // Show date/time only for scheduled/default cases
+    switch(matchStatus.toUpperCase()) {
+      case 'TIMED':
+      case 'SCHEDULED':
+        return Column(
+          children: [
+            Text(formattedDate, style: defaultStyle),
+            Text(formattedTime, style: boldStyle),
+          ],
+        );
+      case 'POSTPONED':
+        return Text(
+          'PST',
+          style: TextStyle(color: Colors.grey, fontSize: 10)
+        );
+      case 'SUSPENDED':
+        return Text(
+          'SUS',
+          style: TextStyle(color: Colors.orange, fontSize: 10)
+        );
+      case 'CANCELLED':
+        return Text(
+          'CAN',
+          style: TextStyle(color: Colors.red, fontSize: 10)
+        );
+      default: // Hide date/time for ongoing/finished matches
+        return const SizedBox.shrink();
+    }
+  }
+
+  // Format match date/time - keeping a different name to avoid duplication
+  String _formatMatchDateTimeAlt(String? dateStr) {
+    if (dateStr == null || dateStr.isEmpty) {
+      return 'Unknown date';
+    }
+    
+    try {
+      final date = DateTime.parse(dateStr);
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final tomorrow = today.add(const Duration(days: 1));
+      final yesterday = today.subtract(const Duration(days: 1));
+      final matchDate = DateTime(date.year, date.month, date.day);
+      
+      String dateText;
+      if (matchDate == today) {
+        dateText = 'Today';
+      } else if (matchDate == tomorrow) {
+        dateText = 'Tomorrow';
+      } else if (matchDate == yesterday) {
+        dateText = 'Yesterday';
+      } else {
+        // Format like "Mar 15, 2023"
+        dateText = DateFormat('MMM d, yyyy').format(date);
+      }
+      
+      // Add time: "Today, 15:00"
+      return '$dateText, ${DateFormat('HH:mm').format(date)}';
+    } catch (e) {
+      return 'Invalid date';
+    }
+  }
 }
 
 // A clean loading screen with just a pulsating SVG logo
@@ -2581,4 +3340,162 @@ class _LoadingScreenState extends State<LoadingScreen> with SingleTickerProvider
       ),
     );
   }
+}
+
+// Add these helper methods at the end of the CustomSearchDelegate class
+
+// Helper method to build team logo
+Widget _buildTeamLogo(String? emblemUrl, double size, bool isDarkMode, ColorScheme colorScheme) {
+  if (emblemUrl == null || emblemUrl.isEmpty) {
+    return Icon(
+      Icons.sports_soccer,
+      size: size,
+      color: isDarkMode ? Colors.white60 : Colors.black45,
+    );
+  }
+
+  // Use the same proxy approach as the dashboard
+  final String proxyUrl = kIsWeb
+      ? 'https://us-central1-footify-13da4.cloudfunctions.net/proxyImage?url=${Uri.encodeComponent(emblemUrl)}'
+      : emblemUrl;
+  
+  // Use direct Image.network for reliability
+  return ClipRRect(
+    borderRadius: BorderRadius.circular(4),
+    child: Image.network(
+      proxyUrl,
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      errorBuilder: (context, error, stackTrace) => Icon(
+        Icons.sports_soccer,
+        size: size,
+        color: colorScheme.onSurfaceVariant,
+      ),
+    ),
+  );
+}
+
+// Local proxy URL helper
+String _getProxyUrl(String? originalUrl) {
+  if (originalUrl == null || originalUrl.isEmpty) {
+    return '';
+  }
+  
+  // Match the app's standard implementation
+  if (kIsWeb) {
+    // Proxy through Firebase function for web
+    return 'https://us-central1-footify-13da4.cloudfunctions.net/proxyImage?url=${Uri.encodeComponent(originalUrl)}';
+  }
+  // Use direct URL for mobile
+  return originalUrl;
+}
+
+// Helper method to get short team name
+String _getShortTeamName(Map<String, dynamic> team) {
+  // First try to use shortName if it exists
+  final shortName = team['shortName'];
+  if (shortName != null && shortName is String && shortName.isNotEmpty) {
+    return shortName;
+  }
+  
+  // Otherwise use team name and truncate if needed
+  final name = team['name'] as String;
+  
+  // If name is longer than 12 chars, try to create shortened version
+  if (name.length > 12) {
+    // Try to split on common words and abbreviate
+    if (name.contains(' FC')) {
+      return name.replaceAll(' FC', '');
+    } else if (name.contains(' CF')) {
+      return name.replaceAll(' CF', '');
+    } else if (name.contains('United')) {
+      return name.replaceAll('United', 'Utd');
+    } else if (name.contains('Manchester')) {
+      return name.replaceAll('Manchester', 'Man');
+    } else if (name.contains('City')) {
+      return name.replaceAll('City', 'C');
+    } else {
+      // Return first 10 chars with ellipsis
+      return name.length > 10 ? '${name.substring(0, 10)}…' : name;
+    }
+  }
+  
+  return name;
+}
+
+// Helper method to add a item to search history
+void addToHistory(Map<String, dynamic> item) async {
+  final prefs = await SharedPreferences.getInstance();
+  final String type = item['type'];
+  List<String> history = prefs.getStringList('search_history') ?? [];
+  
+  // Debug print to track what we're adding
+  print('Adding to history: ${json.encode(item)}');
+  
+  // Convert the item to a simple map for storage
+  Map<String, dynamic> historyItem;
+  
+  if (type == 'match') {
+    // For match items, store necessary info
+    historyItem = {
+      'id': item['id'],
+      'type': 'match',
+      'name': item['name'],
+      'homeTeam': {
+        'name': item['homeTeam'],
+        'emblem': item['homeTeamLogo'] ?? '',
+      },
+      'awayTeam': {
+        'name': item['awayTeam'],
+        'emblem': item['awayTeamLogo'] ?? '',
+      },
+      'homeTeamShortName': item['homeTeamShortName'] ?? item['homeTeam'],
+      'awayTeamShortName': item['awayTeamShortName'] ?? item['awayTeam'],
+      'homeTeamId': item['homeTeamId'] ?? '',
+      'awayTeamId': item['awayTeamId'] ?? '',
+      'date': item['date'] ?? item['utcDate'],
+      'status': item['status'],
+      'score': item['score'],
+      'competition': item['competition'],
+      'competitionId': item['competitionId'] ?? '',
+      'competitionEmblem': item['competitionEmblem'] ?? '',
+    };
+  } else {
+    // For team and competition items
+    historyItem = {
+      'id': item['id'],
+      'type': type,
+      'name': item['name'],
+      'emblem': item['emblem'] ?? '',
+    };
+  }
+  
+  final String itemJson = jsonEncode(historyItem);
+  
+  // Check if the item is already in history
+  final existingIndex = history.indexWhere((element) {
+    try {
+      final decoded = jsonDecode(element);
+      return decoded['id'].toString() == item['id'].toString() && decoded['type'] == type;
+    } catch (e) {
+      return false;
+    }
+  });
+  
+  // If found, remove it so we can add it to the top
+  if (existingIndex != -1) {
+    history.removeAt(existingIndex);
+  }
+  
+  // Add to the beginning of the list
+  history.insert(0, itemJson);
+  
+  // Limit to 20 items
+  if (history.length > 20) {
+    history = history.sublist(0, 20);
+  }
+  
+  // Save back to SharedPreferences
+  await prefs.setStringList('search_history', history);
 }

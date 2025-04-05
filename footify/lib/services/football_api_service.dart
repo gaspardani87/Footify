@@ -188,7 +188,22 @@ class FootballApiService {
   }
 
   // Get proxied image URL
-  static String getProxyImageUrl(String originalUrl) {
+  static String getProxyImageUrl(String? originalUrl) {
+    // Handle null or empty URL
+    if (originalUrl == null || originalUrl.isEmpty) {
+      return '';
+    }
+    
+    // Handle already proxied URLs to avoid double proxying
+    if (originalUrl.contains('proxyImage?url=')) {
+      return originalUrl;
+    }
+    
+    // Handle data URLs (don't proxy these)
+    if (originalUrl.startsWith('data:')) {
+      return originalUrl;
+    }
+    
     _checkInitialized();
     return '$baseUrl/proxyImage?url=${Uri.encodeComponent(originalUrl)}';
   }
@@ -794,16 +809,27 @@ class FootballApiService {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is List) {
-          return data.map((match) => {
-            'id': match['id'],
-            'name': '${match['homeTeam']['name']} vs ${match['awayTeam']['name']}',
-            'homeTeam': match['homeTeam']['name'],
-            'awayTeam': match['awayTeam']['name'],
-            'competition': match['competition']['name'],
-            'date': match['utcDate'],
-            'status': match['status'],
-            'score': match['score'],
-            'type': 'match',
+          return data.map((match) {
+            // Get team info including logos
+            return {
+              'id': match['id'],
+              'name': '${match['homeTeam']['name']} vs ${match['awayTeam']['name']}',
+              'homeTeam': match['homeTeam']['name'],
+              'awayTeam': match['awayTeam']['name'],
+              'homeTeamShortName': match['homeTeam']['shortName'] ?? match['homeTeam']['tla'] ?? match['homeTeam']['name'],
+              'awayTeamShortName': match['awayTeam']['shortName'] ?? match['awayTeam']['tla'] ?? match['awayTeam']['name'],
+              'homeTeamId': match['homeTeam']['id'],
+              'awayTeamId': match['awayTeam']['id'],
+              'homeTeamLogo': match['homeTeam']['crest'] ?? '',
+              'awayTeamLogo': match['awayTeam']['crest'] ?? '',
+              'competition': match['competition']['name'],
+              'competitionId': match['competition']['id'],
+              'competitionEmblem': match['competition']['emblem'] ?? '',
+              'date': match['utcDate'],
+              'status': match['status'],
+              'score': match['score'],
+              'type': 'match',
+            };
           }).toList();
         }
         return [];
