@@ -1797,176 +1797,320 @@ class CustomSearchDelegate extends SearchDelegate {
                   final scoreText = hasScore ? '$homeScore - $awayScore' : 'vs';
                   
                   return Card(
+                    margin: const EdgeInsets.symmetric(vertical: 8),
                     elevation: 3,
-                    margin: const EdgeInsets.only(bottom: 8), // Reduced from 12
+                    color: isDarkMode ? const Color(0xFF292929) : Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(
+                        color: isDarkMode ? Colors.black26 : Colors.grey.withOpacity(0.2),
+                        width: 0.5,
                       ),
-                    color: isDarkMode ? const Color(0xFF292929) : Colors.white,
+                    ),
                     child: InkWell(
                       borderRadius: BorderRadius.circular(16),
                       onTap: () => _navigateToHistoryItem(context, historyItem),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          // Header with competition info
                           Padding(
-                            padding: const EdgeInsets.all(12.0), // Reduced from 16.0
-                        child: Row(
-                          children: [
-                                Expanded(
+                            padding: const EdgeInsets.all(10.0),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFE6AC).withOpacity(0.3),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
                                   child: Text(
-                                    'Match',
+                                    'MATCH',
                                     style: const TextStyle(
-                                      fontSize: 16, // Reduced from 18
+                                      color: Color(0xFFFFE6AC),
+                                      fontSize: 10,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
                                 ),
-                                if (historyItem['competitionEmblem'] != null && historyItem['competitionEmblem'].isNotEmpty)
-                                  ClipRRect(
+                                Container(
+                                  margin: const EdgeInsets.only(left: 6),
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: _getStatusColor(matchStatus, isDarkMode),
                                     borderRadius: BorderRadius.circular(4),
-                                    child: Image.network(
-                                      football_api.FootballApiService.getProxyImageUrl(historyItem['competitionEmblem']),
-                                      width: 20, // Reduced from 24
-                                      height: 20, // Reduced from 24
-                                      fit: BoxFit.contain,
-                                      errorBuilder: (context, error, stackTrace) => Icon(
-                                        Icons.emoji_events,
-                                        size: 20, // Reduced from 24
-                                      ),
+                                  ),
+                                  child: Text(
+                                    _getStatusText(matchStatus),
+                                    style: TextStyle(
+                                      color: isDarkMode ? Colors.black : Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'Lexend',
                                     ),
                                   ),
-                                const SizedBox(width: 8), // Reduced from 10
-                                Text(
-                                  historyItem['competition'] ?? 'Unknown Competition',
-                                  style: TextStyle(
-                                    color: const Color(0xFFFFE6AC),
-                                    fontSize: 12, // Reduced from 14
-                                    fontWeight: FontWeight.bold,
-                                  ),
                                 ),
+                                const Spacer(),
+                                if (historyItem['competitionEmblem'] != null && historyItem['competitionEmblem'].isNotEmpty)
+                                  Row(
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(4),
+                                        child: Image.network(
+                                          football_api.FootballApiService.getProxyImageUrl(historyItem['competitionEmblem']),
+                                          width: 24,
+                                          height: 24,
+                                          fit: BoxFit.contain,
+                                          errorBuilder: (context, error, stackTrace) {
+                                            print('Error loading competition emblem: $error');
+                                            return const Icon(Icons.emoji_events, size: 24);
+                                          },
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        historyItem['competition'] ?? 'Unknown',
+                                        style: const TextStyle(
+                                          color: Color(0xFFFFE6AC),
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          fontFamily: 'Lexend',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                               ],
                             ),
                           ),
+                          
+                          // Match content - Teams and Score
                           Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0), // Reduced from 20.0, 12.0
-                            child: Row(
+                            padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
+                        child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                // Home team column
+                          children: [
+                                // Home Team
                                 Column(
                                   children: [
-                                    historyItem['homeTeam']['emblem'] != null && historyItem['homeTeam']['emblem'].isNotEmpty
+                                    historyItem['homeTeamLogo'] != null && historyItem['homeTeamLogo'].isNotEmpty
                                       ? ClipRRect(
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius: BorderRadius.circular(6),
                                           child: Image.network(
-                                            football_api.FootballApiService.getProxyImageUrl(historyItem['homeTeam']['emblem']),
-                                            width: 60, // Reduced from 70
-                                            height: 60, // Reduced from 70
+                                            football_api.FootballApiService.getProxyImageUrl(historyItem['homeTeamLogo']),
+                                            width: 48,
+                                            height: 48,
                                             fit: BoxFit.contain,
-                                            errorBuilder: (context, error, stackTrace) => Container(
-                                              width: 60, // Reduced from 70
-                                              height: 60, // Reduced from 70
-                                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                                color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                                                borderRadius: BorderRadius.circular(8),
-                                              ),
-                                              child: const Icon(Icons.sports_soccer, size: 30), // Reduced from 35
-                                            ),
+                                            errorBuilder: (context, error, stackTrace) {
+                                              return Container(
+                                                width: 48, 
+                                                height: 48,
+                                                alignment: Alignment.center,
+                                                decoration: BoxDecoration(
+                                                  color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: Icon(Icons.sports_soccer, size: 24, color: colorScheme.onSurfaceVariant),
+                                              );
+                                            },
                                           ),
                                         )
                                       : Container(
-                                          width: 60, // Reduced from 70
-                                          height: 60, // Reduced from 70
+                                          width: 48,
+                                          height: 48,
                                           alignment: Alignment.center,
                                           decoration: BoxDecoration(
                                             color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                                            borderRadius: BorderRadius.circular(8),
+                                            borderRadius: BorderRadius.circular(6),
                                           ),
-                                          child: const Icon(Icons.sports_soccer, size: 30), // Reduced from 35
+                                          child: Icon(Icons.sports_soccer, size: 24, color: colorScheme.onSurfaceVariant),
                                         ),
-                                    const SizedBox(height: 8), // Reduced from 12
+                                    const SizedBox(height: 6),
                                     SizedBox(
-                                      width: 100, // Reduced from 110
+                                      width: 70,
                                       child: Text(
-                                        historyItem['homeTeamShortName'] ?? (historyItem['homeTeam'] is Map ? 
-                                            historyItem['homeTeam']['name'] : historyItem['homeTeam']) ?? '',
-                                        style: const TextStyle(
+                                        historyItem['homeTeamShortName'] ?? historyItem['homeTeam'] ?? '',
+                                        style: TextStyle(
                                           fontWeight: FontWeight.bold,
-                                          fontSize: 14, // Reduced from 15
+                                          fontSize: 12,
+                                          fontFamily: 'Lexend',
+                                          color: isDarkMode ? Colors.white : Colors.black,
                                         ),
                                         textAlign: TextAlign.center,
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
+                                    if (matchStatus == 'IN_PLAY' || matchStatus == 'PAUSED')
+                                      Text(
+                                        '⚽',
+                                        style: TextStyle(
+                                          color: isDarkMode ? Colors.white70 : Colors.black54,
+                                          fontSize: 10,
+                                          fontFamily: 'Lexend',
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
                                   ],
                                 ),
-                                // Score/status column
+                                
+                                // Center - Score/Status
                                 Column(
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    // Status/Score display
-                                    _buildMatchHistoryStatus(context, matchStatus, hasScore, homeScore, awayScore),
-                                    const SizedBox(height: 8), // Reduced from 12
-                                    // Date/Time display
-                                    _buildMatchHistoryDateTime(context, matchStatus, formattedDate, formattedTime, isDarkMode),
+                                    if (hasScore || matchStatus == 'IN_PLAY' || matchStatus == 'PAUSED' || matchStatus == 'FINISHED')
+                            Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                          color: matchStatus == 'IN_PLAY' || matchStatus == 'PAUSED'
+                                            ? Colors.red.withOpacity(0.1)
+                                            : (isDarkMode ? Colors.grey[800] : Colors.grey[200]),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          scoreText,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                            color: matchStatus == 'IN_PLAY' || matchStatus == 'PAUSED'
+                                              ? Colors.red
+                                              : (isDarkMode ? Colors.white : Colors.black),
+                                          ),
+                                        ),
+                                      )
+                                    else
+                                      Text(
+                                        scoreText,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                          color: isDarkMode ? Colors.white : Colors.black,
+                                        ),
+                                      ),
+                                    
+                                    const SizedBox(height: 8),
+                                    
+                                    // Date/Time info
+                                    if (matchStatus == 'TIMED' || matchStatus == 'SCHEDULED')
+                                      Column(
+                                        children: [
+                                          Text(
+                                            formattedDate,
+                                            style: TextStyle(
+                                              color: isDarkMode ? Colors.white70 : Colors.grey[700],
+                                              fontSize: 10,
+                                              fontFamily: 'Lexend',
+                                            ),
+                                          ),
+                                          Text(
+                                            formattedTime,
+                                            style: TextStyle(
+                                              color: isDarkMode ? Colors.white70 : Colors.grey[700],
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                              fontFamily: 'Lexend',
+                                            ),
+                                          ),
+                                        ],
+                                      )
+                                    else if (matchStatus == 'IN_PLAY' || matchStatus == 'PAUSED')
+                                      Text(
+                                        matchStatus == 'PAUSED' ? 'HT' : 'LIVE',
+                                        style: TextStyle(
+                                          color: Colors.red,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          fontFamily: 'Lexend',
+                                        ),
+                                      )
+                                    else if (matchStatus == 'FINISHED')
+                                      Text(
+                                        'FT',
+                                        style: TextStyle(
+                                          color: isDarkMode ? Colors.white70 : Colors.grey[700],
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          fontFamily: 'Lexend',
+                                        ),
+                                      )
+                                    else
+                                      Text(
+                                        _getStatusText(matchStatus),
+                                        style: TextStyle(
+                                          color: isDarkMode ? Colors.white70 : Colors.grey[700],
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          fontFamily: 'Lexend',
+                                        ),
+                                      ),
                                   ],
                                 ),
-                                // Away team column
+                                
+                                // Away Team
                                 Column(
                                   children: [
-                                    historyItem['awayTeam']['emblem'] != null && historyItem['awayTeam']['emblem'].isNotEmpty
+                                    historyItem['awayTeamLogo'] != null && historyItem['awayTeamLogo'].isNotEmpty
                                       ? ClipRRect(
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius: BorderRadius.circular(6),
                                           child: Image.network(
-                                            football_api.FootballApiService.getProxyImageUrl(historyItem['awayTeam']['emblem']),
-                                            width: 60, // Reduced from 70
-                                            height: 60, // Reduced from 70
+                                            football_api.FootballApiService.getProxyImageUrl(historyItem['awayTeamLogo']),
+                                            width: 48,
+                                            height: 48,
                                             fit: BoxFit.contain,
-                                            errorBuilder: (context, error, stackTrace) => Container(
-                                              width: 60, // Reduced from 70
-                                              height: 60, // Reduced from 70
-                                              alignment: Alignment.center,
-                                              decoration: BoxDecoration(
-                                                color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                                                borderRadius: BorderRadius.circular(8),
-                                              ),
-                                              child: const Icon(Icons.sports_soccer, size: 30), // Reduced from 35
-                                      ),
-                                    ),
-                                  )
+                                            errorBuilder: (context, error, stackTrace) {
+                                              return Container(
+                                                width: 48, 
+                                                height: 48,
+                                                alignment: Alignment.center,
+                                                decoration: BoxDecoration(
+                                                  color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: Icon(Icons.sports_soccer, size: 24, color: colorScheme.onSurfaceVariant),
+                                              );
+                                            },
+                                          ),
+                                        )
                                       : Container(
-                                          width: 60, // Reduced from 70
-                                          height: 60, // Reduced from 70
+                                          width: 48,
+                                          height: 48,
                                           alignment: Alignment.center,
                                           decoration: BoxDecoration(
                                             color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                                            borderRadius: BorderRadius.circular(8),
+                                            borderRadius: BorderRadius.circular(6),
                                           ),
-                                          child: const Icon(Icons.sports_soccer, size: 30), // Reduced from 35
+                                          child: Icon(Icons.sports_soccer, size: 24, color: colorScheme.onSurfaceVariant),
                                         ),
-                                    const SizedBox(height: 8), // Reduced from 12
+                                    const SizedBox(height: 6),
                                     SizedBox(
-                                      width: 100, // Reduced from 110
+                                      width: 70,
                                       child: Text(
-                                        historyItem['awayTeamShortName'] ?? (historyItem['awayTeam'] is Map ? 
-                                            historyItem['awayTeam']['name'] : historyItem['awayTeam']) ?? '',
-                                        style: const TextStyle(
+                                        historyItem['awayTeamShortName'] ?? historyItem['awayTeam'] ?? '',
+                                        style: TextStyle(
                                           fontWeight: FontWeight.bold,
-                                          fontSize: 14, // Reduced from 15
+                                          fontSize: 12,
+                                          fontFamily: 'Lexend',
+                                          color: isDarkMode ? Colors.white : Colors.black,
                                         ),
                                         textAlign: TextAlign.center,
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
+                                    if (matchStatus == 'IN_PLAY' || matchStatus == 'PAUSED')
+                                      Text(
+                                        '⚽',
+                                        style: TextStyle(
+                                          color: isDarkMode ? Colors.white70 : Colors.black54,
+                                          fontSize: 10,
+                                          fontFamily: 'Lexend',
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
                                   ],
                                 ),
                               ],
                             ),
                           ),
-                          const SizedBox(height: 8), // Reduced from 12
                         ],
                       ),
                     ),
@@ -2064,9 +2208,9 @@ class CustomSearchDelegate extends SearchDelegate {
                                 Icons.arrow_forward_ios,
                                 size: 14,
                                 color: isDarkMode ? Colors.white60 : Colors.black45,
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
+                        ),
                         ),
                       ],
                       ),
@@ -2328,7 +2472,7 @@ class CustomSearchDelegate extends SearchDelegate {
       final scoreText = hasScore ? '$homeScore - $awayScore' : 'vs';
       
       return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
+        padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -2635,17 +2779,17 @@ class CustomSearchDelegate extends SearchDelegate {
       Card(
         margin: const EdgeInsets.only(bottom: 12, left: 16, right: 16),
         elevation: 3,
-        color: isDarkMode ? const Color(0xFF292929) : Colors.white,
-        shape: RoundedRectangleBorder(
+      color: isDarkMode ? const Color(0xFF292929) : Colors.white,
+      shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-        ),
-        child: InkWell(
+      ),
+      child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(12.0),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
             child: Row(
-              children: [
+            children: [
                 // Team or competition logo
                 Padding(
                   padding: const EdgeInsets.only(right: 16.0),
@@ -2675,11 +2819,11 @@ class CustomSearchDelegate extends SearchDelegate {
                     ),
                   ),
                 ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
-                    children: [
+                      children: [
                       Text(
                         item['name'] ?? '',
                         style: TextStyle(
@@ -2724,7 +2868,7 @@ class CustomSearchDelegate extends SearchDelegate {
         ),
       )
       : Card(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         elevation: 3,
         color: isDarkMode ? const Color(0xFF292929) : Colors.white,
         shape: RoundedRectangleBorder(
@@ -2744,40 +2888,40 @@ class CustomSearchDelegate extends SearchDelegate {
               Padding(
                 padding: const EdgeInsets.all(10.0),
                 child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
                         color: const Color(0xFFFFE6AC).withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
                         'MATCH',
                         style: const TextStyle(
                           color: Color(0xFFFFE6AC),
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
                     if (item['status'] != null)
-                      Container(
-                        margin: const EdgeInsets.only(left: 6),
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: _getStatusColor(item['status'], isDarkMode),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          _getStatusText(item['status']),
-                          style: TextStyle(
-                            color: isDarkMode ? Colors.black : Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
+                              Container(
+                                margin: const EdgeInsets.only(left: 6),
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: _getStatusColor(item['status'], isDarkMode),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  _getStatusText(item['status']),
+                                  style: TextStyle(
+                                    color: isDarkMode ? Colors.black : Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
                             fontFamily: 'Lexend',
-                          ),
-                        ),
-                      ),
+                                  ),
+                                ),
+                              ),
                     const Spacer(),
                     if (item['competitionEmblem'] != null && item['competitionEmblem'].isNotEmpty)
                       Row(
@@ -2805,18 +2949,18 @@ class CustomSearchDelegate extends SearchDelegate {
                               fontFamily: 'Lexend',
                             ),
                           ),
-                        ],
-                      ),
-                  ],
-                ),
+                      ],
+                  ),
+                ],
               ),
+                ),
               
               // Match content
               getTeamLogos() ?? const SizedBox.shrink()
             ],
-          ),
         ),
-      );
+      ),
+    );
   }
 
   // Helper method to get status color
